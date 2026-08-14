@@ -1,0 +1,6 @@
+# DeepSeek Harness bundle layer. Loads the in-memory multi-tenant service into
+# the profile. Later milestones (HTTP auth, RPC authorization, tenant-aware MCP)
+# will depend on it via `inject: [multiTenant]`; this row only mounts the core.
+- insert:
+    - id: multi-tenant
+      name: dsh-multi-tenant
