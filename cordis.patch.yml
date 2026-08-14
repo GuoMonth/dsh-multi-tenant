@@ -1,6 +1,12 @@
-# DeepSeek Harness bundle layer. Loads the in-memory multi-tenant service into
-# the profile. Later milestones (HTTP auth, RPC authorization, tenant-aware MCP)
-# will depend on it via `inject: [multiTenant]`; this row only mounts the core.
+# DeepSeek Harness bundle layer. Assembles the in-memory ownership backend
+# (`ctx.tenantSessionStore`) and the multi-tenant service (`ctx.multiTenant`)
+# as two independent Cordis rows. A durable backend replaces the first row's
+# provider (same `tenantSessionStore` service name) without touching the
+# service. Row order carries no load semantics — activation is driven by
+# service availability.
 - insert:
+    - id: tenant-session-store
+      name: dsh-multi-tenant/store
+
     - id: multi-tenant
       name: dsh-multi-tenant

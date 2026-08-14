@@ -118,27 +118,32 @@ interface SessionOwner {
 }
 ```
 
-### `TenantSessionStore`
+### `TenantSessionStore` (service seam, `ctx.tenantSessionStore`)
 
-The storage seam. `claim` is **atomic** (single operation, not get-then-set) so
-a durable implementation can map it to `INSERT … ON CONFLICT`:
+The storage seam is a Cordis **Service**, not a plain interface: it is provided
+by a backend plugin and consumed by `MultiTenantService`. `claim` is **atomic**
+(single operation, not get-then-set) so a durable backend can map it to
+`INSERT … ON CONFLICT`:
 
 ```ts
 type ClaimResult = 'created' | 'idempotent' | 'conflict'
 
-interface TenantSessionStore {
+abstract class TenantSessionStore extends Service {
   claim(sessionId: string, owner: SessionOwner): Promise<ClaimResult>
   get(sessionId: string): Promise<SessionOwner | undefined>
-  release(sessionId: string): Promise<void>
 }
 ```
 
-`InMemoryTenantSessionStore` is the default implementation — a process-local
-`Map`, intended for **development/bootstrap only**, not production persistence.
+There is deliberately **no release/delete** in the v0 contract: ownership is
+claim-once and immutable. `InMemoryTenantSessionStore` is the default provider —
+a process-local `Map`, intended for **development/bootstrap only**, not
+production persistence. A future durable backend swaps the `tenantSessionStore`
+provider without touching `MultiTenantService`.
 
 ### `MultiTenantService` (`ctx.multiTenant`)
 
-All methods are async so a durable store can be adopted without a breaking change.
+Consumes `ctx.tenantSessionStore` (declared via `static inject`). All methods are
+async so a durable store can be adopted without a breaking change.
 
 | Method | Semantics |
 | --- | --- |
@@ -146,7 +151,6 @@ All methods are async so a durable store can be adopted without a breaking chang
 | `getSessionOwner(sessionId)` | Trusted-facing lookup; returns the owner or `undefined`. |
 | `canAccessSession(principal, sessionId)` | Fail-closed boolean. Same tenant + same owner → `true`; else `false`. |
 | `assertSessionAccess(principal, sessionId)` | Like above, but throws a uniform `SessionAccessDeniedError`. |
-| `releaseSession(sessionId, principal)` | Owner-only release; non-owner or unknown → denied. |
 
 Authorization semantics:
 
@@ -161,12 +165,12 @@ and never assumes UUID/numeric shapes — only opaque exact-match identity.
 
 ## Error privacy
 
-`assertSessionAccess` and `releaseSession` throw a single, non-enumerating
-`SessionAccessDeniedError` (`"Access to session denied."`). Unknown sessions and
-foreign sessions are indistinguishable, and the error never carries the owner's
-tenant or user id. Internal diagnostic reasons (`UNKNOWN_SESSION`,
-`TENANT_MISMATCH`, `USER_MISMATCH`) exist for tests/audit/observability but are
-not part of the public authorization result.
+`assertSessionAccess` throws a single, non-enumerating `SessionAccessDeniedError`
+(`"Access to session denied."`). Unknown sessions and foreign sessions are
+indistinguishable, and the error never carries the owner's tenant or user id.
+Internal diagnostic reasons (`UNKNOWN_SESSION`, `TENANT_MISMATCH`,
+`USER_MISMATCH`) exist for tests/audit/observability but are not part of the
+public authorization result.
 
 ## Security boundary
 

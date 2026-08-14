@@ -1,5 +1,5 @@
 /**
- * Core multi-tenant identity, ownership, and storage-seam types.
+ * Core multi-tenant identity, ownership, and decision types.
  *
  * Identifier semantics: `sessionId`, `tenantId`, and `userId` are all OPAQUE
  * strings. The core never parses structure out of them — no UUID or numeric-id
@@ -44,28 +44,13 @@ export interface SessionOwner {
  * Result of an atomic ownership claim.
  *
  * `claim` returns one of these; it never throws on a conflicting owner (the
- * service maps `'conflict'` to a public error). Keeping the result as a plain
- * discriminated string means a durable store can implement it without leaking
- * the existing owner back through the seam.
+ * service maps `'conflict'` to a public error). A plain discriminated string
+ * keeps the seam from leaking the existing owner back to the caller.
  */
 export type ClaimResult =
   | 'created'
   | 'idempotent'
   | 'conflict'
-
-/**
- * Storage seam for session ownership.
- *
- * `claim` MUST be atomic — a single operation, not a get-then-set — so a
- * durable implementation can map it to `INSERT … ON CONFLICT` over a unique
- * `session_id`. The service is unaware of the backing store (Map / SQL /
- * Redis) and treats it as the single source of truth for ownership.
- */
-export interface TenantSessionStore {
-  claim(sessionId: string, owner: SessionOwner): Promise<ClaimResult>
-  get(sessionId: string): Promise<SessionOwner | undefined>
-  release(sessionId: string): Promise<void>
-}
 
 /**
  * Internal diagnostic reason for an access denial.
@@ -79,8 +64,10 @@ export type AccessDenialReason =
   | 'TENANT_MISMATCH'
   | 'USER_MISMATCH'
 
-/** Internal authorization decision with an optional diagnostic reason. */
-export interface AccessDecision {
-  allowed: boolean
-  reason?: AccessDenialReason
-}
+/**
+ * Internal authorization decision, as a discriminated union: an allowed
+ * decision carries no reason, and a denial always carries one.
+ */
+export type AccessDecision =
+  | { allowed: true }
+  | { allowed: false; reason: AccessDenialReason }

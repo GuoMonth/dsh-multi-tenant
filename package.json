@@ -24,6 +24,10 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
+    "./store": {
+      "types": "./dist/store.d.mts",
+      "import": "./dist/store.mjs"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
   "files": [

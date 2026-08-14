@@ -1,9 +1,11 @@
 import { Context } from '@deepseek-ai/cordis'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  InMemoryTenantSessionStore,
   MultiTenantService,
   SessionAccessDeniedError,
   SessionOwnershipConflictError,
+  TenantSessionStore,
   ValidationError,
 } from '../src/index.ts'
 import type { AccessDecision, SessionOwner, TenantPrincipal } from '../src/types.ts'
@@ -20,6 +22,7 @@ describe('MultiTenantService', () => {
 
   beforeEach(async () => {
     ctx = new Context()
+    await ctx.plugin(InMemoryTenantSessionStore)
     await ctx.plugin(MultiTenantService)
     multiTenant = ctx.multiTenant
   })
@@ -64,9 +67,7 @@ describe('MultiTenantService', () => {
       expect(rejected[0]?.reason).toBeInstanceOf(SessionOwnershipConflictError)
       const owner = await multiTenant.getSessionOwner('s1')
       expect(owner).not.toBeUndefined()
-      const winnerIsAlice = owner?.userId === 'alice'
-      const winnerIsBob = owner?.userId === 'bob'
-      expect(winnerIsAlice || winnerIsBob).toBe(true)
+      expect(owner?.userId === 'alice' || owner?.userId === 'bob').toBe(true)
     })
   })
 
@@ -97,9 +98,7 @@ describe('MultiTenantService', () => {
 
     it('does not let any role cross the tenant boundary', async () => {
       await multiTenant.claimSession('s1', alice)
-      // tenant-admin in a DIFFERENT tenant → denied (boundary is unconditional)
       await expect(multiTenant.canAccessSession(foreignAdmin, 's1')).resolves.toBe(false)
-      // tenant-admin in the SAME tenant but different user → still denied (ownership only, no RBAC yet)
       await expect(multiTenant.canAccessSession(acmeAdmin, 's1')).resolves.toBe(false)
     })
 
@@ -122,30 +121,6 @@ describe('MultiTenantService', () => {
       expect(message).not.toContain('alice')
       expect(message).not.toContain('bob')
       expect(message).toContain('denied')
-    })
-  })
-
-  describe('release', () => {
-    it('lets the owner release', async () => {
-      await multiTenant.claimSession('s1', alice)
-      await expect(multiTenant.releaseSession('s1', alice)).resolves.toBeUndefined()
-      await expect(multiTenant.getSessionOwner('s1')).resolves.toBeUndefined()
-    })
-
-    it('denies release by a different user', async () => {
-      await multiTenant.claimSession('s1', alice)
-      await expect(multiTenant.releaseSession('s1', bob)).rejects.toThrow(SessionAccessDeniedError)
-      await expect(multiTenant.getSessionOwner('s1')).resolves.toEqual({ tenantId: 'acme', userId: 'alice' })
-    })
-
-    it('denies release by a different tenant', async () => {
-      await multiTenant.claimSession('s1', alice)
-      await expect(multiTenant.releaseSession('s1', eve)).rejects.toThrow(SessionAccessDeniedError)
-      await expect(multiTenant.getSessionOwner('s1')).resolves.toEqual({ tenantId: 'acme', userId: 'alice' })
-    })
-
-    it('denies release of an unknown session', async () => {
-      await expect(multiTenant.releaseSession('missing', alice)).rejects.toThrow(SessionAccessDeniedError)
     })
   })
 
@@ -193,6 +168,7 @@ async function captureDenial(fn: () => Promise<unknown>): Promise<Error | undefi
 describe('internal access decision (diagnostic reason)', () => {
   it('classifies unknown / tenant-mismatch / user-mismatch distinctly', async () => {
     const ctx = new Context()
+    await ctx.plugin(InMemoryTenantSessionStore)
     await ctx.plugin(InspectableMultiTenantService)
     const svc = ctx.multiTenant as InspectableMultiTenantService
     await svc.claimSession('s1', alice)
@@ -204,26 +180,34 @@ describe('internal access decision (diagnostic reason)', () => {
   })
 })
 
-describe('TenantSessionStore seam', () => {
-  it('accepts an injected store and does not assume Map backing', async () => {
-    const owners = new Map<string, SessionOwner>()
-    const store = {
-      async claim(sessionId: string, owner: SessionOwner) {
-        if (owners.has(sessionId)) return 'conflict' as const
-        owners.set(sessionId, owner)
+describe('TenantSessionStore service seam', () => {
+  it('consumes a swappable tenantSessionStore provider, not a fixed backend', async () => {
+    class RecordingStore extends TenantSessionStore {
+      readonly claims: string[] = []
+      private readonly owners = new Map<string, SessionOwner>()
+      constructor(ctx: Context) {
+        super(ctx)
+      }
+      override async claim(sessionId: string, owner: SessionOwner) {
+        this.claims.push(sessionId)
+        if (this.owners.has(sessionId)) return 'conflict' as const
+        this.owners.set(sessionId, owner)
         return 'created' as const
-      },
-      async get(sessionId: string) {
-        return owners.get(sessionId)
-      },
-      async release(sessionId: string) {
-        owners.delete(sessionId)
-      },
+      }
+      override async get(sessionId: string) {
+        return this.owners.get(sessionId)
+      }
     }
+
     const ctx = new Context()
-    const service = new MultiTenantService(ctx, store)
-    await service.claimSession('s1', alice)
-    await expect(service.getSessionOwner('s1')).resolves.toEqual({ tenantId: 'acme', userId: 'alice' })
-    await expect(service.claimSession('s1', bob)).rejects.toThrow(SessionOwnershipConflictError)
+    await ctx.plugin(RecordingStore)
+    await ctx.plugin(MultiTenantService)
+
+    await ctx.multiTenant.claimSession('s1', alice)
+    await expect(ctx.multiTenant.getSessionOwner('s1')).resolves.toEqual({ tenantId: 'acme', userId: 'alice' })
+    await expect(ctx.multiTenant.claimSession('s1', bob)).rejects.toThrow(SessionOwnershipConflictError)
+
+    const store = ctx.tenantSessionStore as RecordingStore
+    expect(store.claims).toEqual(['s1', 's1'])
   })
 })

@@ -5,35 +5,30 @@
  * own and authorize access to opaque DSH session ids through a fail-closed,
  * durable-store-compatible ownership contract.
  *
- * The service is storage-agnostic: it depends only on {@link TenantSessionStore}
- * and never inspects the backing store. Ownership is claim-once (immutable); the
- * tenant boundary is unconditional and checked before any other consideration.
+ * The service is storage-agnostic: it consumes the `tenantSessionStore` service
+ * seam (a separate Cordis Service provider) and never constructs or inspects a
+ * backend itself. Ownership is claim-once and immutable; the tenant boundary is
+ * unconditional and checked before any other consideration.
  *
  * @module dsh-multi-tenant/service
  */
 
 import { Service, type Context } from '@deepseek-ai/cordis'
 import { SessionAccessDeniedError, SessionOwnershipConflictError } from './errors.ts'
-import { InMemoryTenantSessionStore } from './store.ts'
+import type { TenantSessionStore } from './store.ts'
 import { validateSessionId, validateTenantPrincipal } from './validation.ts'
-import type {
-  AccessDecision,
-  SessionOwner,
-  TenantPrincipal,
-  TenantSessionStore,
-} from './types.ts'
+import type { AccessDecision, SessionOwner, TenantPrincipal } from './types.ts'
 
 export class MultiTenantService extends Service {
-  private readonly store: TenantSessionStore
+  /** The ownership backend is provided by a separate Cordis service. */
+  static inject = ['tenantSessionStore']
 
-  /**
-   * @param ctx — Cordis context (the service registers itself as `multiTenant`).
-   * @param store — ownership store; defaults to an in-memory bootstrap store.
-   *   Inject a durable `TenantSessionStore` for production.
-   */
-  constructor(ctx: Context, store?: TenantSessionStore) {
+  constructor(ctx: Context) {
     super(ctx, 'multiTenant')
-    this.store = store ?? new InMemoryTenantSessionStore()
+  }
+
+  private get store(): TenantSessionStore {
+    return this.ctx.tenantSessionStore
   }
 
   /**
@@ -44,8 +39,9 @@ export class MultiTenantService extends Service {
    * - Already claimed by a different tenant/user → {@link SessionOwnershipConflictError};
    *   the existing owner is never overwritten.
    *
-   * There is deliberately no reassignment API: reassigning ownership is a
-   * high-privilege admin operation that belongs to a future Admin Plane.
+   * There is deliberately no reassignment or release API: ownership is
+   * immutable, and lifecycle cleanup belongs to a future Admin/Session-lifecycle
+   * plane, not this core.
    */
   async claimSession(sessionId: string, principal: TenantPrincipal): Promise<void> {
     validateSessionId(sessionId)
@@ -83,23 +79,6 @@ export class MultiTenantService extends Service {
     if (!decision.allowed) {
       throw new SessionAccessDeniedError()
     }
-  }
-
-  /**
-   * Release ownership of `sessionId`, but only for the current owner.
-   *
-   * A non-owner (different user, different tenant, or unknown session) is
-   * denied — the same non-enumerating denial as `assertSessionAccess`. There is
-   * no unconditional "delete someone else's ownership" API.
-   */
-  async releaseSession(sessionId: string, principal: TenantPrincipal): Promise<void> {
-    validateSessionId(sessionId)
-    validateTenantPrincipal(principal)
-    const owner = await this.store.get(sessionId)
-    if (!owner || owner.tenantId !== principal.tenantId || owner.userId !== principal.userId) {
-      throw new SessionAccessDeniedError()
-    }
-    await this.store.release(sessionId)
   }
 
   /**
