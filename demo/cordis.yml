@@ -1,0 +1,8 @@
+# Minimal composition that loads dsh-multi-tenant through the real Cordis
+# Loader (not `new MultiTenantService()`), plus a fixture plugin that exercises
+# it. `../src/index.ts` resolves against the demo directory's base URL.
+- id: multi-tenant
+  name: '../src/index.ts'
+
+- id: fixture
+  name: './fixture.ts'

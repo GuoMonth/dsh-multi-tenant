@@ -20,5 +20,5 @@
     "rootDir": ".",
     "outDir": "dist/types"
   },
-  "include": ["src", "tests"]
+  "include": ["src", "tests", "demo"]
 }

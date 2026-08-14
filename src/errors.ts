@@ -1,10 +1,6 @@
 /**
  * Error types for the multi-tenant core.
  *
- * Denials are typed so callers can distinguish "this session does not exist"
- * (`UnknownSessionError`, which does not leak whether a session id is valid)
- * from "this principal may not access this session" (`SessionAccessDeniedError`).
- *
  * @module dsh-multi-tenant/errors
  */
 
@@ -16,19 +12,35 @@ export class MultiTenantError extends Error {
   }
 }
 
-/** Thrown when a session id has no recorded owner. */
-export class UnknownSessionError extends MultiTenantError {
-  constructor(readonly sessionId: string) {
-    super(`Session "${sessionId}" has no recorded tenant owner`)
+/**
+ * Public authorization denial.
+ *
+ * Deliberately uniform and non-enumerating: the message carries no session
+ * existence, no owner tenant/user, and no internal reason. Unknown sessions,
+ * tenant mismatches, and user mismatches all surface as this same error, so the
+ * public API cannot be used to probe session existence or ownership.
+ */
+export class SessionAccessDeniedError extends MultiTenantError {
+  constructor() {
+    super('Access to session denied.')
   }
 }
 
-/** Thrown when a principal is denied access to a session it may not use. */
-export class SessionAccessDeniedError extends MultiTenantError {
-  constructor(
-    readonly sessionId: string,
-    readonly reason?: string,
-  ) {
-    super(`Access to session "${sessionId}" denied${reason ? `: ${reason}` : ''}`)
+/**
+ * Claim conflict: the session is already owned by another principal.
+ *
+ * The message does not reveal the existing owner's identity. This is thrown by
+ * `claimSession` (a server-side operation), not by the authorization path.
+ */
+export class SessionOwnershipConflictError extends MultiTenantError {
+  constructor() {
+    super('Session is already owned.')
+  }
+}
+
+/** Invalid principal / session input rejected at a runtime boundary. */
+export class ValidationError extends MultiTenantError {
+  constructor(message: string) {
+    super(message)
   }
 }

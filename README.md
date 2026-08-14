@@ -4,24 +4,52 @@ Multi-tenant SaaS extension for DeepSeek Harness (DSH): tenant identity,
 session ownership, authorization boundaries, tenant-aware MCP, and audit.
 
 > **Status: early development / architecture bootstrap.** This repository
-> establishes the plugin skeleton and the multi-tenant *core abstractions*. It
-> is **not** yet a production security boundary — see
-> [Security boundary](#security-boundary).
+> implements the multi-tenant **core contract** only. It is **not** a complete
+> SaaS security solution — see [What this core is not](#what-this-core-is-not).
 
 ---
 
-## What this is
+## What this core does
 
-`dsh-multi-tenant` is a [Cordis](https://github.com/cordiverse/cordis) plugin
-for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) that
-provides a single service, `ctx.multiTenant`, which owns the mapping between
-DSH sessions and the tenant/user that may access them. The goal is to let one
-shared Harness runtime host many tenants with **logical isolation** — without
-forking Harness and without patching `node_modules`.
+Given an authenticated `TenantPrincipal`, `dsh-multi-tenant` owns and authorizes
+access to opaque DSH session ids through a fail-closed, durable-store-compatible
+ownership contract.
 
-This first milestone ships only the core: identity types, session ownership,
-and fail-closed authorization. Everything else is on the
-[roadmap](#roadmap).
+Concretely, it provides a single Cordis service, `ctx.multiTenant`, that:
+
+- **abstracts the authenticated principal** (`TenantPrincipal`),
+- **owns sessions** with claim-once, immutable ownership,
+- **enforces the tenant boundary** unconditionally (no role crosses it),
+- **authorizes fail-closed** (unknown and foreign sessions are both denied),
+- **defines a storage seam** (`TenantSessionStore`) so ownership persistence can
+  move to a durable store without a breaking API change.
+
+## What this core is not
+
+- ❌ Authentication / HTTP transport (no JWT, cookies, web login)
+- ❌ Transport authorization / WebSocket filtering / `events.mux` / `events.host`
+- ❌ MCP client or tenant-aware MCP credential pooling
+- ❌ Downstream data isolation / ERP token
+- ❌ Audit persistence
+- ❌ UI / billing / dashboards
+- ❌ An RBAC / role-policy framework
+
+These are all on the [roadmap](#roadmap). The core is the middle of the future
+chain:
+
+```text
+Authenticated Transport
+        ↓
+TenantPrincipal
+        ↓
+dsh-multi-tenant Core          ← this repository (Principal + Ownership + Authorization)
+        ↓
+Session ACL
+        ↓
+Tenant-aware MCP / business credentials
+        ↓
+Downstream tenant validation
+```
 
 ## Architecture
 
@@ -53,19 +81,16 @@ Audit / usage store
 
 - **Shared runtime, logical isolation** — one Harness process, many tenants,
   separated by authorization rather than by process or fork.
-- **Fail closed** — unknown sessions and unauthenticated identities are denied
-  by default.
-- **Identity is server-derived** — a `TenantPrincipal` comes from the
-  authenticated request boundary, never from a client-supplied field.
-- **Explicit session ownership** — every session has one recorded owner; access
-  requires matching that owner (or a future elevated role).
+- **Fail closed** — unknown sessions and unauthenticated identities are denied.
+- **Identity is server-derived** — `TenantPrincipal` comes from the
+  authenticated boundary, never from a client-supplied field.
+- **Claim-once ownership** — a session's owner is immutable; a conflicting
+  claim is denied, never overwritten.
 - **Streams are authorization surfaces** — sessions, RPC, and tool/MCP streams
-  are each an authorization boundary, not just the HTTP entry point.
-- **Tenant-aware tool execution** — tool and MCP access is scoped per tenant.
-- **Defense in depth** — this plugin is one layer; it does not replace the
+  are each a boundary, not just the HTTP entry point.
+- **Defense in depth** — this core is one layer; it does not replace the
   authenticated boundary or downstream tenant validation.
-- **Prefer plugins over forks** — build on DSH's public plugin/service/event
-  seams; do not fork Harness.
+- **Prefer plugins over forks** — build on DSH's public plugin/service seams.
 
 ## Install
 
@@ -73,42 +98,12 @@ Audit / usage store
 dsh plugin --profile web add github:GuoMonth/dsh-multi-tenant
 ```
 
-This installs the package and, because it declares
-[`dsh.bundle`](./package.json), appends its patch layer to the profile. The
-bundle inserts one Cordis row that mounts this service.
-
-> A git install fetches sources, not built artifacts, so the package ships a
-> `prepare` script that builds `dist/` after install. pnpm ≥10 requires the
-> build to be allow-listed the first time — copy the exact package key pnpm
-> prints into the profile's `pnpm-workspace.yaml` under `allowBuilds`, then
-> re-run the `add`.
-
-## Usage
-
-```ts
-import { Context } from '@deepseek-ai/cordis'
-import MultiTenantService, { type TenantPrincipal } from 'dsh-multi-tenant'
-
-const ctx = new Context()
-await ctx.plugin(MultiTenantService)
-
-const principal: TenantPrincipal = {
-  tenantId: 'acme',
-  userId: 'alice',
-  roles: ['member'],
-}
-
-ctx.multiTenant.bindSession('session-42', principal)
-
-ctx.multiTenant.canAccessSession(principal, 'session-42') // true
-ctx.multiTenant.assertSessionAccess(principal, 'session-42') // ok
-
-ctx.multiTenant.unbindSession('session-42')
-```
+The package declares [`dsh.bundle`](./package.json), so this appends its patch
+layer to the profile and mounts `ctx.multiTenant`.
 
 ## Core API
 
-### `TenantPrincipal`
+### Types
 
 ```ts
 interface TenantPrincipal {
@@ -116,87 +111,93 @@ interface TenantPrincipal {
   userId: string
   roles: readonly string[]
 }
-```
 
-### `SessionOwner`
-
-```ts
 interface SessionOwner {
   tenantId: string
   userId: string
 }
 ```
 
-### `MultiTenantService` (provided as `ctx.multiTenant`)
+### `TenantSessionStore`
 
-| Method | Description |
+The storage seam. `claim` is **atomic** (single operation, not get-then-set) so
+a durable implementation can map it to `INSERT … ON CONFLICT`:
+
+```ts
+type ClaimResult = 'created' | 'idempotent' | 'conflict'
+
+interface TenantSessionStore {
+  claim(sessionId: string, owner: SessionOwner): Promise<ClaimResult>
+  get(sessionId: string): Promise<SessionOwner | undefined>
+  release(sessionId: string): Promise<void>
+}
+```
+
+`InMemoryTenantSessionStore` is the default implementation — a process-local
+`Map`, intended for **development/bootstrap only**, not production persistence.
+
+### `MultiTenantService` (`ctx.multiTenant`)
+
+All methods are async so a durable store can be adopted without a breaking change.
+
+| Method | Semantics |
 | --- | --- |
-| `bindSession(sessionId, principal)` | Record the owning tenant/user for a session. |
-| `getSessionOwner(sessionId)` | Return the recorded owner, or `undefined`. |
-| `canAccessSession(principal, sessionId)` | Fail-closed boolean authorization. |
-| `assertSessionAccess(principal, sessionId)` | Like `canAccessSession`, but throws. |
-| `unbindSession(sessionId)` | Forget the ownership binding. |
+| `claimSession(sessionId, principal)` | Claim-once. Unclaimed → success; same owner → idempotent; different owner → `SessionOwnershipConflictError`. |
+| `getSessionOwner(sessionId)` | Trusted-facing lookup; returns the owner or `undefined`. |
+| `canAccessSession(principal, sessionId)` | Fail-closed boolean. Same tenant + same owner → `true`; else `false`. |
+| `assertSessionAccess(principal, sessionId)` | Like above, but throws a uniform `SessionAccessDeniedError`. |
+| `releaseSession(sessionId, principal)` | Owner-only release; non-owner or unknown → denied. |
 
 Authorization semantics:
 
-- **Unknown session** → denied (`UnknownSessionError`).
-- **Tenant mismatch** → denied (`SessionAccessDeniedError`).
+- **Unknown session** → denied.
+- **Tenant mismatch** → denied (unconditional; checked before anything else).
+- **Same tenant, different user** → denied (ownership only; no RBAC yet).
 - **Same tenant, same user** → allowed.
-- **Same tenant, different user** → denied by default; the `canElevatedAccess`
-  extension point is where a future `tenant-admin` / `platform-admin` rule
-  would grant cross-user access.
-- `sessionId` is an **opaque identifier**; the service never parses a tenant id
-  out of it, and never trusts a client-provided tenant id.
 
-## Scope of this milestone
+Identifiers (`sessionId`, `tenantId`, `userId`) are **opaque**: the core never
+parses a tenant id out of a session id, never uses prefix-based authorization,
+and never assumes UUID/numeric shapes — only opaque exact-match identity.
 
-Implemented (in-memory, development bootstrap):
+## Error privacy
 
-- project skeleton matching the DSH bundle/plugin contract
-- `TenantPrincipal` / `SessionOwner`
-- `ctx.multiTenant` Cordis service
-- fail-closed core authorization
-- unit tests + bundle-contract test
-
-Explicitly **not** implemented yet:
-
-- Web HTTP authentication
-- WebSocket filtering / mux
-- API-proxy replacement
-- MCP connection pool
-- database persistence
-- UI
-- audit backend
+`assertSessionAccess` and `releaseSession` throw a single, non-enumerating
+`SessionAccessDeniedError` (`"Access to session denied."`). Unknown sessions and
+foreign sessions are indistinguishable, and the error never carries the owner's
+tenant or user id. Internal diagnostic reasons (`UNKNOWN_SESSION`,
+`TENANT_MISMATCH`, `USER_MISMATCH`) exist for tests/audit/observability but are
+not part of the public authorization result.
 
 ## Security boundary
 
 Cordis / DSH **scope** is a *composition and visibility* mechanism — service
-isolation and dependency wiring. It is **not** by itself a multi-tenant
-security boundary.
+isolation and dependency wiring. It is **not** by itself a multi-tenant security
+boundary.
 
-A production deployment must enforce isolation across multiple layers:
+A production deployment must enforce isolation across layers:
 
 ```text
 authenticated request boundary
         +
-session ACL
+session ACL                          ← this core
         +
 tenant-aware MCP / business token
         +
 downstream ERP / business API tenant validation
 ```
 
-This plugin provides the **session ACL** layer and the extension points for the
-others. Do not treat the in-memory store or the Cordis scope as the security
-perimeter.
+Do not treat the in-memory store or the Cordis scope as the security perimeter.
 
 ## Roadmap
 
 - [x] project bootstrap
-- [x] `TenantPrincipal`
-- [x] session ownership
+- [x] `TenantPrincipal` / `SessionOwner`
+- [x] claim-once session ownership
 - [x] fail-closed core authorization
-- [ ] durable `TenantSessionStore`
+- [x] `TenantSessionStore` seam (in-memory)
+- [x] runtime invariant validation
+- [x] Loader integration test
+- [ ] durable `TenantSessionStore` (PostgreSQL / MySQL / Redis / remote)
 - [ ] HTTP principal/auth integration
 - [ ] session RPC authorization
 - [ ] WebSocket mux filtering
@@ -217,7 +218,7 @@ pnpm build
 
 - `build` runs `tsdown`, emitting `dist/index.mjs` + `dist/index.d.mts`.
 - `typecheck` runs `tsc --noEmit`.
-- `test` runs the Vitest suite.
+- `test` runs unit, security, and a real Cordis Loader integration test.
 
 ## License
 

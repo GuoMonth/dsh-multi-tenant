@@ -1,0 +1,6 @@
+# pnpm 11 supply-chain / build-script policy. Committed so `pnpm install
+# --frozen-lockfile` in CI does not re-prompt for an undecided build script.
+allowBuilds:
+  # esbuild's binary ships via the platform-specific optional dependency
+  # (`@esbuild/linux-x64` etc.), so its postinstall is redundant — deny it.
+  esbuild: false

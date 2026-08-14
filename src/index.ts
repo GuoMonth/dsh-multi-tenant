@@ -1,10 +1,11 @@
 /**
  * dsh-multi-tenant — Multi-tenant SaaS extension for DeepSeek Harness (DSH).
  *
- * Exposes a single Cordis service, `ctx.multiTenant`, that owns the mapping
- * between DSH sessions and the tenant/user that may access them. This first
- * milestone is the fail-closed core; auth, RPC, MCP, and audit layers build on
- * top of it.
+ * Exposes one Cordis service, `ctx.multiTenant`, that owns session ownership
+ * and fail-closed authorization. Public surface is deliberately small: the
+ * service, the identity/ownership types, the storage seam, and the errors.
+ * Internal diagnostic types (access-denial reasons, decisions) are not
+ * re-exported.
  *
  * @module dsh-multi-tenant
  */
@@ -21,9 +22,11 @@ declare module '@deepseek-ai/cordis' {
 export { MultiTenantService }
 export default MultiTenantService
 
-export type {
-  TenantPrincipal,
-  SessionOwner,
-  MultiTenantService as MultiTenantServiceContract,
-} from './types.ts'
-export { MultiTenantError, UnknownSessionError, SessionAccessDeniedError } from './errors.ts'
+export type { TenantPrincipal, SessionOwner, TenantSessionStore, ClaimResult } from './types.ts'
+export { InMemoryTenantSessionStore } from './store.ts'
+export {
+  MultiTenantError,
+  SessionAccessDeniedError,
+  SessionOwnershipConflictError,
+  ValidationError,
+} from './errors.ts'
