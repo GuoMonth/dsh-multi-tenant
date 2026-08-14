@@ -2,13 +2,14 @@ import { Context } from '@deepseek-ai/cordis'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   InMemoryTenantSessionStore,
+  MultiTenantError,
   MultiTenantService,
   SessionAccessDeniedError,
   SessionOwnershipConflictError,
   TenantSessionStore,
   ValidationError,
 } from '../src/index.ts'
-import type { AccessDecision, SessionOwner, TenantPrincipal } from '../src/types.ts'
+import type { AccessDecision, ClaimResult, SessionOwner, TenantPrincipal } from '../src/types.ts'
 
 const alice: TenantPrincipal = { tenantId: 'acme', userId: 'alice', roles: ['member'] }
 const bob: TenantPrincipal = { tenantId: 'acme', userId: 'bob', roles: ['member'] }
@@ -209,5 +210,25 @@ describe('TenantSessionStore service seam', () => {
 
     const store = ctx.tenantSessionStore as RecordingStore
     expect(store.claims).toEqual(['s1', 's1'])
+  })
+
+  it('fails closed when the store returns an invalid claim result', async () => {
+    class InvalidStore extends TenantSessionStore {
+      constructor(ctx: Context) {
+        super(ctx)
+      }
+      override async claim(): Promise<ClaimResult> {
+        return 'bogus' as unknown as ClaimResult
+      }
+      override async get(): Promise<SessionOwner | undefined> {
+        return undefined
+      }
+    }
+
+    const ctx = new Context()
+    await ctx.plugin(InvalidStore)
+    await ctx.plugin(MultiTenantService)
+
+    await expect(ctx.multiTenant.claimSession('s1', alice)).rejects.toThrow(MultiTenantError)
   })
 })

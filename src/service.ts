@@ -14,7 +14,7 @@
  */
 
 import { Service, type Context } from '@deepseek-ai/cordis'
-import { SessionAccessDeniedError, SessionOwnershipConflictError } from './errors.ts'
+import { MultiTenantError, SessionAccessDeniedError, SessionOwnershipConflictError } from './errors.ts'
 import type { TenantSessionStore } from './store.ts'
 import { validateSessionId, validateTenantPrincipal } from './validation.ts'
 import type { AccessDecision, SessionOwner, TenantPrincipal } from './types.ts'
@@ -48,8 +48,16 @@ export class MultiTenantService extends Service {
     validateTenantPrincipal(principal)
     const owner: SessionOwner = { tenantId: principal.tenantId, userId: principal.userId }
     const result = await this.store.claim(sessionId, owner)
-    if (result === 'conflict') {
-      throw new SessionOwnershipConflictError()
+    switch (result) {
+      case 'created':
+      case 'idempotent':
+        return
+      case 'conflict':
+        throw new SessionOwnershipConflictError()
+      default:
+        // Fail closed: a store result outside the ClaimResult contract must
+        // never be treated as a successful claim.
+        throw new MultiTenantError('tenant session store returned an invalid claim result')
     }
   }
 
