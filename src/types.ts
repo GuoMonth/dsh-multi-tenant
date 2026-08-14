@@ -1,10 +1,10 @@
 /**
- * Core multi-tenant identity and authorization types.
+ * Core multi-tenant identity, ownership, and decision types.
  *
- * These are the "seam" types shared by every future layer (HTTP auth, RPC
- * authorization, MCP credential pools). They are intentionally minimal: a
- * principal is an authenticated identity, and an owner is the subset of that
- * identity recorded against a session.
+ * Identifier semantics: `sessionId`, `tenantId`, and `userId` are all OPAQUE
+ * strings. The core never parses structure out of them — no UUID or numeric-id
+ * assumptions, no `tenantId:userId` join rules, no prefix-based authorization.
+ * Identity is an exact-match on the authenticated value.
  *
  * @module dsh-multi-tenant/types
  */
@@ -12,28 +12,28 @@
 /**
  * An authenticated caller identity, established by a server-side boundary.
  *
- * A `TenantPrincipal` is **never** assembled from client-supplied fields: the
- * authenticated request boundary derives it (e.g. from a verified session
- * token or an authenticated API key) and hands it to this service. The service
- * trusts the principal it is given, but does not trust a tenant id that
- * arrives out-of-band.
+ * A `TenantPrincipal` is never assembled from client-supplied fields: the
+ * authenticated transport derives it (verified session token, authenticated
+ * API key, …) and hands it to this core. The core trusts the principal it is
+ * given but never trusts a tenant id that arrives out-of-band.
  */
 export interface TenantPrincipal {
-  /** Opaque tenant identifier. Server-derived; never parsed from a session id. */
+  /** Opaque tenant identifier. Never parsed out of a session id. */
   tenantId: string
   /** User identifier, unique within the tenant. */
   userId: string
-  /** Roles the user holds within the tenant (e.g. `member`, `tenant-admin`). */
+  /**
+   * Roles the user holds within the tenant. Present for future authorization
+   * layers; the v0 core does NOT consult roles for access — ownership only.
+   */
   roles: readonly string[]
 }
 
 /**
- * The recorded owner of a session.
+ * The recorded owner of a session — the minimal authorization binding.
  *
- * This is the minimal authorization binding: which tenant and user a session
- * belongs to. It is deliberately smaller than `TenantPrincipal` — roles are an
- * attribute of the *caller* at request time, not a property pinned to the
- * session.
+ * Deliberately smaller than `TenantPrincipal`: roles are an attribute of the
+ * *caller* at request time, not a property pinned to the session.
  */
 export interface SessionOwner {
   tenantId: string
@@ -41,22 +41,33 @@ export interface SessionOwner {
 }
 
 /**
- * Public contract of the multi-tenant service (provided as `ctx.multiTenant`).
+ * Result of an atomic ownership claim.
  *
- * The concrete implementation is `MultiTenantService` in `./service.ts`, which
- * extends Cordis `Service`. This interface exists so consumers can type
- * decorators, mocks, or a future durable `TenantSessionStore`-backed
- * implementation against the same surface.
+ * `claim` returns one of these; it never throws on a conflicting owner (the
+ * service maps `'conflict'` to a public error). A plain discriminated string
+ * keeps the seam from leaking the existing owner back to the caller.
  */
-export interface MultiTenantService {
-  /** Record `sessionId` as owned by `principal`'s tenant/user. */
-  bindSession(sessionId: string, principal: TenantPrincipal): void
-  /** Return the recorded owner, or `undefined` if the session is unknown. */
-  getSessionOwner(sessionId: string): SessionOwner | undefined
-  /** Fail-closed boolean: may `principal` access `sessionId`? */
-  canAccessSession(principal: TenantPrincipal, sessionId: string): boolean
-  /** Like `canAccessSession`, but throws a specific error on denial. */
-  assertSessionAccess(principal: TenantPrincipal, sessionId: string): void
-  /** Forget the ownership binding for `sessionId`. */
-  unbindSession(sessionId: string): void
-}
+export type ClaimResult =
+  | 'created'
+  | 'idempotent'
+  | 'conflict'
+
+/**
+ * Internal diagnostic reason for an access denial.
+ *
+ * This is an INTERNAL value for tests, audit, and observability. It is never
+ * returned through the public authorization API, which deliberately collapses
+ * all denials into a single non-enumerating error.
+ */
+export type AccessDenialReason =
+  | 'UNKNOWN_SESSION'
+  | 'TENANT_MISMATCH'
+  | 'USER_MISMATCH'
+
+/**
+ * Internal authorization decision, as a discriminated union: an allowed
+ * decision carries no reason, and a denial always carries one.
+ */
+export type AccessDecision =
+  | { allowed: true }
+  | { allowed: false; reason: AccessDenialReason }

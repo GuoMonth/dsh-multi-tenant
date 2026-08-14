@@ -19,9 +19,20 @@ describe('DeepSeek Harness bundle contract', () => {
     expect(existsSync(patchPath)).toBe(true)
   })
 
-  it('inserts this package as a Cordis row under a stable id', () => {
+  it('exposes the service and store seams as package entry points', () => {
+    const main = packageManifest.exports?.['.'] as { import?: string; types?: string } | undefined
+    const store = packageManifest.exports?.['./store'] as { import?: string; types?: string } | undefined
+    expect(main?.import).toBe('./dist/index.mjs')
+    expect(main?.types).toBe('./dist/index.d.mts')
+    expect(store?.import).toBe('./dist/store.mjs')
+    expect(store?.types).toBe('./dist/store.d.mts')
+  })
+
+  it('assembles the store provider and the service as two rows', () => {
     const patch = readFileSync(patchPath, 'utf8')
     expect(patch).toContain('insert:')
+    expect(patch).toContain('id: tenant-session-store')
+    expect(patch).toContain('name: dsh-multi-tenant/store')
     expect(patch).toContain('id: multi-tenant')
     expect(patch).toContain('name: dsh-multi-tenant')
   })

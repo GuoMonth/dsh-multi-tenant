@@ -3,6 +3,3 @@ dist/
 coverage/
 *.log
 .DS_Store
-
-# pnpm 11 auto-generates this supply-chain allowlist; regenerate on install.
-pnpm-workspace.yaml
