@@ -15,7 +15,9 @@ Given an authenticated `TenantPrincipal`, `dsh-multi-tenant` owns and authorizes
 access to opaque DSH session ids through a fail-closed, durable-store-compatible
 ownership contract.
 
-Concretely, it provides a single Cordis service, `ctx.multiTenant`, that:
+Concretely, it provides two Cordis services — `ctx.tenantSessionStore` (the
+ownership-storage seam) and `ctx.multiTenant` (ownership + authorization) —
+that together:
 
 - **abstracts the authenticated principal** (`TenantPrincipal`),
 - **owns sessions** with claim-once, immutable ownership,
@@ -99,7 +101,8 @@ dsh plugin --profile web add github:GuoMonth/dsh-multi-tenant
 ```
 
 The package declares [`dsh.bundle`](./package.json), so this appends its patch
-layer to the profile and mounts `ctx.multiTenant`.
+layer to the profile and mounts both `ctx.tenantSessionStore` and
+`ctx.multiTenant`.
 
 ## Core API
 
