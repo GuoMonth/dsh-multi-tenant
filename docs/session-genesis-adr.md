@@ -1,68 +1,80 @@
 # ADR — Session Genesis Ownership
 
-> Status: **spike conclusion (proposed)**. Based on the static
-> `session-genesis-map.md` plus a runtime probe against
-> `@deepseek-ai/dsh-session@0.1.0-rc.6` (probe output below).
+> Status: **proposed**. Based on the static `session-genesis-map.md` and the
+> `@deepseek-ai/dsh-session@0.1.0-rc.6` runtime probe (F1/F2). The Agent `setup`
+> semantics are statically confirmed; a full agent-stack runtime probe is
+> deferred (the `AgentLoop` injects `llm`/`tools`/`systemPrompt`, and the source
+> is unambiguous).
 
-## Confirmed findings
+## Finding
 
-The runtime probe confirmed the static map:
+DSH's Agent factory (`packages/core/agent-loop`, `setupAndPublish`) already runs
+an **async, before-visibility `setup` hook**:
 
-```json
-{ "F1": {"visibleAtCreated": true},
-  "F2_sync": {"threw": true, "sessionCount": 0},
-  "F2_async": {"threw": false, "sessionCount": 1} }
+```
+sessions.prepare(id)        # Session constructed, NOT in store
+await setup(agent.ctx)      # ← async admission point. Rejection → dispose (rollback).
+sessions.enter(session)     # store entry — get/list now see it
+sessions.announce(session)  # session/created
 ```
 
-- **F1** — when `session/created` fires, the session is **already** in the store
-  (`get`-visible). It is not a before-visibility admission point.
-- **F2** — a **synchronous** `session/created` throw vetoes publication (store
-  entry rolled back); an **async** listener's rejection is logged, not vetoed.
-  Ownership claim is async, so it cannot ride this veto.
-- **F3** — the principal is dropped at the RPC boundary
-  (`(endpoint, payload, signal)`); no genesis path carries it.
-- **F4** — fork / subagent carry `meta.parentSession`; ownership is inheritance.
-- **F5** — resume restores from persistence; ownership is restoration, not claim.
+`CreateAgentOptions.setup` / `ResumeAgentOptions.setup` are public and used by
+all four genesis paths (create / fork / subagent / resume).
 
-## Decision
+## Decisions
 
-### A — existing seam sufficient → **ruled out**
+### 1. The admission mechanism exists; the gap is identity + composability
 
-`session/created` fires after store entry (F1), cannot veto async claims (F2),
-and has no principal (F3). There is no existing before-visibility,
-async-compatible, identity-carrying admission point.
+`setup` is the correct admission point (before `sessions.enter`, async,
+rollback-on-reject). But it is a **per-call option**, not a global middleware.
+A plugin must **wrap `ctx.agents`** (Cordis service interception) to inject its
+admission into every `setup` — the same mechanism H3 needs to wrap the
+`ApiProxy`. The `setup` context (`agent.ctx`) exposes the session (hence the
+`sessionId` and `meta.parentSession`), so the plugin can derive:
 
-### B — DSH needs a minimal session-genesis admission seam → **required**
+| Path | Identity source | Needs H3? |
+| --- | --- | --- |
+| create | caller principal | **yes** (principal is not in `setup`) |
+| fork / subagent | parent owner via `getSessionOwner(parentSession)` | no |
+| resume | durable owner via the durable store | no |
 
-Propose an upstream seam, awaited between `prepare` and `enter`, that carries
-the identity to claim with:
+### 2. H1 and H3 are distinct; only top-level create couples them
 
-| Path | Identity carried |
+- **fork / subagent / resume** are solvable today by wrapping `ctx.agents` and
+  reading the parent/durable owner — **no HTTP principal required**.
+- **top-level create** still needs the caller principal, which is lost at the
+  RPC boundary — that is H3, unchanged.
+
+### 3. Ghost ownership is a reservation tombstone (safe), pending a stricter rule
+
+If admission claims inside `setup` and `publish` then fails (e.g. a sync
+`session/created` throw), the session rolls back but the ownership claim
+remains. This is safe because:
+
+- the session id is a minted `session-<n>` or a client UUID — a failed
+  publication never grants access to anything, so the orphaned claim is a
+  **reservation tombstone**, not an authorization leak;
+- a same-owner retry is **idempotent**; a different-owner retry on the same id
+  is a conflict, which is correct (the id was reserved).
+
+This holds for the in-memory and durable stores alike. A stricter
+"reservation + commit" semantic is possible later (C) but is **not required**
+to close this spike.
+
+## Conclusion
+
+| Option | Verdict |
 | --- | --- |
-| create | the authenticated `TenantPrincipal` |
-| fork / subagent | the parent `sessionId` (owner inherits) |
-| resume | the `sessionId` (owner restored, not re-claimed) |
+| **A** existing seam sufficient | **partially** — `setup` + wrap `ctx.agents` covers fork/subagent/resume today |
+| **B** upstream seam | **narrow** — only a request-scoped principal for top-level create (H3), not a new session lifecycle |
+| **C** core change | **not required** — inheritance/restore are already expressible; ghost ownership is a safe tombstone |
 
-This is **the same transport seam H3 needs** — a request/connection-scoped
-principal at genesis. H1 and H3 are one upstream problem, not two.
-
-### C — core contract change → **not required, minor optional**
-
-The existing `claimSession` + `getSessionOwner` already express inheritance
-(lookup parent owner → claim child) and restoration (durable store read, no
-re-claim). A small convenience — accept a `SessionOwner` directly, or add
-`claimInherited(childId, parentId)` — removes the awkwardness of reconstructing
-a fake `TenantPrincipal`, but is not a blocker.
-
-## Consequence for the kernel
-
-No kernel change now. The kernel's `claim-once` + fail-closed semantics survive
-this spike intact. The unblock is upstream (B) + a durable `TenantSessionStore`
-(M5) for cross-restart restoration — not a contract delta.
+The upstream proposal shrinks to **H3 only** (a request/connection-scoped
+principal reaching the create path). No new session-lifecycle seam is needed.
 
 ## Next
 
-- Upstream proposal: a session-genesis admission seam (async, before `enter`,
-  identity-carrying) — combined with the H3 request-scoped-principal seam.
-- M3 (web seam) proceeds against this same upstream seam rather than opening a
-  separate design surface.
+- M3 (web seam spike) proceeds on the **H3-only** upstream proposal.
+- Durable `TenantSessionStore` (M5) is still needed for cross-restart resume.
+- A full `ctx.agents.create` runtime probe can be added later if the AgentLoop's
+  dependencies (`llm`/`tools`/`systemPrompt`) become cheap to fixture.
