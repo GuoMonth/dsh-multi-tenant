@@ -5,6 +5,8 @@
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "verify": "node scripts/verify-packages.mjs",
+    "smoke": "node scripts/package-smoke.mjs"
   }
 }

@@ -55,7 +55,8 @@ Two test kinds prove different things:
 - **Contract Test Suite** — for a *provider seam* (e.g. `TenantSessionStore`).
   Any implementation must pass the same suite as the default provider. This is
   what makes "default ≠ only" hold: a replacement is proven by the contract,
-  not by fiat.
+  not by fiat. The kernel ships this suite via the `dsh-multi-tenant/testing`
+  subpath (`assertTenantSessionStoreContract`).
 - **Conformance / Invariant Suite** — for a *security or integration
   capability* (e.g. web enforcement). It asserts the tenant-isolation
   invariants (A cannot list / history / mux / respond B; concurrent principals
@@ -65,5 +66,5 @@ Two test kinds prove different things:
 
 - Spec / ADR updated wherever behavior is decided.
 - Contract and unit tests green (`pnpm test`).
-- `pnpm typecheck` and `pnpm build` green.
+- `pnpm typecheck`, `pnpm build`, `pnpm verify`, and `pnpm smoke` green.
 - No transport/vendor dependency leaked into the kernel.

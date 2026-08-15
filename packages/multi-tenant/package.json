@@ -28,6 +28,10 @@
       "types": "./dist/store.d.mts",
       "import": "./dist/store.mjs"
     },
+    "./testing": {
+      "types": "./dist/testing.d.mts",
+      "import": "./dist/testing.mjs"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
   "files": [
