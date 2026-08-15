@@ -18,10 +18,9 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
 
 ## Next (settled)
 
-- 🚧 **H3-only upstream proposal** — a request/connection-scoped principal
-  reaching the top-level create path (the only genesis path that needs it).
-  fork / subagent / resume are solvable via `setup` + wrapping `ctx.agents` from
-  the parent / durable owner, no HTTP principal.
+- 🚧 **H3 upstream proposal** — file the request/connection-scoped principal
+  seam against `deepseek-ai/deepseek-harness` (the one remaining upstream gap),
+  then build the enforcement (`ctx.agents` decorator + `ApiProxy` facade).
 
 ## Deferred (decision-gated)
 
@@ -44,8 +43,9 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
   smoke, compatibility policy.
 - **M2 — Session genesis spike** ✅ `setup` hook confirmed as the admission
   point; H3-only upstream proposal (fork / subagent / resume solvable today).
-- **M3 — Real web seam spike v2** real `ApiProxy` types, connection lifecycle,
-  `respond`, `mux`/`host` → minimal upstream requirement.
+- **M3 — Real web seam spike v2** ✅ converged: H3-only upstream seam
+  (request-scoped principal); enforcement solvable via `ctx.agents` decorator +
+  `ApiProxy` facade.
 - **M4 — Web enforcement.**
 - **M5 — Providers** durable stores, auth.
 - **M6 — MCP / audit / full-stack preset.**
