@@ -15,15 +15,19 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
 
 ## Next (settled)
 
-- 🚧 **H1 — claim-at-create.** Add an atomic ownership-claim seam to session
-  creation so a session is owned *before* it becomes visible to mux/list. This
-  is the one core-contract delta from the ADR. (Kernel, `packages/multi-tenant`.)
+- 🚧 **H1 — Session Genesis Ownership.** Establish (or inherit, for fork /
+  subagent) ownership *before* a session becomes visible, for every genesis
+  path — create, fork, subagent, resume/attach. Determine whether the required
+  seam belongs upstream in DSH's lifecycle or needs a kernel-contract delta;
+  do not change the kernel until this is proven. (Kernel,
+  `packages/multi-tenant`.)
 - 🚧 **Contract-test extraction.** Promote the store contract assertions to a
   shared suite any `TenantSessionStore` implementation must pass — the concrete
   form of "default ≠ only".
-- 🚧 **H3 — upstream seam proposal.** File the per-connection `ApiProxy` seam
-  proposal against `deepseek-ai/deepseek-harness` (unblocks real web
-  enforcement).
+- 🚧 **H3 — request/connection-scoped principal binding.** State the upstream
+  requirement (principal scoped to request/connection, non-ambient, enforceable
+  across unary / respond / stream lifetime), with a per-connection `ApiProxy`
+  seam as the preferred candidate, against `deepseek-ai/deepseek-harness`.
 
 ## Deferred (decision-gated)
 
@@ -37,9 +41,20 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
   provisional until H3 resolves).
 - ⏳ Tenant-aware MCP, audit/usage, billing/UI.
 
-## Sequencing
+## Milestones
 
-The suite is grown in this order: **stabilize the kernel → establish the
-contract-test pattern → unblock the web seam upstream → then fan out providers.**
-Each deferred item above is pulled forward only when its gate (a decision or an
-upstream seam) closes.
+- **M0 — Engineering foundation** ✅ monorepo, package rules, spec/ADR
+  discipline, CI.
+- **M1 — Kernel hardening** 🚧 extract the shared contract-test harness; pin the
+  current kernel contract with tests; publication/version policy.
+- **M2 — Session genesis spike** create / fork / subagent / resume →
+  ownership-before-visibility; decide whether the seam is upstream or a kernel
+  delta.
+- **M3 — Real web seam spike v2** real `ApiProxy` types, connection lifecycle,
+  `respond`, `mux`/`host` → minimal upstream requirement.
+- **M4 — Web enforcement.**
+- **M5 — Providers** durable stores, auth.
+- **M6 — MCP / audit / full-stack preset.**
+
+Each milestone is gated by its predecessor's decision; deferred items above are
+pulled forward only when their gate (a decision or an upstream seam) closes.
