@@ -45,8 +45,8 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
 
 - **M0 — Engineering foundation** ✅ monorepo, package rules, spec/ADR
   discipline, CI.
-- **M1 — Kernel hardening** 🚧 extract the shared contract-test harness; pin the
-  current kernel contract with tests; publication/version policy.
+- **M1 — Kernel hardening** ✅ contract-test harness, architecture gate, package
+  smoke, compatibility policy.
 - **M2 — Session genesis spike** create / fork / subagent / resume →
   ownership-before-visibility; decide whether the seam is upstream or a kernel
   delta.

@@ -36,7 +36,7 @@ for (const name of readdirSync(packagesDir)) {
   }
 
   if (pkg.name === 'dsh-multi-tenant') {
-    const runtime = { ...(pkg.dependencies ?? {}), ...(pkg.peerDependencies ?? {}) }
+    const runtime = { ...(pkg.dependencies ?? {}), ...(pkg.peerDependencies ?? {}), ...(pkg.optionalDependencies ?? {}) }
     for (const dep of Object.keys(runtime)) {
       if (!KERNEL_RUNTIME_ALLOWLIST.has(dep)) {
         errors.push(`${label}: runtime dependency "${dep}" is not allowed in the kernel`)
