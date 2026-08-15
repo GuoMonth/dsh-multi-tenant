@@ -3,8 +3,9 @@
 Composable multi-tenant / SaaS plugin suite for
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH).
 
-> **Phase: engineering foundation.** The kernel contract is stable; the suite
-> grows around it one plugin at a time. See [ROADMAP.md](./ROADMAP.md).
+> **Phase: engineering foundation.** The kernel baseline is established and
+> test-pinned; its public contract remains prerelease. The suite grows around it
+> one plugin at a time. See [ROADMAP.md](./ROADMAP.md).
 
 ## What this is
 
@@ -22,9 +23,10 @@ plugin's unit test can prove.
 
 ## Guiding principles
 
-- **Three layers, native vocabulary** — *Contract* (a native DSH/Cordis seam:
+- **Typical capability layering** — *Contract* (a native DSH/Cordis seam:
   Service, event, or protocol) → *Provider* (plugin) → *Composition*
-  (`cordis.patch.yml` bundle). No abstractions beyond what DSH already has.
+  (`cordis.patch.yml` bundle), *where applicable*. Pure integration /
+  security-boundary plugins compose directly against native seams.
 - **One-way dependency** — the kernel owns only the minimal cross-suite tenant
   primitives and depends on nothing transport- or vendor-specific (no JWT, no
   PostgreSQL, no HTTP, no MCP, no Redis); capability packages own their own
