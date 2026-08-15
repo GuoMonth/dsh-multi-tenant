@@ -35,8 +35,9 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
   tenant-owned. Product decision; until then, v0 denies non-session host frames.
 - ⏳ **Auth providers** (JWT / OIDC / API key). Post-H3; `TenantPrincipalResolver`
   placement still undecided.
-- ⏳ **Durable stores** (PostgreSQL / Redis / MySQL). Create packages only when a
-  real second implementation lands.
+- ⏳ **Durable stores** (PostgreSQL / Redis / MySQL). Create a provider package
+  once an independent composition / replacement / dependency / lifecycle
+  boundary is demonstrated.
 - ⏳ **Public-contract freeze** for `dsh-multi-tenant-web` (name and surface are
   provisional until H3 resolves).
 - ⏳ Tenant-aware MCP, audit/usage, billing/UI.
