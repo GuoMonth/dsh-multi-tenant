@@ -27,9 +27,10 @@ proposal).
   package may be a *pure provider* or a *pure integration*; extract a separate
   package only when a provider gains independent install / replace / lifecycle
   value.
-- **Do not scaffold empty packages.** Create a package only when a second real
-  implementation of a seam exists, or when the seam is a distinct security
-  surface of its own.
+- **Do not scaffold speculative packages.** Create a package only when an
+  independent composition / replacement / dependency / versioning / lifecycle /
+  security boundary has been *demonstrated* — justified in an ADR, not by a
+  code-size or implementation-count threshold.
 - Directory names are short (`multi-tenant`); npm names are the published
   identity (`dsh-multi-tenant`). They need not match.
 
@@ -47,12 +48,18 @@ package that owns their contract. Sibling capabilities do not reach through one
 another's implementations. A pull request that adds a transport/vendor
 dependency into the kernel is rejected.
 
-## Contract tests
+## Tests: contract vs conformance
 
-Every replaceable seam has a shared contract-test suite. A third-party
-implementation must pass the same suite as the default provider. This is what
-makes "default ≠ only" hold: a replacement is proven by the contract, not by
-fiat.
+Two test kinds prove different things:
+
+- **Contract Test Suite** — for a *provider seam* (e.g. `TenantSessionStore`).
+  Any implementation must pass the same suite as the default provider. This is
+  what makes "default ≠ only" hold: a replacement is proven by the contract,
+  not by fiat.
+- **Conformance / Invariant Suite** — for a *security or integration
+  capability* (e.g. web enforcement). It asserts the tenant-isolation
+  invariants (A cannot list / history / mux / respond B; concurrent principals
+  never cross-talk), which no single provider's unit test can prove.
 
 ## Definition of done
 
