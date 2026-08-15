@@ -117,3 +117,16 @@ unary path (→H4).
 | `/api/respond` bypasses unary intercept | `clientResponseSchema` special-case in `toFetchHandler` | H4 |
 | create→claim race | `session.create(id?: SessionId)`; core has no `release`/`reassign` | H1 |
 | host stream exposes Workspace + host-global | `HostFrame` union includes `workspace-*`, `remote-event` | H2 |
+
+## 7. Ecosystem notes
+
+- **Stale `latest` dist-tags.** `@deepseek-ai/dsh-{host-apiproxy,session,client-connection,tools}`
+  publish `latest` → `0.0.1-rc.1` while the newest published version is
+  `0.1.0-rc.6`. Consumers must pin an explicit prerelease version
+  (`…@0.1.0-rc.6`), never `latest`. This is a footgun for third-party plugins
+  and matters for how `dsh-multi-tenant-web` declares DSH deps.
+- **`ApiProxy` shape.** The real surface is a large namespace object
+  (`sessions` / `subagents` / `host` / `workspace` / `skills` / `agentPresets` /
+  `events` / `goals` / `settings` / `credentials` / `llm` / `respond`), with
+  methods wrapped in `RpcRequest`/`RpcResponse`. The prototype's `ApiSurface`
+  is a spike-local simplification of the session-bearing subset.
