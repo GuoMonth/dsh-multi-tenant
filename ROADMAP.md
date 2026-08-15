@@ -12,6 +12,9 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
 - ✅ **Web seam spike** — Seam Map, executable facade prototype (6 security
   invariants), and ADR in `packages/multi-tenant-web`. Concluded that web
   enforcement is blocked on an upstream per-connection seam (H3).
+- ✅ **Kernel engineering harness** — `TenantSessionStore` contract suite
+  (`dsh-multi-tenant/testing`), architecture gate (`pnpm verify`), package
+  smoke (`pnpm smoke`), compatibility policy (`docs/compatibility.md`).
 
 ## Next (settled)
 
@@ -21,9 +24,6 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
   seam belongs upstream in DSH's lifecycle or needs a kernel-contract delta;
   do not change the kernel until this is proven. (Kernel,
   `packages/multi-tenant`.)
-- 🚧 **Contract-test extraction.** Promote the store contract assertions to a
-  shared suite any `TenantSessionStore` implementation must pass — the concrete
-  form of "default ≠ only".
 - 🚧 **H3 — request/connection-scoped principal binding.** State the upstream
   requirement (principal scoped to request/connection, non-ambient, enforceable
   across unary / respond / stream lifetime), with a per-connection `ApiProxy`

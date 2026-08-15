@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "DSH Web multi-tenant integration: principal binding, RPC/mux/WS authorization. Early spike.",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.19"
+  },
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
