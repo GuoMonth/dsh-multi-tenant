@@ -29,8 +29,8 @@ async function withStore<T>(
   fn: (store: TenantSessionStore) => Promise<T>,
 ): Promise<T> {
   const ctx = new Context()
-  const store = await factory(ctx)
   try {
+    const store = await factory(ctx)
     return await fn(store)
   } finally {
     await ctx.fiber.dispose()
@@ -40,7 +40,7 @@ async function withStore<T>(
 /**
  * Assert that `factory` produces stores satisfying the `TenantSessionStore`
  * contract: atomic claim, idempotent same-owner claim, conflict (never
- * overwrite), `get` semantics, defensive copy, and atomic concurrency.
+ * overwrite), `get` semantics, and atomic concurrency.
  */
 export async function assertTenantSessionStoreContract(factory: TenantSessionStoreFactory): Promise<void> {
   const alice: SessionOwner = { tenantId: 'acme', userId: 'alice' }
