@@ -1,3 +1,6 @@
+packages:
+  - packages/*
+
 # pnpm 11 supply-chain / build-script policy. Committed so `pnpm install
 # --frozen-lockfile` in CI does not re-prompt for an undecided build script.
 allowBuilds:

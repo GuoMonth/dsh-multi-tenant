@@ -16,9 +16,6 @@
     "rewriteRelativeImportExtensions": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"],
-    "rootDir": ".",
-    "outDir": "dist/types"
-  },
-  "include": ["src", "tests", "demo"]
+    "types": ["node"]
+  }
 }
