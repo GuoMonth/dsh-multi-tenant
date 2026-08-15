@@ -22,12 +22,13 @@ plugin's unit test can prove.
 
 ## Guiding principles
 
-- **Three layers, native vocabulary** — *Contract* (abstract `Service`) →
-  *Provider* (plugin) → *Composition* (`cordis.patch.yml` bundle). No
-  abstractions beyond what DSH already has.
-- **One-way dependency** — everything depends on the kernel's contracts; the
-  kernel depends on nothing transport- or vendor-specific (no JWT, no
-  PostgreSQL, no HTTP, no MCP, no Redis).
+- **Three layers, native vocabulary** — *Contract* (a native DSH/Cordis seam:
+  Service, event, or protocol) → *Provider* (plugin) → *Composition*
+  (`cordis.patch.yml` bundle). No abstractions beyond what DSH already has.
+- **One-way dependency** — the kernel owns only the minimal cross-suite tenant
+  primitives and depends on nothing transport- or vendor-specific (no JWT, no
+  PostgreSQL, no HTTP, no MCP, no Redis); capability packages own their own
+  contracts and may depend on the kernel's primitives.
 - **Split by replaceable capability, not size** — and a single security
   invariant is not split across packages.
 - **Default ≠ only** — the suite ships defaults; third parties may swap any

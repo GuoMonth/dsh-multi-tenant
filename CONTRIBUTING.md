@@ -18,10 +18,15 @@ proposal).
 
 ## Package conventions
 
-- One package = one **replaceable capability** (a Cordis service seam). Never a
-  code-size threshold, and never a fragment of a single security invariant.
-- A package ships: its **Service definition** (the contract), its **default
-  provider**, and a `cordis.patch.yml` bundle row that composes it.
+- One package = one **independently composable / replaceable capability**, or
+  one **indivisible security boundary**. Never a code-size threshold, and never
+  a fragment of a single security invariant.
+- Prefer **native DSH/Cordis seams** (Service, event/waterfall, typed
+  protocol). Do not invent a Service merely to create a package boundary.
+- **Contract and default implementation may co-locate** (especially early). A
+  package may be a *pure provider* or a *pure integration*; extract a separate
+  package only when a provider gains independent install / replace / lifecycle
+  value.
 - **Do not scaffold empty packages.** Create a package only when a second real
   implementation of a seam exists, or when the seam is a distinct security
   surface of its own.
@@ -31,13 +36,16 @@ proposal).
 ## Dependency direction (non-negotiable)
 
 ```
-Core ──▶ Contract ◀── Provider
+Kernel primitives ◀── capability contracts ◀── providers
 ```
 
-The kernel's contracts have zero transport/vendor dependencies. Providers
-depend on the kernel's contract; the kernel never knows JWT / PostgreSQL /
-HTTP / MCP / Redis. A pull request that adds such a dependency into the kernel
-is rejected.
+The kernel owns only the minimal cross-suite tenant primitives (identity,
+ownership, authorization) and has zero transport/vendor dependencies — it never
+knows JWT / PostgreSQL / HTTP / MCP / Redis. Capability packages own their own
+contracts and may depend on the kernel's primitives. Providers depend on the
+package that owns their contract. Sibling capabilities do not reach through one
+another's implementations. A pull request that adds a transport/vendor
+dependency into the kernel is rejected.
 
 ## Contract tests
 
