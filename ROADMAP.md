@@ -15,17 +15,14 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
 - ✅ **Kernel engineering harness** — `TenantSessionStore` contract suite
   (`dsh-multi-tenant/testing`), architecture gate (`pnpm verify`), package
   smoke (`pnpm smoke`), compatibility policy (`docs/compatibility.md`).
-- ✅ **Session Genesis Spike (M2)** — mapped create / fork / subagent / resume
-  against the real `@deepseek-ai/dsh-session` lifecycle (static map + runtime
-  probe). Concluded the ownership-admission seam belongs **upstream** (B), not a
-  kernel-contract delta (`docs/session-genesis-adr.md`).
 
 ## Next (settled)
 
-- 🚧 **Upstream seam proposal** — one proposal combining the session-genesis
-  admission seam (async, before `enter`, identity-carrying for
-  create/fork/subagent/resume) with a request/connection-scoped principal,
-  against `deepseek-ai/deepseek-harness` (resolves H1 + H3 as a single seam).
+- 🚧 **M2.1 — admission seam validation.** The Agent `setup` hook is a
+  before-visibility async point, but its composability is unverified. Confirm it
+  with a real `ctx.agents.create`/`resume` probe, determine how a plugin
+  composes into every `setup`, and resolve ghost-ownership failure semantics —
+  then converge the ADR and file the (narrowed) upstream proposal.
 
 ## Deferred (decision-gated)
 
@@ -46,8 +43,8 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
   discipline, CI.
 - **M1 — Kernel hardening** ✅ contract-test harness, architecture gate, package
   smoke, compatibility policy.
-- **M2 — Session genesis spike** ✅ map + runtime probe + ADR → the seam is
-  upstream (B), not a kernel delta.
+- **M2 — Session genesis spike** 🚧 static map + low-level `SessionStore` probe
+  done; M2.1 admission-seam validation pending.
 - **M3 — Real web seam spike v2** real `ApiProxy` types, connection lifecycle,
   `respond`, `mux`/`host` → minimal upstream requirement.
 - **M4 — Web enforcement.**
