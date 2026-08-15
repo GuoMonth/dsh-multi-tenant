@@ -18,11 +18,9 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
 
 ## Next (settled)
 
-- 🚧 **M3 — web seam + H3 real-seam validation.** M3.0 admission-composition
-  proof done (`ctx.agents` decorator is the feasible mechanism). Next validate
-  whether a request/connection-scoped principal seam is actually needed for
-  top-level create, or the decorator suffices — before proposing any upstream
-  seam.
+- 🚧 **H3 upstream proposal** — file the request/connection-scoped principal
+  seam against `deepseek-ai/deepseek-harness` (the one remaining upstream gap),
+  then build the enforcement (`ctx.agents` decorator + `ApiProxy` facade).
 
 ## Deferred (decision-gated)
 
@@ -45,8 +43,9 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
   smoke, compatibility policy.
 - **M2 — Session genesis spike** ✅ `setup` hook confirmed as the admission
   point; H3-only upstream proposal (fork / subagent / resume solvable today).
-- **M3 — Real web seam spike v2** 🚧 M3.0 admission-composition proof done;
-  request→principal, unary/respond/mux/host, connection lifetime, ADR pending.
+- **M3 — Real web seam spike v2** ✅ converged: H3-only upstream seam
+  (request-scoped principal); enforcement solvable via `ctx.agents` decorator +
+  `ApiProxy` facade.
 - **M4 — Web enforcement.**
 - **M5 — Providers** durable stores, auth.
 - **M6 — MCP / audit / full-stack preset.**
