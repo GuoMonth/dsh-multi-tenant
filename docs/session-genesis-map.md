@@ -84,14 +84,14 @@ what M2.1 must answer.
 | --- | --- |
 | 1. No ownership window | ✅ `setup` runs before `sessions.enter` — an admission in `setup` has no window |
 | 2. Child inheritance explicit | ⚠️ store contract can express it (F4), but the admission needs the parent owner at the hook |
-| 3. No ghost ownership on failure | ⚠️ **open** — claim-in-`setup` then publish failure leaves ownership behind (core has no `release`) |
+| 3. No ghost ownership on failure | ✅ reservation tombstone — no access grant; same-owner retry idempotent; different-owner retry conflicts (correct) |
 | 4. Resume doesn't steal | ✅ idempotent same-owner claim; restore, don't re-claim |
 | 5. Concurrent genesis unique | ✅ `sessionCreations` dedup + `enter` collision check |
 
-## 6. Lean (to be validated in M2.1)
+## 6. Conclusion (see `session-genesis-adr.md`)
 
-The `setup` hook is the before-visibility async admission point. The gap is
-**composability**: a per-call `setup` is not a global seam. M2.1 must determine
-whether a plugin can wrap `ctx.agents` (or DSH needs a composable setup
-middleware) — and must resolve the ghost-ownership failure semantics (invariant
-3) before the ADR can converge.
+The `setup` hook is the before-visibility async admission point. Composability
+is via wrapping `ctx.agents` (the same mechanism H3 needs to wrap `ApiProxy`).
+Fork / subagent / resume are solvable today from the parent / durable owner;
+only top-level create needs the H3 request-scoped principal. Ghost ownership is
+a safe reservation tombstone. The upstream proposal shrinks to **H3 only**.

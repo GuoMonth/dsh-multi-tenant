@@ -1,65 +1,80 @@
 # ADR — Session Genesis Ownership
 
-> Status: **partial / proposed** — low-level publication confirmed, but the
-> admission seam is not yet validated (M2.1). This ADR supersedes the earlier
-> draft, which incorrectly claimed no before-visibility async point existed.
+> Status: **proposed**. Based on the static `session-genesis-map.md` and the
+> `@deepseek-ai/dsh-session@0.1.0-rc.6` runtime probe (F1/F2). The Agent `setup`
+> semantics are statically confirmed; a full agent-stack runtime probe is
+> deferred (the `AgentLoop` injects `llm`/`tools`/`systemPrompt`, and the source
+> is unambiguous).
 
-## Corrected finding
+## Finding
 
-DSH **does** have an existing before-visibility async point: the Agent
-`setup` hook (`CreateAgentOptions.setup` / `ResumeAgentOptions.setup`), awaited
-by `agent-loop`'s `setupAndPublish` before `sessions.enter`, with rejection →
-rollback. It is used by all four genesis paths (create / fork / subagent /
-resume).
+DSH's Agent factory (`packages/core/agent-loop`, `setupAndPublish`) already runs
+an **async, before-visibility `setup` hook**:
 
-The real gap is **composability**: `setup` is a per-call option, not a global
-middleware. The open question is whether a third-party plugin can participate
-in *every* setup unfailingly.
+```
+sessions.prepare(id)        # Session constructed, NOT in store
+await setup(agent.ctx)      # ← async admission point. Rejection → dispose (rollback).
+sessions.enter(session)     # store entry — get/list now see it
+sessions.announce(session)  # session/created
+```
 
-## Decisions (revised)
+`CreateAgentOptions.setup` / `ResumeAgentOptions.setup` are public and used by
+all four genesis paths (create / fork / subagent / resume).
 
-### H1 and H3 are distinct seams, coupled only on top-level create
+## Decisions
 
-- **H3** (identity propagation) is needed only by **top-level create**, which
-  must carry the caller principal.
-- **H1** (resource lifecycle) for fork / subagent needs the **parent owner**;
-  for resume it needs the **durable owner** — neither needs the HTTP principal.
+### 1. The admission mechanism exists; the gap is identity + composability
 
-They may share one upstream proposal, but are two contracts, not one seam.
+`setup` is the correct admission point (before `sessions.enter`, async,
+rollback-on-reject). But it is a **per-call option**, not a global middleware.
+A plugin must **wrap `ctx.agents`** (Cordis service interception) to inject its
+admission into every `setup` — the same mechanism H3 needs to wrap the
+`ApiProxy`. The `setup` context (`agent.ctx`) exposes the session (hence the
+`sessionId` and `meta.parentSession`), so the plugin can derive:
 
-### Ghost ownership is an OPEN question
+| Path | Identity source | Needs H3? |
+| --- | --- | --- |
+| create | caller principal | **yes** (principal is not in `setup`) |
+| fork / subagent | parent owner via `getSessionOwner(parentSession)` | no |
+| resume | durable owner via the durable store | no |
 
-Claim-in-`setup` followed by a publish failure (e.g. a sync `session/created`
-throw) rolls the session back but leaves the ownership claim behind — the core
-deliberately has no `release`. This must be resolved explicitly:
+### 2. H1 and H3 are distinct; only top-level create couples them
 
-- either the core adds a rollback / reservation+commit semantics, or
-- the ADR proves stale ownership is safe (no access grant; same-owner retry
-  idempotent; acceptable for a minted UUID).
+- **fork / subagent / resume** are solvable today by wrapping `ctx.agents` and
+  reading the parent/durable owner — **no HTTP principal required**.
+- **top-level create** still needs the caller principal, which is lost at the
+  RPC boundary — that is H3, unchanged.
 
-### Conclusion is NOT final
+### 3. Ghost ownership is a reservation tombstone (safe), pending a stricter rule
 
-The outcome depends on M2.1:
+If admission claims inside `setup` and `publish` then fails (e.g. a sync
+`session/created` throw), the session rolls back but the ownership claim
+remains. This is safe because:
 
-- If a plugin can compose into `setup` (wrap `ctx.agents`) → **A** partially
-  reopens (existing point usable), modulo H3 for create.
-- Otherwise → **B**, but narrowly: a **composable Agent setup/admission
-  middleware** (not a new session lifecycle seam).
+- the session id is a minted `session-<n>` or a client UUID — a failed
+  publication never grants access to anything, so the orphaned claim is a
+  **reservation tombstone**, not an authorization leak;
+- a same-owner retry is **idempotent**; a different-owner retry on the same id
+  is a conflict, which is correct (the id was reserved).
 
-**C** (core change) is only for ghost-ownership rollback, if invariant 3
-demands it — not yet proven.
+This holds for the in-memory and durable stores alike. A stricter
+"reservation + commit" semantic is possible later (C) but is **not required**
+to close this spike.
 
-## Consequence for the kernel
+## Conclusion
 
-No kernel change yet. Inheritance/restoration are already expressible by the
-store contract (`store.claim(childId, SessionOwner)`) and a durable store;
-only the `claimSession` helper is Principal-oriented (an ergonomics gap).
+| Option | Verdict |
+| --- | --- |
+| **A** existing seam sufficient | **partially** — `setup` + wrap `ctx.agents` covers fork/subagent/resume today |
+| **B** upstream seam | **narrow** — only a request-scoped principal for top-level create (H3), not a new session lifecycle |
+| **C** core change | **not required** — inheritance/restore are already expressible; ghost ownership is a safe tombstone |
 
-## Next (M2.1)
+The upstream proposal shrinks to **H3 only** (a request/connection-scoped
+principal reaching the create path). No new session-lifecycle seam is needed.
 
-1. Real `ctx.agents.create`/`resume` probe — assert the session is not visible
-   inside `setup`, and `setup` rejection never publishes.
-2. Determine how a plugin composes into every `setup` (wrap `ctx.agents`?).
-3. Resolve ghost-ownership failure semantics (invariant 3).
-4. Re-run the probe against `@deepseek-ai/dsh-session@0.1.0-rc.6` and record the
-   exact pin in the map.
+## Next
+
+- M3 (web seam spike) proceeds on the **H3-only** upstream proposal.
+- Durable `TenantSessionStore` (M5) is still needed for cross-restart resume.
+- A full `ctx.agents.create` runtime probe can be added later if the AgentLoop's
+  dependencies (`llm`/`tools`/`systemPrompt`) become cheap to fixture.
