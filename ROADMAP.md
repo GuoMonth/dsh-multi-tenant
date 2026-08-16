@@ -34,9 +34,10 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
      `scripts/admission-decorator-probe.mjs` (`docs/specs/admission-composition.md`
      §5): a decorator joins every `setup` and the admission runs before
      visibility on all four paths — no new admission seam needed.
-  2. **Real `ApiProxy` facade** — drop the spike `ApiSurface`; classify the real
-     `@deepseek-ai/dsh-host-apiproxy` surface exhaustively (ALLOW / GUARD /
-     FILTER / DENY) so a new DSH method fails to compile, not silently passes.
+  2. **Real `ApiProxy` facade** ✅ — dropped the spike `ApiSurface`; classified the
+     real `@deepseek-ai/dsh-host-apiproxy` surface exhaustively (ALLOW / GUARD /
+     FILTER / DENY, 52 methods) so a new DSH method fails to compile. Streams
+     (`events`) / `respond` / `downloads` are denied until ②-C / H4.
   3. **Real transport prototype** — HTTP / WS / respond / mux / host against the
      real runtime (still `X-Test-Tenant` / `X-Test-User`), locking the six
      tenant-isolation invariants.

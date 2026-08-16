@@ -1,93 +1,131 @@
 /**
- * Spike-local tenant-bound ApiProxy facade.
+ * Tenant-bound `ApiProxy` facade.
  *
- * The facade is a pure, closure-bound wrapper: it takes a session-bearing API
- * surface plus a `TenantPrincipal`, and returns a version whose point methods
- * are guarded, collections filtered, and streams filtered. The principal never
- * enters any shared/ambient context — it is closed over, so concurrent tenants
- * cannot cross-talk.
+ * Wraps the **real** `ApiProxy` contract (`@deepseek-ai/dsh-host-apiproxy/api`)
+ * and enforces the tenant boundary per method, driven by the exhaustive
+ * `CLASSIFICATION` table in `./classification.ts`:
  *
- * The `ApiSurface` here is a spike-local SIMPLIFICATION of the real
- * `@deepseek-ai/dsh-host-apiproxy` `ApiProxy` (whose methods wrap args in
- * `RpcRequest`/`RpcResponse`). The enforcement LOGIC — guard point, filter
- * collection, filter stream, guard response, deny-unclassified — is identical;
- * type-compatibility with the real `ApiProxy` is deferred until DSH publishes a
- * current release or exposes a proper seam (see SEAM-MAP.md / ADR).
+ *   - `allow`  — pass through unchanged.
+ *   - `guard`  — assert `assertSessionAccess` on the payload's session id before
+ *     delegating (throws a uniform `SessionAccessDeniedError` on denial).
+ *   - `filter` — project `session.list` / `session.search` results to the
+ *     sessions the principal may access.
+ *   - `deny`   — fail closed (host-global / workspace surfaces; unclassified).
+ *
+ * The principal is **closed over**, never written to any shared/ambient context,
+ * so concurrent tenants cannot cross-talk. The proxy is the runtime dispatcher;
+ * the compile-time security invariant lives in `CLASSIFICATION` (a new DSH
+ * method fails `tsc`, it cannot silently pass as unclassified).
+ *
+ * Surfaces *outside* the unary `RpcMethodMap` — `respond` (bidirectional,
+ * H4), `events` (streams, ②-C), and `downloads` (host-only) — are denied
+ * fail-closed until their enforcement lands.
  *
  * @module dsh-multi-tenant-web/bind-tenant
  */
-
+import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { SessionAccessDeniedError } from 'dsh-multi-tenant'
 import type { MultiTenantService, TenantPrincipal } from 'dsh-multi-tenant'
+import { classify, guardSessionKey } from './classification.ts'
 
-export interface SessionSummary {
-  sessionId: string
+// Async: ApiProxy methods return promises, so a denial must reject (not throw
+// synchronously) to stay uniform with the guard/filter paths.
+const deny = async (): Promise<never> => {
+  throw new SessionAccessDeniedError()
 }
 
-export interface MuxFrame {
-  type: string
-  sessionId?: string
+/** A namespace whose every method denies (fail-closed) — for `events` / `downloads`. */
+const denySurface = (): unknown => new Proxy({}, { get: () => deny })
+
+/**
+ * `ApiProxy` groups methods under plural namespace objects (`sessions`,
+ * `subagents`, `skills`, `goals`, `agentPresets`), while the wire method names
+ * in `RpcMethodMap` use singular prefixes (`session.*`, `subagent.*`, …). Map
+ * the plural namespace field back to the wire prefix before classifying.
+ */
+const NAMESPACE_PREFIX: Readonly<Record<string, string>> = {
+  sessions: 'session',
+  subagents: 'subagent',
+  skills: 'skill',
+  goals: 'goal',
+  agentPresets: 'agentPreset',
 }
 
-export interface SessionsSurface {
-  list(): Promise<{ items: SessionSummary[] }>
-  history(req: { sessionId: string }): Promise<unknown>
-}
-
-export interface EventsSurface {
-  mux(): AsyncIterable<MuxFrame>
-}
-
-export interface ApiSurface {
-  sessions: SessionsSurface
-  events: EventsSurface
-  respond(msg: { sessionId: string }): Promise<unknown>
+function methodName(namespace: string, method: string): string {
+  return `${NAMESPACE_PREFIX[namespace] ?? namespace}.${method}`
 }
 
 /**
  * Return `api` narrowed to the sessions `principal` may access.
- *
- * - point methods → `assertSessionAccess` guard (throws on denial)
- * - collections → filtered to accessible sessions
- * - streams → frames filtered by their `sessionId`; frames without a
- *   `sessionId` are dropped (fail-closed: cannot be attributed to a tenant)
- * - response (`respond`) → `assertSessionAccess` guard
  */
 export function bindTenant(
-  api: ApiSurface,
+  api: ApiProxy,
   principal: TenantPrincipal,
   multiTenant: MultiTenantService,
-): ApiSurface {
+): ApiProxy {
+  const wrap = (name: string, fn: unknown): unknown => {
+    if (typeof fn !== 'function') return fn
+    switch (classify(name)) {
+      case 'allow':
+        return fn
+      case 'deny':
+        return deny
+      case 'guard':
+        return async (request: any, signal: any) => {
+          const sessionId: unknown = request?.payload?.[guardSessionKey(name)]
+          if (typeof sessionId !== 'string' || sessionId === '') {
+            throw new SessionAccessDeniedError()
+          }
+          await multiTenant.assertSessionAccess(principal, sessionId)
+          return (fn as any)(request, signal)
+        }
+      case 'filter':
+        return async (request: any, signal: any) => {
+          const response: any = await (fn as any)(request, signal)
+          return filterVisible(response, principal, multiTenant)
+        }
+    }
+  }
+
+  return new Proxy(api, {
+    get(target, prop, receiver) {
+      const key = String(prop)
+      // Non-unary surfaces — separate authorization seams, not in RpcMethodMap.
+      if (key === 'respond') return deny
+      if (key === 'events' || key === 'downloads') return denySurface()
+      const namespace = Reflect.get(target, prop, receiver)
+      if (namespace !== null && typeof namespace === 'object') {
+        return new Proxy(namespace as object, {
+          get(nsTarget, method, nsReceiver) {
+            const fn = Reflect.get(nsTarget, method, nsReceiver)
+            return typeof fn === 'function' ? wrap(methodName(key, String(method)), fn) : fn
+          },
+        })
+      }
+      return namespace
+    },
+  }) as ApiProxy
+}
+
+async function filterVisible(
+  response: any,
+  principal: TenantPrincipal,
+  multiTenant: MultiTenantService,
+): Promise<any> {
+  const items: any[] | undefined = response?.result?.value?.items
+  if (items === undefined) return response
+  const visible: any[] = []
+  for (const item of items) {
+    const sessionId: unknown = item?.sessionId
+    if (typeof sessionId === 'string' && await multiTenant.canAccessSession(principal, sessionId)) {
+      visible.push(item)
+    }
+  }
   return {
-    sessions: {
-      list: async () => {
-        const { items } = await api.sessions.list()
-        const visible: SessionSummary[] = []
-        for (const item of items) {
-          if (await multiTenant.canAccessSession(principal, item.sessionId)) {
-            visible.push(item)
-          }
-        }
-        return { items: visible }
-      },
-      history: async (req) => {
-        await multiTenant.assertSessionAccess(principal, req.sessionId)
-        return api.sessions.history(req)
-      },
-    },
-    events: {
-      mux: async function* () {
-        for await (const frame of api.events.mux()) {
-          // Fail-closed: an unclassifiable frame (no sessionId) is not yielded.
-          if (frame.sessionId === undefined) continue
-          if (await multiTenant.canAccessSession(principal, frame.sessionId)) {
-            yield frame
-          }
-        }
-      },
-    },
-    respond: async (msg) => {
-      await multiTenant.assertSessionAccess(principal, msg.sessionId)
-      return api.respond(msg)
+    ...response,
+    result: {
+      ...response.result,
+      value: { ...response.result.value, items: visible },
     },
   }
 }

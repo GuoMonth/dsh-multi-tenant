@@ -48,21 +48,24 @@ Namespaces / methods (52 total):
 | Namespace | Methods | sessionId-bearing |
 |---|---|---|
 | `session.*` | `list` `search` `create` `history` `models` `selectModel` `rename` `fork` `prompt` `attachment` `updateQueue` `cancel` | all except `list`/`search`/`create` |
-| `subagent.*` | `list` `history` `prompt` `interrupt` | `history`/`prompt`/`interrupt` (subagent is session-scoped) |
+| `subagent.*` | `list` `history` `prompt` `interrupt` | all (`parentSessionId`) |
 | `host.*` | `describe` `pickDirectory` `listDirectory` `createDirectory` `openPath` | none (host-global) |
-| `workspace.*` | `list` `create` `rename` `delete` `insertBefore` `insertSessionBefore` `archiveSession` | `archiveSession`/`insertSessionBefore` reference sessions |
-| `goal.*` | `create` `edit` `pause` `resume` `complete` `clear` | none (workspace/agent-scoped) |
-| `skill.*` | `list` | none |
-| `agentPreset.*` | `list` `select` `read` `copy` `openDocument` `remove` | none |
+| `workspace.*` | `list` `create` `rename` `delete` `insertBefore` `insertSessionBefore` `archiveSession` | `archiveSession`/`insertSessionBefore` reference sessions (workspace-scoped) |
+| `goal.*` | `create` `edit` `pause` `resume` `complete` `clear` | all (`sessionId`) |
+| `skill.*` | `list` | `sessionId` |
+| `agentPreset.*` | `list` `select` `read` `copy` `openDocument` `remove` | `select` (`sessionId`) |
 | `settings.*` | `describe` `openDocument` `update` `replace` `mutate` | none |
 | `credentials.*` | `describe` `set` `unset` | none |
 | `llm.*` | `providers` `models` `discoverModels` | none |
 
 **Enforcement implication**: session-keyed methods are POINT guards
-(`assertSessionAccess(principal, payload.sessionId)`); the rest are either
-COLLECTION filters (`session.list`/`search`), host-global DENY, or not-yet-
-classified — all resolvable from `payload` alone. The **principal** is the open
-question (→H3), not the `sessionId` (which `payload` already carries).
+(`assertSessionAccess(principal, payload.sessionId)` — or `payload.parentSessionId`
+for `subagent.*`); `session.list`/`search` are COLLECTION filters; `host.*` /
+`workspace.*` are host-global DENY; the rest are global-config ALLOW. This is now
+the executable `CLASSIFICATION` table in `dsh-multi-tenant-web` — a new DSH
+method fails `tsc` rather than silently passing as unclassified. The
+**principal** is the open question (→H3), not the `sessionId` (which `payload`
+already carries).
 
 ## 4. Stream surfaces
 

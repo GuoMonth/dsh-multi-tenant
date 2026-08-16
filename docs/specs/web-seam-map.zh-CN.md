@@ -39,17 +39,17 @@ DSH Web 暴露**五个**与授权相关的 surface，按 **Resource × Access Sh
 | 命名空间 | 方法 | 承载 sessionId |
 |---|---|---|
 | `session.*` | `list` `search` `create` `history` `models` `selectModel` `rename` `fork` `prompt` `attachment` `updateQueue` `cancel` | 除 `list`/`search`/`create` 外全部 |
-| `subagent.*` | `list` `history` `prompt` `interrupt` | `history`/`prompt`/`interrupt`（subagent 是 session 作用域） |
+| `subagent.*` | `list` `history` `prompt` `interrupt` | 全部（`parentSessionId`） |
 | `host.*` | `describe` `pickDirectory` `listDirectory` `createDirectory` `openPath` | 无（host-global） |
-| `workspace.*` | `list` `create` `rename` `delete` `insertBefore` `insertSessionBefore` `archiveSession` | `archiveSession`/`insertSessionBefore` 引用 session |
-| `goal.*` | `create` `edit` `pause` `resume` `complete` `clear` | 无（workspace/agent 作用域） |
-| `skill.*` | `list` | 无 |
-| `agentPreset.*` | `list` `select` `read` `copy` `openDocument` `remove` | 无 |
+| `workspace.*` | `list` `create` `rename` `delete` `insertBefore` `insertSessionBefore` `archiveSession` | `archiveSession`/`insertSessionBefore` 引用 session（workspace 作用域） |
+| `goal.*` | `create` `edit` `pause` `resume` `complete` `clear` | 全部（`sessionId`） |
+| `skill.*` | `list` | `sessionId` |
+| `agentPreset.*` | `list` `select` `read` `copy` `openDocument` `remove` | `select`（`sessionId`） |
 | `settings.*` | `describe` `openDocument` `update` `replace` `mutate` | 无 |
 | `credentials.*` | `describe` `set` `unset` | 无 |
 | `llm.*` | `providers` `models` `discoverModels` | 无 |
 
-**强制含义**：session 为键的方法是 POINT guard（`assertSessionAccess(principal, payload.sessionId)`）；其余要么是 COLLECTION filter（`session.list`/`search`）、host-global DENY，要么尚未分类 —— 均可仅由 `payload` 解决。悬而未决的是 **principal**（→H3），而非 `sessionId`（`payload` 已携带）。
+**强制含义**：session 为键的方法是 POINT guard（`assertSessionAccess(principal, payload.sessionId)` —— `subagent.*` 则为 `payload.parentSessionId`）；`session.list`/`search` 是 COLLECTION filter；`host.*` / `workspace.*` 是 host-global DENY；其余是全局配置 ALLOW。这已落为 `dsh-multi-tenant-web` 中可执行的 `CLASSIFICATION` 表 —— 新增 DSH 方法会令 `tsc` 失败，而非静默地作为未分类通过。悬而未决的是 **principal**（→H3），而非 `sessionId`（`payload` 已携带）。
 
 ## 4. 流 surface
 
