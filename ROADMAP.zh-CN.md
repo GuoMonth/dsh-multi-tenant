@@ -16,7 +16,7 @@
 
 - 🚧 **M4 — 真实集成证明。** 在提交上游提案*之前*，用真实 DSH runtime 演示 M3 的结论：
   1. **准入装饰器** ✅ —— 包装真实的 `AgentService`；断言准入在 `setup` 内、先于 `sessions.enter` 执行，覆盖 create / fork / subagent / resume。已由 `scripts/admission-decorator-probe.mjs`（`docs/specs/admission-composition.md` §5）证明：装饰器能加入每一次 `setup`，且准入在四条路径上都先于可见 —— 无需新的准入 seam。
-  2. **真实 `ApiProxy` facade** —— 删掉 spike 的 `ApiSurface`；对真实 `@deepseek-ai/dsh-host-apiproxy` surface 做穷举分类（ALLOW / GUARD / FILTER / DENY），使新增的 DSH 方法**编译失败**，而非默默通过。
+  2. **真实 `ApiProxy` facade** ✅ —— 删掉了 spike 的 `ApiSurface`；对真实 `@deepseek-ai/dsh-host-apiproxy` surface 做了穷举分类（ALLOW / GUARD / FILTER / DENY，共 52 个方法），使新增 DSH 方法**编译失败**。流（`events`）/ `respond` / `downloads` 在 ②-C / H4 之前按拒绝处理。
   3. **真实 transport 原型** —— 对真实 runtime 跑 HTTP / WS / respond / mux / host（仍用 `X-Test-Tenant` / `X-Test-User`），锁死六条租户隔离不变量。
 - 🚧 **M5 — 上游提案 + Web 强制。** 提交 request/connection-scoped principal seam（以及 M4 暴露的任何其他 seam），然后在其上构建强制。
 

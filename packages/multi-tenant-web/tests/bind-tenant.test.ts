@@ -5,8 +5,9 @@ import {
   MultiTenantService,
   SessionAccessDeniedError,
 } from 'dsh-multi-tenant'
+import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { bindTenant } from '../src/bind-tenant.ts'
-import type { ApiSurface, MuxFrame, SessionSummary } from '../src/bind-tenant.ts'
+import { CLASSIFICATION } from '../src/classification.ts'
 
 const alice = { tenantId: 'acme', userId: 'alice', roles: ['member'] }
 const bob = { tenantId: 'acme', userId: 'bob', roles: ['member'] }
@@ -20,76 +21,86 @@ async function makeMultiTenant(): Promise<MultiTenantService> {
   return ctx.multiTenant
 }
 
-function makeMockApi(): ApiSurface {
-  const all: SessionSummary[] = [{ sessionId: 's1' }, { sessionId: 's2' }]
+function makeStubApi(): ApiProxy {
+  const ok = (rpcId: string, value: unknown) => ({ rpcId, result: { ok: true, value } })
   return {
     sessions: {
-      list: async () => ({ items: all }),
-      history: async (req) => ({ historyOf: req.sessionId }),
+      list: async (req: any) => ok(req.rpcId, { items: [{ sessionId: 's1' }, { sessionId: 's2' }] }),
+      search: async (req: any) => ok(req.rpcId, { items: [{ sessionId: 's1' }, { sessionId: 's2' }], hasMore: false }),
+      history: async (req: any) => ok(req.rpcId, { historyOf: req.payload.sessionId }),
     },
-    events: {
-      mux: async function* (): AsyncIterable<MuxFrame> {
-        yield { type: 'session/event', sessionId: 's1' }
-        yield { type: 'session/event', sessionId: 's2' }
-        yield { type: 'stream/error' } // no sessionId → unclassifiable
-      },
+    subagents: {
+      list: async (req: any) => ok(req.rpcId, { entries: [], parentAvailable: true }),
     },
-    respond: async (msg) => ({ respondedTo: msg.sessionId }),
-  }
+    host: {
+      describe: async (req: any) => ok(req.rpcId, {}),
+    },
+    llm: {
+      models: async (req: any) => ok(req.rpcId, {}),
+    },
+    respond: async () => ({ accepted: true }),
+  } as unknown as ApiProxy
 }
 
-async function collect(iterable: AsyncIterable<MuxFrame>): Promise<MuxFrame[]> {
-  const frames: MuxFrame[] = []
-  for await (const frame of iterable) frames.push(frame)
-  return frames
-}
-
-describe('bindTenant facade', () => {
-  it('1. filters session.list to the principal\'s own sessions', async () => {
-    const multiTenant = await makeMultiTenant()
-    const facade = bindTenant(makeMockApi(), alice, multiTenant)
-    const { items } = await facade.sessions.list()
-    expect(items.map(item => item.sessionId)).toEqual(['s1'])
+describe('CLASSIFICATION (exhaustive — compile-time guaranteed by Record<keyof RpcMethodMap, …>)', () => {
+  it('maps session-keyed methods to guard, collections to filter', () => {
+    expect(CLASSIFICATION['session.history']).toBe('guard')
+    expect(CLASSIFICATION['session.list']).toBe('filter')
+    expect(CLASSIFICATION['session.search']).toBe('filter')
+    expect(CLASSIFICATION['goal.create']).toBe('guard')
+    expect(CLASSIFICATION['skill.list']).toBe('guard')
+    expect(CLASSIFICATION['agentPreset.select']).toBe('guard')
+    expect(CLASSIFICATION['subagent.list']).toBe('guard')
   })
 
-  it('2. guards session.history for a foreign session', async () => {
+  it('maps create/global-config to allow, host/workspace to deny', () => {
+    expect(CLASSIFICATION['session.create']).toBe('allow')
+    expect(CLASSIFICATION['llm.models']).toBe('allow')
+    expect(CLASSIFICATION['settings.describe']).toBe('allow')
+    expect(CLASSIFICATION['credentials.set']).toBe('allow')
+    expect(CLASSIFICATION['host.describe']).toBe('deny')
+    expect(CLASSIFICATION['workspace.list']).toBe('deny')
+  })
+})
+
+describe('bindTenant facade (real ApiProxy)', () => {
+  it('guards a point method: own session passes, foreign session denies', async () => {
     const multiTenant = await makeMultiTenant()
-    const facade = bindTenant(makeMockApi(), alice, multiTenant)
-    await expect(facade.sessions.history({ sessionId: 's1' })).resolves.toEqual({ historyOf: 's1' })
-    await expect(facade.sessions.history({ sessionId: 's2' })).rejects.toThrow(SessionAccessDeniedError)
+    const facade = bindTenant(makeStubApi(), alice, multiTenant)
+    await expect((facade.sessions as any).history({ rpcId: 'r', payload: { sessionId: 's1' } })).resolves.toBeDefined()
+    await expect((facade.sessions as any).history({ rpcId: 'r', payload: { sessionId: 's2' } })).rejects.toThrow(SessionAccessDeniedError)
   })
 
-  it('3. filters events.mux frames by sessionId', async () => {
+  it('filters session.list to the principal\'s own sessions', async () => {
     const multiTenant = await makeMultiTenant()
-    const facade = bindTenant(makeMockApi(), alice, multiTenant)
-    const frames = await collect(facade.events.mux())
-    expect(frames.map(frame => frame.sessionId)).toEqual(['s1'])
+    const facade = bindTenant(makeStubApi(), alice, multiTenant)
+    const res: any = await (facade.sessions as any).list({ rpcId: 'r', payload: {} })
+    expect(res.result.value.items.map((item: any) => item.sessionId)).toEqual(['s1'])
   })
 
-  it('4. guards respond for a foreign approval/question', async () => {
+  it('denies host-global methods', async () => {
     const multiTenant = await makeMultiTenant()
-    const facade = bindTenant(makeMockApi(), alice, multiTenant)
-    await expect(facade.respond({ sessionId: 's1' })).resolves.toEqual({ respondedTo: 's1' })
-    await expect(facade.respond({ sessionId: 's2' })).rejects.toThrow(SessionAccessDeniedError)
+    const facade = bindTenant(makeStubApi(), alice, multiTenant)
+    await expect((facade.host as any).describe({ rpcId: 'r', payload: {} })).rejects.toThrow(SessionAccessDeniedError)
   })
 
-  it('5. does not cross-talk between concurrent tenants', async () => {
+  it('allows global-config methods through unchanged', async () => {
     const multiTenant = await makeMultiTenant()
-    const api = makeMockApi()
-    const aliceFacade = bindTenant(api, alice, multiTenant)
-    const bobFacade = bindTenant(api, bob, multiTenant)
-    const [aliceItems, bobItems] = await Promise.all([
-      aliceFacade.sessions.list().then(r => r.items),
-      bobFacade.sessions.list().then(r => r.items),
-    ])
-    expect(aliceItems.map(item => item.sessionId)).toEqual(['s1'])
-    expect(bobItems.map(item => item.sessionId)).toEqual(['s2'])
+    const facade = bindTenant(makeStubApi(), alice, multiTenant)
+    await expect((facade.llm as any).models({ rpcId: 'r', payload: {} })).resolves.toBeDefined()
   })
 
-  it('6. denies (drops) an unclassifiable frame without a sessionId', async () => {
+  it('guards subagent methods on the parent session', async () => {
     const multiTenant = await makeMultiTenant()
-    const facade = bindTenant(makeMockApi(), alice, multiTenant)
-    const frames = await collect(facade.events.mux())
-    expect(frames.some(frame => frame.type === 'stream/error')).toBe(false)
+    const facade = bindTenant(makeStubApi(), alice, multiTenant)
+    await expect((facade.subagents as any).list({ rpcId: 'r', payload: { parentSessionId: 's1' } })).resolves.toBeDefined()
+    await expect((facade.subagents as any).list({ rpcId: 'r', payload: { parentSessionId: 's2' } })).rejects.toThrow(SessionAccessDeniedError)
+  })
+
+  it('denies non-unary surfaces (respond / events)', async () => {
+    const multiTenant = await makeMultiTenant()
+    const facade = bindTenant(makeStubApi(), alice, multiTenant)
+    await expect((facade as any).respond({ type: 'client-response', rpcId: 'r', result: { ok: true, value: {} } })).rejects.toThrow(SessionAccessDeniedError)
+    await expect((facade as any).events.mux()).rejects.toThrow(SessionAccessDeniedError)
   })
 })
