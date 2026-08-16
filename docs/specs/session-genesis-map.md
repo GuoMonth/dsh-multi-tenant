@@ -1,3 +1,5 @@
+[简体中文](./session-genesis-map.zh-CN.md) | English
+
 # Session Genesis Map
 
 > Static analysis of DSH's session + agent lifecycle. Source read at
@@ -88,7 +90,7 @@ what M2.1 must answer.
 | 4. Resume doesn't steal | ✅ idempotent same-owner claim; restore, don't re-claim |
 | 5. Concurrent genesis unique | ✅ `sessionCreations` dedup + `enter` collision check |
 
-## 6. Conclusion (see `session-genesis-adr.md`)
+## 6. Conclusion (see `../adr/session-genesis.md`)
 
 The `setup` hook is the before-visibility async admission point. Composability
 is via wrapping `ctx.agents` (the same mechanism H3 needs to wrap `ApiProxy`).

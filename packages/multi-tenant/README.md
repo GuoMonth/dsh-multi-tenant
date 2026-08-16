@@ -1,3 +1,5 @@
+[简体中文](./README.zh-CN.md) | English
+
 # dsh-multi-tenant
 
 Multi-tenant SaaS extension for DeepSeek Harness (DSH): tenant identity,

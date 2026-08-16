@@ -1,3 +1,5 @@
+[简体中文](./compatibility.zh-CN.md) | English
+
 # Compatibility & versioning policy
 
 ## Runtime
@@ -11,7 +13,7 @@ DeepSeek Harness sub-packages publish a stale `latest` dist-tag (`0.0.1-rc.1`)
 while the newest published version is `0.1.0-rc.6`. **Never depend on
 `latest`** — pin an explicit prerelease version (e.g. `…@0.1.0-rc.6`), and
 record the DSH commit SHA a package's types were verified against (see
-`packages/multi-tenant-web/SEAM-MAP.md`).
+`../specs/web-seam-map.md`).
 
 ## Toolchain
 

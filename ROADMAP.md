@@ -1,3 +1,5 @@
+[简体中文](./ROADMAP.zh-CN.md) | English
+
 # Roadmap
 
 Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
@@ -14,7 +16,7 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
   enforcement is blocked on an upstream per-connection seam (H3).
 - ✅ **Kernel engineering harness** — `TenantSessionStore` contract suite
   (`dsh-multi-tenant/testing`), architecture gate (`pnpm verify`), package
-  smoke (`pnpm smoke`), compatibility policy (`docs/compatibility.md`).
+  smoke (`pnpm smoke`), compatibility policy (`docs/reference/compatibility.md`).
 
 ## Next (settled)
 

@@ -1,8 +1,10 @@
+[简体中文](./web-enforcement.zh-CN.md) | English
+
 # ADR — DSH Web Multi-Tenant Enforcement (converged)
 
 > Status: **proposed**. Converges M2 (session genesis), M3.0 (admission
-> composition), and the web Seam Map (`packages/multi-tenant-web/SEAM-MAP.md`).
-> Supersedes `packages/multi-tenant-web/ADR.md` (which predated M2/M3.0).
+> composition), and the web Seam Map (`../specs/web-seam-map.md`). Supersedes the
+> earlier web ADR (which predated M2/M3.0).
 
 ## Context
 

@@ -1,3 +1,5 @@
+[简体中文](./admission-composition.zh-CN.md) | English
+
 # M3.0 — Agent Setup Admission Composition
 
 > Static proof of how a third-party Cordis plugin can reliably join every Agent

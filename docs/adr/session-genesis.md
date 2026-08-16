@@ -1,6 +1,8 @@
+[简体中文](./session-genesis.zh-CN.md) | English
+
 # ADR — Session Genesis Ownership
 
-> Status: **proposed**. Based on the static `session-genesis-map.md` and the
+> Status: **proposed**. Based on the static `../specs/session-genesis-map.md` and the
 > `@deepseek-ai/dsh-session@0.1.0-rc.6` runtime probe (F1/F2). The Agent `setup`
 > semantics are statically confirmed; a full agent-stack runtime probe is
 > deferred (the `AgentLoop` injects `llm`/`tools`/`systemPrompt`, and the source

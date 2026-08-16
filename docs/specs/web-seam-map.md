@@ -1,8 +1,10 @@
+[简体中文](./web-seam-map.zh-CN.md) | English
+
 # DSH Web Multi-Tenant Seam Map
 
 > Based on `deepseek-ai/deepseek-harness` @ `47f943859bef60e4160492346772ded9b24f765a`
 > (master, 2026-08-15). Preliminary verdicts are refined by the executable
-> prototype; final verdicts land in `ADR.md`.
+> prototype; final verdicts land in `../adr/web-enforcement.md`.
 
 ## 1. Summary
 
