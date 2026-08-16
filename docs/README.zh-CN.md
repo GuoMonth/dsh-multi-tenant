@@ -17,6 +17,7 @@
 
 ## 规格与分析
 
+- [架构 —— 六层](./specs/architecture.zh-CN.md) — 全局六层图
 - [会话创生图](./specs/session-genesis-map.zh-CN.md) — `prepare → setup → enter → announce` 生命周期
 - [准入组合](./specs/admission-composition.zh-CN.md) — 插件如何加入每一次 Agent `setup`（M3.0）
 - [Web seam 图](./specs/web-seam-map.zh-CN.md) — 五个授权 surface

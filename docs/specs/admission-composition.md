@@ -5,7 +5,7 @@
 > Static proof of how a third-party Cordis plugin can reliably join every Agent
 > `setup`. Source read at `deepseek-ai/deepseek-harness` @
 > `47f943859bef60e4160492346772ded9b24f765a`. Runtime proof of the chosen
-> candidate is M3.1's first step.
+> candidate landed in M4 (②-A) — see §5 and `scripts/admission-decorator-probe.mjs`.
 
 ## 1. The composition mechanism
 
@@ -84,8 +84,33 @@ This matches the M2 ADR: **only top-level create needs H3**.
   *unfailing* and carries the identity via `options`; **A** is user-config, **B**
   does not exist.
 - **D** (an upstream global setup-contribution middleware) is the cleaner
-  alternative if wrapping `ctx.agents` proves too invasive in M3.1.
+  alternative if wrapping `ctx.agents` proves too invasive in M3.1. **M4 (②-A)
+  shows it is not required** — C holds at runtime.
 
-M3.1's first step is the runtime proof of **C** — wrap `ctx.agents`, assert the
-admission runs inside `setup` before `sessions.enter`, for the three
-identity-bearing paths.
+## 5. Runtime proof (M4 · ②-A)
+
+`scripts/admission-decorator-probe.mjs` wraps the **real** `AgentRegistry`
+(`ctx.agents`, `@deepseek-ai/dsh-agent`) and runs admission against the **real**
+`AgentLoop` (`@deepseek-ai/dsh-agent-loop@0.1.0-rc.6`) + `SessionStore`
+(`@deepseek-ai/dsh-session@0.1.0-rc.6`). The `llm` / `tools` / `systemPrompt`
+services are structurally injected but not exercised by the create → setup →
+enter path, so they are no-op stubs; `sessionPersistence` is a minimal stub for
+the resume path.
+
+Result — for all four genesis paths the admission ran inside `setup`, and the
+session was **not yet in the store** at admission time (i.e. before
+`sessions.enter`), then was present after create/resume resolved:
+
+| Path | Identity available in `options` | Admission before `sessions.enter` |
+| --- | --- | --- |
+| create | `sessionId` | ✅ |
+| fork | `meta.parentSession` | ✅ |
+| subagent | `meta.origin === 'subagent'` + `meta.parentSession` | ✅ |
+| resume | `resumeSessionId` | ✅ |
+
+This proves **C is composable** (a plugin can wrap `ctx.agents` and prepend to
+`setup`) and that the admission point is **before visibility** for every path.
+What it does *not* yet prove (②-C) is that a plugin installs the wrap
+*unfailingly before the host's own `create` calls* in a live deployment — that is
+the transport prototype's job. The upstream gap therefore remains **H3 only**
+(identity for top-level `create`), not a new admission seam.
