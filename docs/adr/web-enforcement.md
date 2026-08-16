@@ -17,7 +17,7 @@ multi-tenancy across DSH Web's surfaces.
 | Concern | Status |
 | --- | --- |
 | **H1 — session genesis** | **resolved (M2)** — the Agent `setup` hook is the before-visibility async admission point; no core change. |
-| **Admission composability** | **resolved (M3.0)** — a plugin joins every `setup` via the `ctx.agents` decorator (identity via `options`); no new seam. |
+| **Admission composability** | **runtime-proven (M4 ②-A)** — a plugin wraps `ctx.agents` and its admission runs inside `setup` before `sessions.enter`; *unfailing* scope installation (before the host's own `create`) is ②-C. |
 | **Enforcement surfaces** (unary guard/filter, mux/host stream filter, respond guard) | **solvable** — the closure-bound `ApiProxy` facade (PR #2's `bind-tenant.ts`) wraps the session-bearing methods and streams. |
 | **Ghost ownership** | **v0-safe tombstone** (M2) — session ids must not be reusable; cleanup semantics deferred. |
 
@@ -45,6 +45,8 @@ Explicitly **not** required:
 
 ## Next
 
-File the H3 upstream proposal (request/connection-scoped principal seam), then
-build the enforcement: `ctx.agents` decorator (admission) + `ApiProxy` facade
-(guard/filter/respond) against the real DSH runtime.
+②-A (admission decorator) is runtime-proven via
+`scripts/admission-decorator-probe.mjs`. Remaining M4 work: ②-B (real `ApiProxy`
+facade + exhaustive classification) and ②-C (real HTTP/WS transport prototype).
+Then file the H3 upstream proposal (request/connection-scoped principal seam)
+and build the full enforcement on top of it.
