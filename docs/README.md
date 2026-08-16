@@ -17,6 +17,7 @@ Navigation hub for `dsh-multi-tenant` documentation.
 
 ## Specs & analysis
 
+- [Architecture — six layers](./specs/architecture.md) — the global six-layer map
 - [Session genesis map](./specs/session-genesis-map.md) — the `prepare → setup → enter → announce` lifecycle
 - [Admission composition](./specs/admission-composition.md) — how a plugin joins every Agent `setup` (M3.0)
 - [Web seam map](./specs/web-seam-map.md) — the five authorization surfaces
