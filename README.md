@@ -1,3 +1,5 @@
+[简体中文](./README.zh-CN.md) | English
+
 # dsh-multi-tenant
 
 Composable multi-tenant / SaaS plugin suite for
@@ -37,6 +39,7 @@ plugin's unit test can prove.
   layer, if it passes the same contract test.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for how development is done here.
+Full documentation lives in [`docs/`](./docs/README.md).
 
 ## Packages
 

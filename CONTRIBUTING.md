@@ -1,3 +1,5 @@
+[简体中文](./CONTRIBUTING.zh-CN.md) | English
+
 # Contributing
 
 ## Development model: spec-driven, then test-driven
@@ -12,8 +14,8 @@ This repository develops by **spec first, test second, implementation third**.
    pass.
 3. **Implement** — the smallest thing that satisfies the spec and the test.
 
-Current spec artifacts: `packages/multi-tenant-web/SEAM-MAP.md` (web surfaces)
-and `packages/multi-tenant-web/ADR.md` (hard conclusions + upstream seam
+Current spec artifacts: `docs/specs/web-seam-map.md` (web surfaces) and
+`docs/adr/web-enforcement.md` (hard conclusions + upstream seam
 proposal).
 
 ## Package conventions
