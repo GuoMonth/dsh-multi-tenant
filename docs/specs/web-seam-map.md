@@ -5,6 +5,12 @@
 > Based on `deepseek-ai/deepseek-harness` @ `47f943859bef60e4160492346772ded9b24f765a`
 > (master, 2026-08-15). Preliminary verdicts are refined by the executable
 > prototype; final verdicts land in `../adr/web-enforcement.md`.
+>
+> **Converged since this map was written** (see the ADR): **H1** (create→claim
+> atomicity) is resolved by the Agent `setup` hook — admission runs before
+> `sessions.enter` (runtime-proven M4 ②-A). **H4** (respond) is solvable via the
+> facade's `api.respond` wrap. **H3** (principal propagation) remains the one
+> upstream gap; **H2** (resource model) stays deferred.
 
 ## 1. Summary
 
@@ -25,7 +31,7 @@ DSH Web exposes **five** authorization-relevant surfaces, organized by
 |---|---|---|---|---|---|---|
 | Session | `history` `prompt` `rename` `fork` `cancel` `models` `selectModel` `attachment` `updateQueue` | Point | Guard | `/api` unary | handler `(endpoint, payload, signal)`; payload carries `sessionId` | **Guardable**; principal propagation open (→H3) |
 | Session | `list` `search` | Collection | Filter | `/api` unary | `session.list`/`session.search` return everything (no `sessionId`) | **Filterable**; same propagation issue (→H3) |
-| Session | `create` `fork` | Create | Atomic claim | `session.create` lifecycle | `create(id?: SessionId)` — client may pre-allocate; claim happens after | **NOT atomic today** (→H1) |
+| Session | `create` `fork` | Create | Atomic claim | Agent `setup` hook | admission in `setup` runs before `sessions.enter` (no window) | **Atomic via `setup`** (H1 resolved — ADR) |
 | Session | mux frames | Stream | Filter | `events.mux` | all-session aggregated (`ctx.sessions.list()` loop); every frame except `stream/error` is `sessionId`-keyed | **Filterable only via facade/upstream** (→H3) |
 | Approval/Question | `respond` | Response | Guard | `/api/respond` | `clientResponseSchema`, not a `ClientRequest`; not in `rpc.intercept()` | **Not covered by unary intercept** (→H4) |
 | Workspace | host frames | Stream | Filter / deny | `events.host` | `HostFrame` mixes session + workspace + host-global | **Requires resource model** (→H2) |
@@ -108,7 +114,7 @@ Approval/question is server-initiated: `approval/requested` → browser answers 
 `ClientRequest`. The unary `rpc.intercept()` path decodes `ClientRequest` only;
 `toFetchHandler` special-cases `/api/respond`. The response payload carries
 `sessionId`, so ownership **is** checkable — but there is no shared seam with the
-unary path (→H4).
+unary path (→H4). Resolved by the facade's `api.respond` wrap (ADR).
 
 ## 6. Seams and gaps (→ Hard Conclusions)
 
@@ -116,8 +122,8 @@ unary path (→H4).
 |---|---|---|
 | Unary handler has no principal/Request | `ConnectionRpcHandler = (endpoint, payload, signal)` | H3 |
 | Mux/host streams are global | `WebSocketDownlinks` holds one `ApiProxy`; `events.mux` aggregates `ctx.sessions.list()` | H3 |
-| `/api/respond` bypasses unary intercept | `clientResponseSchema` special-case in `toFetchHandler` | H4 |
-| create→claim race | `session.create(id?: SessionId)`; core has no `release`/`reassign` | H1 |
+| `/api/respond` bypasses unary intercept | `clientResponseSchema` special-case in `toFetchHandler` | ~~H4~~ resolved (facade `api.respond` wrap) |
+| ~~create→claim race~~ | `session.create(id?: SessionId)`; core has no `release`/`reassign` | ~~H1~~ resolved (`setup` hook, M4 ②-A) |
 | host stream exposes Workspace + host-global | `HostFrame` union includes `workspace-*`, `remote-event` | H2 |
 
 ## 7. Ecosystem notes

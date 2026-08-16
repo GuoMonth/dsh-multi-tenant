@@ -4,6 +4,8 @@
 
 > 基于 `deepseek-ai/deepseek-harness` @ `47f943859bef60e4160492346772ded9b24f765a`
 > （master，2026-08-15）。初步判定由可执行原型细化；最终判定落在 `../adr/web-enforcement.md`。
+>
+> **本图成文后已收敛**（见 ADR）：**H1**（create→claim 原子性）由 Agent `setup` 钩子解决 —— 准入在 `sessions.enter` 之前运行（M4 ②-A 运行时证明）。**H4**（respond）可经 facade 的 `api.respond` 包装解决。**H3**（principal 传播）仍是唯一上游缺口；**H2**（资源模型）仍延后。
 
 ## 1. 概述
 
@@ -23,7 +25,7 @@ DSH Web 暴露**五个**与授权相关的 surface，按 **Resource × Access Sh
 |---|---|---|---|---|---|---|
 | Session | `history` `prompt` `rename` `fork` `cancel` `models` `selectModel` `attachment` `updateQueue` | Point | Guard | `/api` unary | handler `(endpoint, payload, signal)`；payload 携带 `sessionId` | **可守卫**；principal 传播待定（→H3） |
 | Session | `list` `search` | Collection | Filter | `/api` unary | `session.list`/`session.search` 返回全部（无 `sessionId`） | **可过滤**；同一传播问题（→H3） |
-| Session | `create` `fork` | Create | Atomic claim | `session.create` 生命周期 | `create(id?: SessionId)` —— 客户端可预分配；认领发生在其后 | **今天非原子**（→H1） |
+| Session | `create` `fork` | Create | Atomic claim | Agent `setup` 钩子 | 准入在 `setup` 内、`sessions.enter` 之前运行（无窗口） | **经 `setup` 原子**（H1 已解决 — ADR） |
 | Session | mux frames | Stream | Filter | `events.mux` | 全 session 聚合（`ctx.sessions.list()` 循环）；除 `stream/error` 外的每个 frame 都以 `sessionId` 为键 | **仅能经 facade/上游过滤**（→H3） |
 | Approval/Question | `respond` | Response | Guard | `/api/respond` | `clientResponseSchema`，非 `ClientRequest`；不在 `rpc.intercept()` 内 | **未被 unary intercept 覆盖**（→H4） |
 | Workspace | host frames | Stream | Filter / deny | `events.host` | `HostFrame` 混合 session + workspace + host-global | **需要资源模型**（→H2） |
@@ -89,7 +91,7 @@ type HostFrame =
 
 ## 5. `/api/respond`（双向）
 
-Approval/question 是服务端发起的：`approval/requested` → 浏览器应答 → 携带 `ClientResponse`（`clientResponseSchema`）的 `POST /api/respond`，**而非** `ClientRequest`。unary `rpc.intercept()` 路径只解码 `ClientRequest`；`toFetchHandler` 特判 `/api/respond`。响应 payload 携带 `sessionId`，因此所有权**是**可检查的 —— 但与 unary 路径之间没有共享 seam（→H4）。
+Approval/question 是服务端发起的：`approval/requested` → 浏览器应答 → 携带 `ClientResponse`（`clientResponseSchema`）的 `POST /api/respond`，**而非** `ClientRequest`。unary `rpc.intercept()` 路径只解码 `ClientRequest`；`toFetchHandler` 特判 `/api/respond`。响应 payload 携带 `sessionId`，因此所有权**是**可检查的 —— 但与 unary 路径之间没有共享 seam（→H4）。经 facade 的 `api.respond` 包装解决（ADR）。
 
 ## 6. Seam 与缺口（→ 硬结论）
 
@@ -97,8 +99,8 @@ Approval/question 是服务端发起的：`approval/requested` → 浏览器应�
 |---|---|---|
 | Unary handler 无 principal/Request | `ConnectionRpcHandler = (endpoint, payload, signal)` | H3 |
 | Mux/host 流是全局的 | `WebSocketDownlinks` 持有一个 `ApiProxy`；`events.mux` 聚合 `ctx.sessions.list()` | H3 |
-| `/api/respond` 绕过 unary intercept | `toFetchHandler` 中的 `clientResponseSchema` 特例 | H4 |
-| create→claim 竞态 | `session.create(id?: SessionId)`；core 无 `release`/`reassign` | H1 |
+| `/api/respond` 绕过 unary intercept | `toFetchHandler` 中的 `clientResponseSchema` 特例 | ~~H4~~ 已解决（facade `api.respond` 包装） |
+| ~~create→claim 竞态~~ | `session.create(id?: SessionId)`；core 无 `release`/`reassign` | ~~H1~~ 已解决（`setup` 钩子，M4 ②-A） |
 | host 流暴露 Workspace + host-global | `HostFrame` union 含 `workspace-*`、`remote-event` | H2 |
 
 ## 7. 生态备注

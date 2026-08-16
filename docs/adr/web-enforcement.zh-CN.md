@@ -13,7 +13,7 @@
 | 关注点 | 状态 |
 | --- | --- |
 | **H1 — 会话创生** | **已解决（M2）** —— Agent `setup` 钩子是可见之前的异步准入点；无需内核改动。 |
-| **准入组合性** | **已解决（M3.0）** —— 插件通过 `ctx.agents` 装饰器加入每一次 `setup`（身份经 `options`）；无需新 seam。 |
+| **准入组合性** | **运行时已证（M4 ②-A）** —— 插件包装 `ctx.agents`，其准入在 `setup` 内、`sessions.enter` 之前运行；*无条件* scope 安装（先于宿主自身的 `create`）仍属 ②-C。 |
 | **强制 surface**（unary guard/filter、mux/host 流 filter、respond guard） | **可解决** —— 闭包绑定的 `ApiProxy` facade（PR #2 的 `bind-tenant.ts`）包装承载会话的方法与流。 |
 | **幽灵所有权** | **v0 安全墓碑**（M2） —— 会话 id 必须不可复用；清理语义延后。 |
 
@@ -33,4 +33,4 @@ facade 接收一个 `TenantPrincipal`，但 principal 在 **RPC 边界被丢弃*
 
 ## 下一步
 
-提交 H3 上游提案（request/connection-scoped principal seam），然后基于真实 DSH 运行时构建强制：`ctx.agents` 装饰器（准入）+ `ApiProxy` facade（guard/filter/respond）。
+②-A（准入装饰器）已由 `scripts/admission-decorator-probe.mjs` 运行时证明。剩余 M4 工作：②-B（真实 `ApiProxy` facade + 穷举分类）与 ②-C（真实 HTTP/WS transport 原型）。然后提交 H3 上游提案（request/connection-scoped principal seam）并在此之上构建完整强制。
