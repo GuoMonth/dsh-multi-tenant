@@ -13,42 +13,43 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
   delegated root scripts, CI.
 - ✅ **Web seam spike (M2)** — Seam Map, executable facade prototype (6 security
   invariants), and the converged web ADR. Concluded that web enforcement is
-  blocked on an upstream per-connection seam (H3).
+  blocked on a transport principal-binding problem (H3 hypothesis).
 - ✅ **Kernel engineering harness** — `TenantSessionStore` contract suite
   (`dsh-multi-tenant/testing`), architecture gate (`pnpm verify`), package
   smoke (`pnpm smoke`), compatibility policy (`docs/reference/compatibility.md`).
 - ✅ **Architecture convergence (M3)** — six-layer architecture
   (`docs/specs/architecture.md`), the Agent `setup` hook confirmed as the
-  admission point, and "H3-only" established as a **hypothesis**: enforcement is
-  *statically* solvable via a `ctx.agents` decorator + `ApiProxy` facade. The
-  **runtime proof is deferred to M4** — the static conclusions are not yet
-  demonstrated against the real DSH runtime.
+  admission point, and "H3-only" established as a **hypothesis** to verify with
+  real transport evidence in M4.
 
 ## Next (settled)
 
 - 🚧 **M4 — Real integration proof.** Demonstrate the M3 claims against the real
   DSH runtime *before* filing the upstream proposal:
-  1. **Admission decorator** ✅ — wrap the real `AgentService`; assert the
-     admission runs inside `setup`, before `sessions.enter`, for
-     create / fork / subagent / resume. Proven by
-     `scripts/admission-decorator-probe.mjs` (`docs/specs/admission-composition.md`
-     §5): a decorator joins every `setup` and the admission runs before
-     visibility on all four paths — no new admission seam needed.
-  2. **Real `ApiProxy` facade** ✅ — dropped the spike `ApiSurface`; classified the
-     real `@deepseek-ai/dsh-host-apiproxy` surface exhaustively (ALLOW / GUARD /
-     FILTER / DENY, 52 methods) so a new DSH method fails to compile. Streams
-     (`events`) / `respond` / `downloads` are denied until ②-C / H4.
+  1. **Admission decorator** ✅ — real `AgentService`, create / fork / subagent /
+     resume, admission inside `setup` before `sessions.enter`.
+  2. **Real `ApiProxy` facade** ✅ — the spike `ApiSurface` is gone; the real
+     `RpcMethodMap` is exhaustively classified at compile time. The v0 security
+     policy is fail-closed: GUARD session points, FILTER only `session.list`,
+     ADMIT `session.create` (denied until the admission bridge is installed),
+     and DENY search / host-global / deployment-management surfaces that do not
+     yet have tenant-safe semantics. Streams / `respond` / `downloads` remain
+     denied pending ②-C.
   3. **Real transport prototype** — HTTP / WS / respond / mux / host against the
-     real runtime (still `X-Test-Tenant` / `X-Test-User`), locking the six
-     tenant-isolation invariants.
+     real runtime (still `X-Test-Tenant` / `X-Test-User`), locking the tenant-
+     isolation invariants, `rpcId → sessionId` respond correlation, and
+     unfailing installation ordering.
 - 🚧 **M5 — Upstream proposal + web enforcement.** File the request/connection-
-  scoped principal seam (plus any other seam M4 surfaces), then build the
-  enforcement on top of it.
+  scoped principal seam (plus any other seam M4 actually proves necessary),
+  then build the full enforcement on top of it.
 
 ## Deferred (decision-gated)
 
 - ⏳ **H2 — resource model.** Whether Workspace and host-global frames are
   tenant-owned. Product decision; until then, v0 denies non-session host frames.
+- ⏳ **Tenant-scoped search.** `session.search` is globally ranked/capped today;
+  it stays denied until a visibility predicate / scoped candidate set preserves
+  correct search semantics.
 - ⏳ **Auth providers** (JWT / OIDC / API key). Post-H3; `TenantPrincipalResolver`
   placement still undecided.
 - ⏳ **Durable stores** (PostgreSQL / Redis / MySQL). Create a provider package
@@ -66,11 +67,10 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
   smoke, compatibility policy.
 - **M2 — Session genesis spike** ✅ `setup` hook confirmed as the admission
   point; fork / subagent / resume solvable today.
-- **M3 — Architecture convergence** ✅ *static only*: six-layer architecture,
-  H3-only as a hypothesis; enforcement statically solvable via `ctx.agents`
-  decorator + `ApiProxy` facade.
-- **M4 — Real integration proof** 🚧 admission decorator, real `ApiProxy`
-  facade + exhaustive classification, real HTTP/WS transport prototype.
+- **M3 — Architecture convergence** ✅ six-layer architecture and H3-only as a
+  hypothesis.
+- **M4 — Real integration proof** 🚧 admission decorator and real unary
+  `ApiProxy` are proven; real HTTP/WS transport remains.
 - **M5 — Upstream proposal + web enforcement.**
 - **M6 — Providers** durable stores, auth.
 - **M7 — MCP / audit / full-stack preset.**
