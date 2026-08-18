@@ -5,12 +5,13 @@
  * and enforces the tenant boundary per method, driven by the exhaustive
  * `CLASSIFICATION` table in `./classification.ts`:
  *
- *   - `allow`  — pass through unchanged.
+ *   - `allow`  — explicitly tenant-neutral read-only discovery; pass through.
  *   - `guard`  — assert `assertSessionAccess` on the payload's session id before
  *     delegating (throws a uniform `SessionAccessDeniedError` on denial).
- *   - `filter` — project `session.list` / `session.search` results to the
- *     sessions the principal may access.
- *   - `deny`   — fail closed (host-global / workspace surfaces; unclassified).
+ *   - `filter` — project post-filterable collections to visible sessions.
+ *   - `admit`  — requires the pre-publication Agent `setup` admission bridge;
+ *     denied by the standalone facade until M4 ②-C installs that bridge.
+ *   - `deny`   — fail closed (host/global/unmodelled surfaces).
  *
  * The principal is **closed over**, never written to any shared/ambient context,
  * so concurrent tenants cannot cross-talk. The proxy is the runtime dispatcher;
@@ -55,9 +56,7 @@ function methodName(namespace: string, method: string): string {
   return `${NAMESPACE_PREFIX[namespace] ?? namespace}.${method}`
 }
 
-/**
- * Return `api` narrowed to the sessions `principal` may access.
- */
+/** Return `api` narrowed to the sessions `principal` may access. */
 export function bindTenant(
   api: ApiProxy,
   principal: TenantPrincipal,
@@ -68,6 +67,7 @@ export function bindTenant(
     switch (classify(name)) {
       case 'allow':
         return fn
+      case 'admit':
       case 'deny':
         return deny
       case 'guard':

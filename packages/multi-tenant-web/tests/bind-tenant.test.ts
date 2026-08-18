@@ -27,6 +27,7 @@ function makeStubApi(): ApiProxy {
     sessions: {
       list: async (req: any) => ok(req.rpcId, { items: [{ sessionId: 's1' }, { sessionId: 's2' }] }),
       search: async (req: any) => ok(req.rpcId, { items: [{ sessionId: 's1' }, { sessionId: 's2' }], hasMore: false }),
+      create: async (req: any) => ok(req.rpcId, { sessionId: 'new' }),
       history: async (req: any) => ok(req.rpcId, { historyOf: req.payload.sessionId }),
     },
     subagents: {
@@ -35,31 +36,46 @@ function makeStubApi(): ApiProxy {
     host: {
       describe: async (req: any) => ok(req.rpcId, {}),
     },
+    settings: {
+      describe: async (req: any) => ok(req.rpcId, {}),
+    },
+    credentials: {
+      set: async (req: any) => ok(req.rpcId, {}),
+    },
     llm: {
       models: async (req: any) => ok(req.rpcId, {}),
+    },
+    agentPresets: {
+      list: async (req: any) => ok(req.rpcId, { presets: [] }),
+      read: async (req: any) => ok(req.rpcId, {}),
     },
     respond: async () => ({ accepted: true }),
   } as unknown as ApiProxy
 }
 
 describe('CLASSIFICATION (exhaustive — compile-time guaranteed by Record<keyof RpcMethodMap, …>)', () => {
-  it('maps session-keyed methods to guard, collections to filter', () => {
+  it('guards session-keyed methods and only post-filters safe collections', () => {
     expect(CLASSIFICATION['session.history']).toBe('guard')
     expect(CLASSIFICATION['session.list']).toBe('filter')
-    expect(CLASSIFICATION['session.search']).toBe('filter')
+    expect(CLASSIFICATION['session.search']).toBe('deny')
     expect(CLASSIFICATION['goal.create']).toBe('guard')
     expect(CLASSIFICATION['skill.list']).toBe('guard')
     expect(CLASSIFICATION['agentPreset.select']).toBe('guard')
     expect(CLASSIFICATION['subagent.list']).toBe('guard')
   })
 
-  it('maps create/global-config to allow, host/workspace to deny', () => {
-    expect(CLASSIFICATION['session.create']).toBe('allow')
-    expect(CLASSIFICATION['llm.models']).toBe('allow')
-    expect(CLASSIFICATION['settings.describe']).toBe('allow')
-    expect(CLASSIFICATION['credentials.set']).toBe('allow')
+  it('treats session.create as admission, not ordinary allow', () => {
+    expect(CLASSIFICATION['session.create']).toBe('admit')
+  })
+
+  it('denies deployment-management surfaces by default', () => {
     expect(CLASSIFICATION['host.describe']).toBe('deny')
     expect(CLASSIFICATION['workspace.list']).toBe('deny')
+    expect(CLASSIFICATION['settings.describe']).toBe('deny')
+    expect(CLASSIFICATION['credentials.set']).toBe('deny')
+    expect(CLASSIFICATION['llm.models']).toBe('deny')
+    expect(CLASSIFICATION['agentPreset.read']).toBe('deny')
+    expect(CLASSIFICATION['agentPreset.list']).toBe('allow')
   })
 })
 
@@ -78,16 +94,31 @@ describe('bindTenant facade (real ApiProxy)', () => {
     expect(res.result.value.items.map((item: any) => item.sessionId)).toEqual(['s1'])
   })
 
-  it('denies host-global methods', async () => {
+  it('denies search until tenant-scoped query semantics exist', async () => {
     const multiTenant = await makeMultiTenant()
     const facade = bindTenant(makeStubApi(), alice, multiTenant)
-    await expect((facade.host as any).describe({ rpcId: 'r', payload: {} })).rejects.toThrow(SessionAccessDeniedError)
+    await expect((facade.sessions as any).search({ rpcId: 'r', payload: { query: 'x' } })).rejects.toThrow(SessionAccessDeniedError)
   })
 
-  it('allows global-config methods through unchanged', async () => {
+  it('denies session.create until the admission bridge is installed', async () => {
     const multiTenant = await makeMultiTenant()
     const facade = bindTenant(makeStubApi(), alice, multiTenant)
-    await expect((facade.llm as any).models({ rpcId: 'r', payload: {} })).resolves.toBeDefined()
+    await expect((facade.sessions as any).create({ rpcId: 'r', payload: {} })).rejects.toThrow(SessionAccessDeniedError)
+  })
+
+  it('denies deployment-management methods', async () => {
+    const multiTenant = await makeMultiTenant()
+    const facade = bindTenant(makeStubApi(), alice, multiTenant)
+    await expect((facade.settings as any).describe({ rpcId: 'r', payload: {} })).rejects.toThrow(SessionAccessDeniedError)
+    await expect((facade.credentials as any).set({ rpcId: 'r', payload: { ref: 'x', value: 'secret' } })).rejects.toThrow(SessionAccessDeniedError)
+    await expect((facade.llm as any).models({ rpcId: 'r', payload: {} })).rejects.toThrow(SessionAccessDeniedError)
+    await expect((facade.agentPresets as any).read({ rpcId: 'r', payload: { agentPreset: 'p' } })).rejects.toThrow(SessionAccessDeniedError)
+  })
+
+  it('allows explicitly tenant-neutral picker discovery', async () => {
+    const multiTenant = await makeMultiTenant()
+    const facade = bindTenant(makeStubApi(), alice, multiTenant)
+    await expect((facade.agentPresets as any).list({ rpcId: 'r', payload: {} })).resolves.toBeDefined()
   })
 
   it('guards subagent methods on the parent session', async () => {

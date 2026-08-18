@@ -8,22 +8,22 @@
  * silently pass through as unclassified.
  *
  * Categories:
- *   - `allow`  — no session identity; pass through unchanged (global config:
- *               settings, credentials, llm, agent-preset management, and
- *               `session.create`, whose ownership is established downstream in
- *               the Agent `setup` admission hook).
+ *   - `allow`  — explicitly tenant-neutral read-only discovery that is safe to
+ *               expose unchanged.
  *   - `guard`  — a point method whose payload carries a session id; the facade
  *               asserts `assertSessionAccess` before delegating.
- *   - `filter` — a collection method (`session.list` / `session.search`) whose
- *               result is projected to the sessions the principal may access.
- *   - `deny`   — host-global / workspace surfaces that cannot be tenant-isolated
- *               until the resource model (H2) is decided; fail closed.
+ *   - `filter` — a collection that is semantically safe to post-filter by
+ *               session ownership (`session.list` today).
+ *   - `admit`  — creates a new tenant-owned resource and therefore requires the
+ *               pre-publication Agent `setup` admission path. The standalone
+ *               ApiProxy facade denies it until that bridge is installed.
+ *   - `deny`   — host/global or otherwise unmodelled surfaces; fail closed.
  *
  * @module dsh-multi-tenant-web/classification
  */
 import type { RpcMethodMap } from '@deepseek-ai/dsh-host-apiproxy/api'
 
-export type Category = 'allow' | 'guard' | 'filter' | 'deny'
+export type Category = 'allow' | 'guard' | 'filter' | 'admit' | 'deny'
 
 /**
  * Method name → category. Annotation (not `satisfies`) so both a *missing* key
@@ -32,8 +32,13 @@ export type Category = 'allow' | 'guard' | 'filter' | 'deny'
 export const CLASSIFICATION: Record<keyof RpcMethodMap, Category> = {
   // session.*
   'session.list': 'filter',
-  'session.search': 'filter',
-  'session.create': 'allow',
+  // Search is capped/ranked globally (20 results + hasMore). Post-filtering can
+  // hide a tenant's lower-ranked matches, so it is not a correct tenant-scoped
+  // query until DSH exposes a visibility predicate / scoped candidate set.
+  'session.search': 'deny',
+  // Creation is not ordinary ALLOW: ownership must be established in Agent
+  // setup before publication. The transport/admission bridge lands in M4 ②-C.
+  'session.create': 'admit',
   'session.history': 'guard',
   'session.models': 'guard',
   'session.selectModel': 'guard',
@@ -64,13 +69,14 @@ export const CLASSIFICATION: Record<keyof RpcMethodMap, Category> = {
   'workspace.archiveSession': 'deny',
   // skill.* — session-contextual listing.
   'skill.list': 'guard',
-  // agentPreset.* — management is global; `select` targets one session.
+  // agentPreset.list is picker discovery; select targets one guarded session.
+  // Authoring/inspection calls are deployment-management surfaces → deny.
   'agentPreset.list': 'allow',
   'agentPreset.select': 'guard',
-  'agentPreset.read': 'allow',
-  'agentPreset.copy': 'allow',
-  'agentPreset.openDocument': 'allow',
-  'agentPreset.remove': 'allow',
+  'agentPreset.read': 'deny',
+  'agentPreset.copy': 'deny',
+  'agentPreset.openDocument': 'deny',
+  'agentPreset.remove': 'deny',
   // goal.* — session-scoped (each goal carries its sessionId).
   'goal.create': 'guard',
   'goal.edit': 'guard',
@@ -78,20 +84,22 @@ export const CLASSIFICATION: Record<keyof RpcMethodMap, Category> = {
   'goal.resume': 'guard',
   'goal.complete': 'guard',
   'goal.clear': 'guard',
-  // settings.* — deployment/global config, not session data.
-  'settings.describe': 'allow',
-  'settings.openDocument': 'allow',
-  'settings.update': 'allow',
-  'settings.replace': 'allow',
-  'settings.mutate': 'allow',
-  // credentials.* — global credential management.
-  'credentials.describe': 'allow',
-  'credentials.set': 'allow',
-  'credentials.unset': 'allow',
-  // llm.* — global provider/model catalog.
-  'llm.providers': 'allow',
-  'llm.models': 'allow',
-  'llm.discoverModels': 'allow',
+  // settings.* — deployment/global configuration. DSH documents these as
+  // loopback/configuration-plane surfaces, including write-only secrets.
+  'settings.describe': 'deny',
+  'settings.openDocument': 'deny',
+  'settings.update': 'deny',
+  'settings.replace': 'deny',
+  'settings.mutate': 'deny',
+  // credentials.* — deployment credential management, never tenant-session data.
+  'credentials.describe': 'deny',
+  'credentials.set': 'deny',
+  'credentials.unset': 'deny',
+  // llm.* — host-scoped provider/configuration catalog. Session-scoped model
+  // discovery remains available through guarded `session.models`.
+  'llm.providers': 'deny',
+  'llm.models': 'deny',
+  'llm.discoverModels': 'deny',
 }
 
 /**

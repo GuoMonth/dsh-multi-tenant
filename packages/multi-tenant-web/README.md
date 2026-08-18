@@ -10,10 +10,15 @@ DSH Web multi-tenant integration: principal binding, RPC/mux/WS authorization.
 
 ## Status
 
-M4 in progress: the admission decorator (②-A) and the real `ApiProxy` facade
-with exhaustive classification (②-B) are done. `bindTenant` wraps the real
-`@deepseek-ai/dsh-host-apiproxy` `ApiProxy`; `CLASSIFICATION` assigns every one
-of the 52 unary RPC methods an `allow` / `guard` / `filter` / `deny` verdict (a
-new DSH method fails `tsc`). Streams (`events`) and `respond` are denied until
-②-C / H4. The one remaining upstream gap is a request/connection-scoped
-principal (H3). See [`docs/adr/web-enforcement.md`](../../docs/adr/web-enforcement.md).
+M4 is in progress. The admission decorator (②-A) and the real `ApiProxy` facade
+with exhaustive unary classification (②-B) are done. `CLASSIFICATION` covers
+all 52 current unary RPC methods and a new DSH method fails `tsc` until it is
+classified.
+
+The v0 policy is deliberately fail-closed: session-keyed point methods are
+`guard`, only `session.list` is currently safe to `filter`, `session.create` is
+`admit` (denied until the transport installs the pre-publication admission
+bridge), and unmodelled host/deployment management plus `session.search` are
+`deny`. Streams (`events`), `respond`, and `downloads` remain denied until ②-C
+proves their real transport authorization path. H3 remains the principal-
+binding hypothesis to validate, not a filed upstream conclusion yet.
