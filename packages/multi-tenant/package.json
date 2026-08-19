@@ -50,7 +50,7 @@
     "tenant-isolation"
   ],
   "engines": {
-    "node": ">=22.19"
+    "node": "^22.19.0 || >=24.0.0"
   },
   "dsh": {
     "bundle": {
