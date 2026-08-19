@@ -3,6 +3,8 @@ name: R1 lockfile bootstrap
 on:
   push:
     branches: [agent/r1-rc7-bootstrap]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
