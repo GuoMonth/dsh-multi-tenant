@@ -1,0 +1,30 @@
+name: R1 lockfile bootstrap
+
+on:
+  push:
+    branches: [agent/r1-rc7-bootstrap]
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - name: Regenerate lockfile
+        run: pnpm install --no-frozen-lockfile
+      - name: Upload generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: r1-generated-lockfile
+          path: pnpm-lock.yaml
+          if-no-files-found: error
