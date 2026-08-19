@@ -26,8 +26,8 @@ is either an ecosystem contract or an explicit boundary.
 | --- | --- | --- | --- |
 | Tenant principal / session ownership / access decisions | **Control → enforce** | Own the contract and fail closed. | **Yes** — already implemented and test-pinned. |
 | `TenantSessionStore` seam + contract suite | **Control → enforce** | Own the seam; ship the in-memory reference; third parties prove providers with the shared suite. | **Yes** — already done. |
-| Agent genesis admission (`setup`) | **Control → enforce** | Keep the decorator/probe; revalidate only the affected RC7 seam. | **Yes** — compatibility evidence only. |
-| Unary `ApiProxy` classification | **Control → enforce** | Exhaustively classify the real `RpcMethodMap`; unknown/new methods fail closed. | **Yes** — compatibility evidence only. |
+| Agent genesis admission (`setup`) | **Control → enforce** | Keep the decorator/probe; revalidate only the affected DSH seam on each target bump. | **Yes** — RC7 evidence refreshed in R1. |
+| Unary `ApiProxy` classification | **Control → enforce** | Exhaustively classify the real `RpcMethodMap`; unknown/new methods fail closed. | **Yes** — RC7 type/evidence refreshed in R1. |
 | HTTP/WS request/connection principal scope | **Ecosystem → standardize** | Specify the smallest generic DSH seam and upstream it. Do not fork/rebuild the Web transport. | **No** for kernel; **yes** for production web enforcement. |
 | mux / host streams and `respond` | **Control after ecosystem seam** | Keep denied in the spike; implement/test only after a principal-scoped transport seam exists. | No for kernel. |
 | Auth providers (JWT/OIDC/API key) | **Later provider** | Add a replaceable reference provider only after there is a real transport principal scope. | No. |
@@ -45,29 +45,33 @@ is either an ecosystem contract or an explicit boundary.
 - ✅ **M1 — Kernel hardening** — claim-once ownership, fail-closed access,
   `TenantSessionStore`, shared contract tests, package smoke, architecture gates.
 - ✅ **M2 — Session genesis proof** — Agent `setup` is the before-visibility
-  admission point; create / fork / subagent / resume are covered by the RC6
-  runtime proof.
+  admission point; create / fork / subagent / resume were established on RC6.
 - ✅ **M3 — Web enforcement spike** — real `ApiProxy` facade, exhaustive unary
   classification, fail-closed policy, and the H3 transport gap identified.
 - ✅ **Boundary policy** — control → enforce; ecosystem → standardize; outside
   control → bound. RC7 is the current target baseline.
+- ✅ **R1 — RC7 compatibility refresh** — DSH proof pins/lockfile refreshed to
+  RC7; source-facing seams reviewed; session-genesis and admission runtime proofs
+  pass on Node 22.19 and Node 24; DSH pin drift and runtime proofs are now CI
+  gates. Exact evidence lives in `docs/reference/compatibility.md`.
 
 ## Release track — the next few iterations
 
 Only these steps block the first `dsh-multi-tenant` release.
 
-### 🚧 R1 — RC7 compatibility refresh
+### ✅ R1 — RC7 compatibility refresh
 
-A focused compatibility PR, not a feature PR:
+Completed by the R1 compatibility PR:
 
-1. bump the DSH dev/test pins that participate in the proofs from RC6 to
-   **`0.1.0-rc.7`** and refresh the lockfile;
-2. rerun the admission/runtime probe and the real `RpcMethodMap` type/test
-   coverage against RC7;
-3. record the exact RC7 evidence commit/version in the compatibility docs;
-4. if an affected seam changed, adapt the smallest owned layer only. Do **not**
-   redesign unchanged layers and do not build a replacement Web carrier merely
-   to close H3 locally.
+1. `@deepseek-ai/dsh-host-apiproxy` and its resolved DSH graph are pinned to
+   **`0.1.0-rc.7`** with a frozen lockfile;
+2. the relevant RC6 → RC7 source seams were reviewed and the real runtime proofs
+   rerun on both supported Node lines;
+3. the exact RC7 release commit and source blobs are recorded in the
+   compatibility reference;
+4. the DSH target is centralized and CI fails on package-pin drift;
+5. no unchanged architecture was redesigned and H3 remains on the ecosystem
+   track rather than being closed with a local transport fork.
 
 ### 🚧 R2 — Kernel release hardening
 
@@ -76,8 +80,8 @@ A focused compatibility PR, not a feature PR:
    audit, auth, or production Web isolation;
 2. publish clear **supported guarantees** and **explicit boundaries** in the
    README/package docs;
-3. run the existing release gates: `pnpm verify`, `pnpm typecheck`, `pnpm test`,
-   `pnpm build`, and `pnpm smoke`;
+3. run the release gates: frozen install, `pnpm verify`, `pnpm typecheck`,
+   `pnpm test`, `pnpm build`, `pnpm smoke`, plus the RC compatibility probes;
 4. choose the first 0.1 prerelease version (recommended `0.1.0-rc.1`) and verify
    the packed consumer experience.
 
@@ -171,7 +175,7 @@ policy plane and are not silently added to the kernel.
 ## What blocks what
 
 ```text
-RC7 compatibility ──> kernel release hardening ──> dsh-multi-tenant 0.1 prerelease
+RC7 compatibility ✅ ──> kernel release hardening ──> dsh-multi-tenant 0.1 prerelease
 
 DSH principal-scope seam ──> production dsh-multi-tenant-web ──> Web E2E / Web release
 
