@@ -25,3 +25,4 @@ Navigation hub for `dsh-multi-tenant` documentation.
 ## Reference
 
 - [Compatibility & versioning](./reference/compatibility.md) — Node / Cordis / DSH ranges + pinning
+- [Kernel prerelease contract](./reference/release.md) — `0.1.0-rc.1` artifact, release gates, boundaries, and R3 checklist

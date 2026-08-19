@@ -6,10 +6,10 @@ Multi-tenant kernel primitives for DeepSeek Harness (DSH): tenant identity,
 immutable session ownership, fail-closed authorization, and a replaceable
 ownership-store contract.
 
-> **Status: first 0.1 prerelease line.** This package is intentionally small. It
-> is the kernel release candidate; Web/auth/MCP/runtime isolation are separate
-> integration or ecosystem concerns. See the repository
-> [ROADMAP](../../ROADMAP.md).
+> **Release candidate: `0.1.0-rc.1`.** This package is intentionally small. It
+> is the only publishable artifact in the first 0.1 release line; Web/auth/MCP/
+> runtime isolation are separate integration or ecosystem concerns. The current
+> DSH compatibility target is `0.1.0-rc.7`.
 
 ## Supported guarantee
 
@@ -106,21 +106,31 @@ user identity is never included in the public error.
 
 ## Install / composition
 
+The first npm prerelease is published on the **`next`** dist-tag, not `latest`.
+After R3 publishes it, install into a DSH profile with:
+
 ```sh
-dsh plugin --profile web add github:GuoMonth/dsh-multi-tenant
+dsh plugin --profile <profile> add dsh-multi-tenant@next
 ```
 
-The package bundle mounts the in-memory `tenantSessionStore` reference and the
-`multiTenant` service. A deployment that needs durability should replace the
-store provider rather than modify the kernel.
+The package declares `dsh.bundle`; DSH therefore adds its bundle layer to the
+profile. The bundled layer mounts the in-memory `tenantSessionStore` reference
+and the `multiTenant` service. A deployment that needs durability should replace
+the store provider rather than modify the kernel.
 
-## Release path
+## Release verification
 
-The first release only depends on:
+From the repository root:
 
-1. refreshing affected DSH evidence from RC6 to the current RC7 target;
-2. passing `verify`, typecheck, tests, build, and packed-package smoke;
-3. publishing the 0.1 prerelease with this supported guarantee and boundary.
+```sh
+pnpm install --frozen-lockfile
+pnpm release:check
+```
+
+`release:check` covers package/architecture invariants, release-manifest
+preflight, typecheck, unit/contract tests, build, a packed external-consumer
+smoke test, and the RC7 DSH runtime proofs. See
+[`docs/reference/release.md`](../../docs/reference/release.md).
 
 Production Web principal binding, durable providers, auth providers, search,
 MCP, audit, and deployment recipes are independent follow-ups. See

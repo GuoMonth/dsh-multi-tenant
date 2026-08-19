@@ -26,7 +26,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.7.0
 
       - uses: actions/setup-node@v4
         with:
@@ -38,6 +38,9 @@ jobs:
 
       - name: Verify package and architecture invariants
         run: pnpm verify
+
+      - name: Verify release manifest
+        run: pnpm release:preflight
 
       - name: Typecheck
         run: pnpm typecheck
@@ -64,7 +67,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.7.0
 
       - uses: actions/setup-node@v4
         with:

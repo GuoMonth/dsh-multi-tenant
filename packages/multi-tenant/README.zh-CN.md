@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness（DSH）的多租户 kernel 原语：tenant identity、不可变 session ownership、fail-closed authorization，以及可替换的 ownership-store contract。
 
-> **状态：第一次 0.1 prerelease 版本线。** 这个 package 刻意保持小而明确。它是 kernel release candidate；Web/auth/MCP/runtime isolation 属于独立 integration 或生态问题。参见仓库 [ROADMAP](../../ROADMAP.md)。
+> **Release candidate：`0.1.0-rc.1`。** 这个 package 刻意保持小而明确。它是第一次 0.1 版本线中**唯一可发布的 artifact**；Web/auth/MCP/runtime isolation 属于独立 integration 或生态问题。当前 DSH compatibility target 为 `0.1.0-rc.7`。
 
 ## 支持的保证
 
@@ -90,19 +90,24 @@ abstract class TenantSessionStore extends Service {
 
 ## 安装 / 组合
 
+第一次 npm prerelease 使用 **`next`** dist-tag，而不是 `latest`。R3 发布以后，可安装到 DSH profile：
+
 ```sh
-dsh plugin --profile web add github:GuoMonth/dsh-multi-tenant
+dsh plugin --profile <profile> add dsh-multi-tenant@next
 ```
 
-Package bundle 会挂载内存 `tenantSessionStore` 参考实现与 `multiTenant` service。需要 durability 的 deployment 应替换 store provider，而不是修改 kernel。
+Package 声明了 `dsh.bundle`，因此 DSH 会把它的 bundle layer 加入 profile。内置 layer 会挂载内存 `tenantSessionStore` 参考实现与 `multiTenant` service。需要 durability 的 deployment 应替换 store provider，而不是修改 kernel。
 
-## 发布路径
+## 发布验证
 
-第一次发布只依赖：
+在仓库根目录执行：
 
-1. 把受影响的 DSH evidence 从 RC6 刷新到当前 RC7 target；
-2. 通过 `verify`、typecheck、test、build 与 packed-package smoke；
-3. 带着本文明确的 supported guarantee 与 boundary 发布 0.1 prerelease。
+```sh
+pnpm install --frozen-lockfile
+pnpm release:check
+```
+
+`release:check` 覆盖 package/architecture invariant、release-manifest preflight、typecheck、unit/contract test、build、真实 packed external-consumer smoke，以及 RC7 DSH runtime proof。详细见 [`docs/reference/release.zh-CN.md`](../../docs/reference/release.zh-CN.md)。
 
 Production Web principal binding、durable provider、auth provider、search、MCP、audit 与 deployment recipe 都是独立 follow-up。参见 [`ROADMAP.md`](../../ROADMAP.md)。
 

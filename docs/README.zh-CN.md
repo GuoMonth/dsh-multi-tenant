@@ -25,3 +25,4 @@
 ## 参考
 
 - [兼容性与版本](./reference/compatibility.zh-CN.md) — Node / Cordis / DSH 范围 + pinning
+- [Kernel prerelease 发布契约](./reference/release.zh-CN.md) — `0.1.0-rc.1` artifact、发布 gate、边界与 R3 checklist

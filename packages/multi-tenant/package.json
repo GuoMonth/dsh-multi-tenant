@@ -1,6 +1,6 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.1.0",
+  "version": "0.1.0-rc.1",
   "description": "Multi-tenant primitives for DeepSeek Harness (DSH): tenant identity, immutable session ownership, fail-closed authorization, and a replaceable ownership-store contract.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
@@ -13,7 +13,8 @@
     "url": "https://github.com/GuoMonth/dsh-multi-tenant/issues"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "tag": "next"
   },
   "sideEffects": false,
   "type": "module",

@@ -4,10 +4,10 @@
 
 Experimental DSH Web tenant-bound `ApiProxy` enforcement research.
 
-> **Not a production multi-user Web package yet.** The current code proves
-> fail-closed unary enforcement and admission composition. Production principal
-> binding depends on a DSH request/connection-scoped transport seam; this package
-> does not replace the DSH Web carrier to hide that dependency.
+> **Repository-only in the 0.1 kernel release.** This workspace package is
+> `private: true` and is intentionally not publishable while its production
+> principal-binding contract depends on a DSH request/connection-scoped transport
+> seam. R3 publishes only `dsh-multi-tenant`.
 
 ## Status
 
@@ -29,11 +29,11 @@ authentication layer. The principal-scope gap is therefore treated as an
 
 ## What happens next
 
-This package does **not** block the first `dsh-multi-tenant` kernel prerelease.
-The next Web deliverable is a small, generic upstream request/connection-scope
-proposal. Once DSH exposes an adequate seam, this package can add principal-bound
-HTTP/WS admission, streams, `respond`, and a two-tenant E2E suite, then freeze a
-production public contract.
+This package does **not** block or ship with the first `dsh-multi-tenant` kernel
+prerelease. The next Web deliverable is a small, generic upstream
+request/connection-scope proposal. Once DSH exposes an adequate seam, this
+package can add principal-bound HTTP/WS admission, streams, `respond`, and a
+two-tenant E2E suite, then freeze a production public contract.
 
 See [`ROADMAP.md`](../../ROADMAP.md) and
 [`docs/adr/web-enforcement.md`](../../docs/adr/web-enforcement.md).

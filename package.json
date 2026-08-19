@@ -2,12 +2,15 @@
   "name": "dsh-multi-tenant-root",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.7.0",
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "verify": "node scripts/verify-packages.mjs",
     "probe:dsh": "node scripts/session-genesis-probe.mjs && node scripts/admission-decorator-probe.mjs",
-    "smoke": "node scripts/package-smoke.mjs"
+    "smoke": "node scripts/package-smoke.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "release:check": "pnpm verify && pnpm release:preflight && pnpm typecheck && pnpm test && pnpm build && pnpm smoke && pnpm probe:dsh"
   }
 }
