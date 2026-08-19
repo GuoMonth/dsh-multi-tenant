@@ -70,6 +70,7 @@ if (!existsSync(releaseWorkflowPath)) {
   const workflow = readFileSync(releaseWorkflowPath, 'utf8')
   if (!workflow.includes('id-token: write')) errors.push('release workflow must grant id-token: write for npm OIDC')
   if (!workflow.includes('environment: npm-release')) errors.push('release workflow must use the npm-release environment')
+  if (!workflow.includes('actions/setup-node@v7')) errors.push('release workflow must use actions/setup-node@v7 so npm OIDC is not shadowed by the v6 dummy auth token')
   if (workflow.includes('NPM_BOOTSTRAP_TOKEN')) errors.push('release workflow must be OIDC-only; bootstrap token fallback is not allowed')
 }
 
