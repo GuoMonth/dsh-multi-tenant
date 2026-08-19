@@ -3,11 +3,9 @@ name: R1 lockfile bootstrap
 on:
   push:
     branches: [agent/r1-rc7-bootstrap]
-  pull_request:
-    branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -24,9 +22,14 @@ jobs:
           cache: pnpm
       - name: Regenerate lockfile
         run: pnpm install --no-frozen-lockfile
-      - name: Upload generated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: r1-generated-lockfile
-          path: pnpm-lock.yaml
-          if-no-files-found: error
+      - name: Commit generated lockfile
+        run: |
+          git add pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            echo "lockfile already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "build: refresh lockfile for DSH RC7"
+          git push
