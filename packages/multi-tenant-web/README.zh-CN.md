@@ -2,12 +2,23 @@
 
 # dsh-multi-tenant-web
 
-DSH Web 多租户集成：主体绑定、RPC/mux/WS 授权。
+实验性的 DSH Web tenant-bound `ApiProxy` enforcement 研究。
 
-> **早期 spike。** 尚无生产 surface。web 强制调研位于 [`docs/`](../../docs) —— 见 [`docs/adr/web-enforcement.md`](../../docs/adr/web-enforcement.md)。
+> **目前还不是 production 多用户 Web package。** 当前代码证明了 fail-closed unary enforcement 与 admission composition。Production principal binding 依赖 DSH request/connection-scoped transport seam；本 package 不会为了掩盖这个依赖而替换 DSH Web carrier。
 
 ## 状态
 
-M4 进行中。准入装饰器（②-A）与真实 `ApiProxy` facade + unary 穷举分类（②-B）已完成。`CLASSIFICATION` 覆盖当前全部 52 个 unary RPC 方法；DSH 新增方法时，未分类前会直接令 `tsc` 失败。
+真实 `ApiProxy` facade 与 unary `RpcMethodMap` 穷举分类已经实现。当前策略刻意 fail-closed：
 
-v0 策略刻意默认拒绝：session-keyed point 方法为 `guard`，目前只有 `session.list` 适合 `filter`，`session.create` 为 `admit`（transport 尚未安装发布前准入 bridge 时直接拒绝），未建模的 host/deployment 管理面以及 `session.search` 都为 `deny`。流（`events`）、`respond` 与 `downloads` 在 ②-C 证明真实 transport 授权路径之前继续拒绝。H3 仍是待验证的 principal 绑定假设，而不是已经提交的上游结论。
+- session-keyed point method 为 `guard`；
+- 当前只有 `session.list` 为 `filter`；
+- `session.create` 为 `admit`，在 principal-scoped pre-publication admission 可以安装以前继续拒绝；
+- `session.search`、host/global management、streams、`respond`、downloads 在真正具备支持的 tenant 语义以前继续拒绝。
+
+DSH RC7 公开的 `ConnectionRpcHandler` 只暴露解码后的 `(endpoint, payload, signal)`，真实 HTTP/WS request 留在 DSH Web carrier 内部。官方 carrier 文档也明确说明当前没有 authentication layer。因此 principal-scope 缺口被归类为**生态 seam**。
+
+## 下一步
+
+这个 package **不阻塞**第一次 `dsh-multi-tenant` kernel prerelease。Web 的下一项交付是一个小而通用的 upstream request/connection-scope proposal。DSH 提供足够 seam 以后，本 package 再增加 principal-bound HTTP/WS admission、streams、`respond` 与 two-tenant E2E suite，然后再冻结 production public contract。
+
+参见 [`ROADMAP.md`](../../ROADMAP.md) 与 [`docs/adr/web-enforcement.md`](../../docs/adr/web-enforcement.md)。
