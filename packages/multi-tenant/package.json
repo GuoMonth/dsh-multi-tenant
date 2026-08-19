@@ -14,7 +14,8 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "next"
+    "tag": "next",
+    "provenance": true
   },
   "sideEffects": false,
   "type": "module",

@@ -11,6 +11,8 @@
     "probe:dsh": "node scripts/session-genesis-probe.mjs && node scripts/admission-decorator-probe.mjs",
     "smoke": "node scripts/package-smoke.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
+    "release:registry-preflight": "node scripts/registry-preflight.mjs",
+    "release:registry-smoke": "node scripts/registry-smoke.mjs",
     "release:check": "pnpm verify && pnpm release:preflight && pnpm typecheck && pnpm test && pnpm build && pnpm smoke && pnpm probe:dsh"
   }
 }
