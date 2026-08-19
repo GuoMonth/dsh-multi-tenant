@@ -1,11 +1,8 @@
 #!/usr/bin/env node
 /**
- * Package smoke (M1.3): prove the kernel's published tarball is a valid
- * distributable for an external consumer. Build → pack → verify tarball
- * contents and every `exports` target → install the tarball into a clean
- * temp consumer → import the published subpaths and run a claim/access smoke.
- *
- * Run from the repo root: `node scripts/package-smoke.mjs`.
+ * Package smoke: prove the kernel's packed tarball is a valid distributable for
+ * an external consumer. Build → pack → verify tarball contents/exports → install
+ * into a clean temp consumer → exercise the public kernel subpaths.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -17,7 +14,6 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const pkgDir = join(root, 'packages', 'multi-tenant')
 const pkg = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'))
 
-/** Recursively collect every file-path string leaf under an `exports` map. */
 function collectTargets(exports, acc = []) {
   if (typeof exports === 'string') {
     acc.push(exports)
@@ -32,7 +28,6 @@ function collectTargets(exports, acc = []) {
 const tmp = mkdtempSync(join(tmpdir(), 'dsh-mt-pack-'))
 const consumer = mkdtempSync(join(tmpdir(), 'dsh-mt-consumer-'))
 try {
-  // 1. fresh build, then pack.
   execFileSync('pnpm', ['--filter', 'dsh-multi-tenant', 'build'], { cwd: root, stdio: 'ignore' })
   execFileSync('pnpm', ['--filter', 'dsh-multi-tenant', 'pack', '--pack-destination', tmp], {
     cwd: root,
@@ -41,7 +36,6 @@ try {
   const tarball = readdirSync(tmp).find(f => f.endsWith('.tgz'))
   if (!tarball) throw new Error('pnpm pack produced no tarball')
 
-  // 2. verify the tarball ships the intended files and every exports target.
   const listing = execFileSync('tar', ['-tzf', join(tmp, tarball)], { encoding: 'utf8' })
   const lines = listing.split('\n')
   const has = f => lines.some(line => line === f || line.endsWith(`/${f}`))
@@ -54,7 +48,6 @@ try {
   const unresolved = targets.filter(t => !has(t.replace(/^\.\//, '')))
   if (unresolved.length) throw new Error(`exports targets missing from tarball: ${unresolved.join(', ')}`)
 
-  // 3. install the tarball into a clean consumer and exercise the published subpaths.
   writeFileSync(join(consumer, 'package.json'), JSON.stringify({ name: 'smoke-consumer', private: true, type: 'module' }))
   execFileSync('pnpm', ['add', join(tmp, tarball), '@deepseek-ai/cordis@4.0.1'], { cwd: consumer, stdio: 'ignore' })
   writeFileSync(join(consumer, 'smoke.mjs'), [
@@ -65,7 +58,7 @@ try {
     'const ctx = new Context();',
     'await ctx.plugin(Store);',
     'await ctx.plugin(Service);',
-    'const alice = { tenantId: "acme", userId: "alice", roles: ["member"] };',
+    'const alice = { tenantId: "acme", userId: "alice" };',
     'await ctx.multiTenant.claimSession("s1", alice);',
     'if ((await ctx.multiTenant.canAccessSession(alice, "s1")) !== true) throw new Error("smoke: same-user should be allowed");',
     'await assertTenantSessionStoreContract(async (c) => { await c.plugin(Store); return c.tenantSessionStore });',

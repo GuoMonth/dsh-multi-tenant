@@ -10,30 +10,23 @@
  */
 
 /**
- * An authenticated caller identity, established by a server-side boundary.
+ * The minimal authenticated identity required by the ownership kernel.
  *
- * A `TenantPrincipal` is never assembled from client-supplied fields: the
- * authenticated transport derives it (verified session token, authenticated
- * API key, …) and hands it to this core. The core trusts the principal it is
- * given but never trusts a tenant id that arrives out-of-band.
+ * A `TenantPrincipal` is established by a server-side authentication boundary;
+ * it is never assembled from client-supplied tenant fields. Roles, permissions,
+ * admin flags, and other policy attributes are deliberately NOT part of this
+ * contract. If the ecosystem later needs same-tenant sharing or RBAC, that
+ * belongs to a separate policy plane rather than the ownership identity.
  */
 export interface TenantPrincipal {
   /** Opaque tenant identifier. Never parsed out of a session id. */
   tenantId: string
   /** User identifier, unique within the tenant. */
   userId: string
-  /**
-   * Roles the user holds within the tenant. Present for future authorization
-   * layers; the v0 core does NOT consult roles for access — ownership only.
-   */
-  roles: readonly string[]
 }
 
 /**
  * The recorded owner of a session — the minimal authorization binding.
- *
- * Deliberately smaller than `TenantPrincipal`: roles are an attribute of the
- * *caller* at request time, not a property pinned to the session.
  */
 export interface SessionOwner {
   tenantId: string
@@ -64,10 +57,7 @@ export type AccessDenialReason =
   | 'TENANT_MISMATCH'
   | 'USER_MISMATCH'
 
-/**
- * Internal authorization decision, as a discriminated union: an allowed
- * decision carries no reason, and a denial always carries one.
- */
+/** Internal authorization decision. */
 export type AccessDecision =
   | { allowed: true }
   | { allowed: false; reason: AccessDenialReason }

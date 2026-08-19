@@ -1,11 +1,5 @@
 #!/usr/bin/env node
-/**
- * Post-publication registry smoke.
- *
- * Verifies the exact version and `next` dist-tag from npm, installs the registry
- * artifact into a clean consumer, imports every public kernel subpath used by
- * consumers, and exercises claim/access plus the shared store contract.
- */
+/** Post-publication registry smoke for the exact kernel prerelease. */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -48,9 +42,7 @@ for (let attempt = 1; attempt <= 10; attempt++) {
   await new Promise((resolve) => setTimeout(resolve, 3000))
 }
 
-if (registryVersion !== version) {
-  throw new Error(`registry did not resolve ${PACKAGE_NAME}@${version}`)
-}
+if (registryVersion !== version) throw new Error(`registry did not resolve ${PACKAGE_NAME}@${version}`)
 
 const nextVersion = npmJson(['view', `${PACKAGE_NAME}@next`, 'version'])
 if (nextVersion !== version) {
@@ -67,34 +59,26 @@ if (!integrity) throw new Error('registry artifact is missing dist.integrity')
 
 const consumer = mkdtempSync(join(tmpdir(), 'dsh-mt-registry-consumer-'))
 try {
-  writeFileSync(
-    join(consumer, 'package.json'),
-    JSON.stringify({ name: 'registry-smoke-consumer', private: true, type: 'module' }),
-  )
+  writeFileSync(join(consumer, 'package.json'), JSON.stringify({ name: 'registry-smoke-consumer', private: true, type: 'module' }))
+  execFileSync('pnpm', ['add', `${PACKAGE_NAME}@${version}`, '@deepseek-ai/cordis@4.0.1'], {
+    cwd: consumer,
+    stdio: 'ignore',
+  })
 
-  execFileSync(
-    'pnpm',
-    ['add', `${PACKAGE_NAME}@${version}`, '@deepseek-ai/cordis@4.0.1'],
-    { cwd: consumer, stdio: 'ignore' },
-  )
-
-  writeFileSync(
-    join(consumer, 'smoke.mjs'),
-    [
-      'import { Context } from "@deepseek-ai/cordis";',
-      'import Store from "dsh-multi-tenant/store";',
-      'import Service from "dsh-multi-tenant";',
-      'import { assertTenantSessionStoreContract } from "dsh-multi-tenant/testing";',
-      'const ctx = new Context();',
-      'await ctx.plugin(Store);',
-      'await ctx.plugin(Service);',
-      'const alice = { tenantId: "acme", userId: "alice", roles: ["member"] };',
-      'await ctx.multiTenant.claimSession("registry-s1", alice);',
-      'if ((await ctx.multiTenant.canAccessSession(alice, "registry-s1")) !== true) throw new Error("registry smoke: owner access denied");',
-      'await assertTenantSessionStoreContract(async (c) => { await c.plugin(Store); return c.tenantSessionStore });',
-      'console.log("registry consumer smoke passed");',
-    ].join('\n'),
-  )
+  writeFileSync(join(consumer, 'smoke.mjs'), [
+    'import { Context } from "@deepseek-ai/cordis";',
+    'import Store from "dsh-multi-tenant/store";',
+    'import Service from "dsh-multi-tenant";',
+    'import { assertTenantSessionStoreContract } from "dsh-multi-tenant/testing";',
+    'const ctx = new Context();',
+    'await ctx.plugin(Store);',
+    'await ctx.plugin(Service);',
+    'const alice = { tenantId: "acme", userId: "alice" };',
+    'await ctx.multiTenant.claimSession("registry-s1", alice);',
+    'if ((await ctx.multiTenant.canAccessSession(alice, "registry-s1")) !== true) throw new Error("registry smoke: owner access denied");',
+    'await assertTenantSessionStoreContract(async (c) => { await c.plugin(Store); return c.tenantSessionStore });',
+    'console.log("registry consumer smoke passed");',
+  ].join('\n'))
 
   execFileSync('node', ['smoke.mjs'], {
     cwd: consumer,
@@ -105,6 +89,4 @@ try {
   rmSync(consumer, { recursive: true, force: true })
 }
 
-console.log(
-  `registry smoke passed: ${PACKAGE_NAME}@${version}; next=${version}; integrity=${integrity.slice(0, 20)}…`,
-)
+console.log(`registry smoke passed: ${PACKAGE_NAME}@${version}; next=${version}; integrity=${integrity.slice(0, 20)}…`)

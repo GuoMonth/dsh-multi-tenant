@@ -6,8 +6,8 @@ export let completed: Promise<void> = Promise.resolve()
 
 export function apply(ctx: Context): void {
   completed = (async () => {
-    const alice = { tenantId: 'acme', userId: 'alice', roles: ['member'] }
-    const eve = { tenantId: 'evilcorp', userId: 'alice', roles: ['member'] }
+    const alice = { tenantId: 'acme', userId: 'alice' }
+    const eve = { tenantId: 'evilcorp', userId: 'alice' }
 
     await ctx.multiTenant.claimSession('s1', alice)
     const owner = await ctx.multiTenant.getSessionOwner('s1')

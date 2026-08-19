@@ -11,11 +11,9 @@ import {
 } from '../src/index.ts'
 import type { AccessDecision, ClaimResult, SessionOwner, TenantPrincipal } from '../src/types.ts'
 
-const alice: TenantPrincipal = { tenantId: 'acme', userId: 'alice', roles: ['member'] }
-const bob: TenantPrincipal = { tenantId: 'acme', userId: 'bob', roles: ['member'] }
-const eve: TenantPrincipal = { tenantId: 'evilcorp', userId: 'alice', roles: ['member'] }
-const acmeAdmin: TenantPrincipal = { tenantId: 'acme', userId: 'root', roles: ['tenant-admin'] }
-const foreignAdmin: TenantPrincipal = { tenantId: 'evilcorp', userId: 'root', roles: ['tenant-admin', 'platform-admin'] }
+const alice: TenantPrincipal = { tenantId: 'acme', userId: 'alice' }
+const bob: TenantPrincipal = { tenantId: 'acme', userId: 'bob' }
+const eve: TenantPrincipal = { tenantId: 'evilcorp', userId: 'alice' }
 
 describe('MultiTenantService', () => {
   let ctx: Context
@@ -97,10 +95,10 @@ describe('MultiTenantService', () => {
       await expect(multiTenant.assertSessionAccess(alice, 'missing')).rejects.toThrow(SessionAccessDeniedError)
     })
 
-    it('does not let any role cross the tenant boundary', async () => {
+    it('does not let out-of-contract policy hints override the tenant boundary', async () => {
       await multiTenant.claimSession('s1', alice)
-      await expect(multiTenant.canAccessSession(foreignAdmin, 's1')).resolves.toBe(false)
-      await expect(multiTenant.canAccessSession(acmeAdmin, 's1')).resolves.toBe(false)
+      const foreignWithPolicyHint = { tenantId: 'evilcorp', userId: 'root', admin: true }
+      await expect(multiTenant.canAccessSession(foreignWithPolicyHint, 's1')).resolves.toBe(false)
     })
 
     it('surfaces a uniform error for unknown vs foreign sessions', async () => {
@@ -141,16 +139,9 @@ describe('MultiTenantService', () => {
     it('rejects an empty userId', async () => {
       await expect(multiTenant.claimSession('s1', { ...alice, userId: '' })).rejects.toThrow(ValidationError)
     })
-
-    it('rejects an invalid role entry', async () => {
-      await expect(
-        multiTenant.claimSession('s1', { ...alice, roles: ['member', ''] }),
-      ).rejects.toThrow(ValidationError)
-    })
   })
 })
 
-/** A test subclass that exposes the internal denial reason for assertions. */
 class InspectableMultiTenantService extends MultiTenantService {
   async reason(principal: TenantPrincipal, sessionId: string): Promise<AccessDecision> {
     return this.evaluateAccess(principal, sessionId)

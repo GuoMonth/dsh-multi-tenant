@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact package version to publish (for example 0.1.0-rc.1)
+        description: Exact package version to publish (for example 0.1.0-rc.2)
         required: true
         type: string
 
@@ -77,14 +77,9 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: node scripts/registry-preflight.mjs "$RELEASE_VERSION"
 
-      - name: Publish to npm
+      - name: Publish to npm via Trusted Publishing
         if: steps.registry.outputs.publish_needed == 'true'
         working-directory: packages/multi-tenant
-        env:
-          # First-ever publication bootstrap only. After rc.1 exists, configure
-          # npm Trusted Publishing for release.yml and remove this environment secret.
-          # npm CLI prefers OIDC trusted publishing before falling back to this token.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
         run: npm publish --access public --tag next --provenance
 
       - name: Verify registry artifact

@@ -9,8 +9,8 @@ import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { bindTenant } from '../src/bind-tenant.ts'
 import { CLASSIFICATION } from '../src/classification.ts'
 
-const alice = { tenantId: 'acme', userId: 'alice', roles: ['member'] }
-const bob = { tenantId: 'acme', userId: 'bob', roles: ['member'] }
+const alice = { tenantId: 'acme', userId: 'alice' }
+const bob = { tenantId: 'acme', userId: 'bob' }
 
 async function makeMultiTenant(): Promise<MultiTenantService> {
   const ctx = new Context()
