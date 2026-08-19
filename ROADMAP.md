@@ -4,6 +4,25 @@
 
 Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
 
+## Roadmap discipline
+
+This roadmap follows the same boundary rule as the implementation:
+
+- **Control → enforce.** Milestones may promise strict behavior only where this
+  repository owns a reliable enforcement point and can lock it with tests.
+- **Ecosystem → standardize.** If progress depends on a DSH / third-party seam,
+  the deliverable is a minimal contract, conformance expectation, or upstream
+  proposal. The roadmap does not silently turn an ecosystem dependency into a
+  permanent local fork.
+- **Outside control → bound.** If a guarantee cannot currently be enforced, it
+  is documented as a support / threat-model boundary or deferred. We do not add
+  large subsystems merely to make the checklist look more complete.
+- **Fast-follow the current DSH prerelease.** The current target is
+  **`0.1.0-rc.7`**. Historical RC6 evidence remains valid as RC6 evidence; only
+  seams affected by the version move are revalidated before a dependent
+  milestone is considered proven on RC7. See
+  `docs/reference/compatibility.md`.
+
 ## Done
 
 - ✅ **Kernel core** — `TenantPrincipal` / `SessionOwner`, claim-once ownership,
@@ -25,7 +44,9 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
 ## Next (settled)
 
 - 🚧 **M4 — Real integration proof.** Demonstrate the M3 claims against the real
-  DSH runtime *before* filing the upstream proposal:
+  DSH runtime *before* filing the upstream proposal. Existing RC6 proofs are
+  historical evidence; affected seams are selectively revalidated against the
+  current RC7 target rather than redesigning unchanged layers:
   1. **Admission decorator** ✅ — real `AgentService`, create / fork / subagent /
      resume, admission inside `setup` before `sessions.enter`.
   2. **Real `ApiProxy` facade** ✅ — the spike `ApiSurface` is gone; the real
@@ -39,9 +60,11 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
      real runtime (still `X-Test-Tenant` / `X-Test-User`), locking the tenant-
      isolation invariants, `rpcId → sessionId` respond correlation, and
      unfailing installation ordering.
-- 🚧 **M5 — Upstream proposal + web enforcement.** File the request/connection-
-  scoped principal seam (plus any other seam M4 actually proves necessary),
-  then build the full enforcement on top of it.
+- 🚧 **M5 — Upstream proposal + web enforcement.** File only the
+  request/connection-scoped principal seam (plus any other seam M4 actually
+  proves necessary), then build the full enforcement on top of it. A missing
+  upstream seam is an ecosystem collaboration point, not a reason to absorb the
+  whole transport into this repository.
 
 ## Deferred (decision-gated)
 
@@ -74,9 +97,10 @@ Statuses: ✅ done · 🚧 next (settled) · ⏳ deferred (decision-gated).
 - **M5 — Upstream proposal + web enforcement.**
 - **M6 — Providers** durable stores, auth.
 - **M7 — MCP / audit / full-stack preset.**
-- **M8 — End-to-end tenant-isolation suite** — the executable "crown" that proves
-  Tenant A can never touch Tenant B across auth → HTTP/WS → ApiProxy → session →
-  agent → MCP → storage.
+- **M8 — End-to-end tenant-isolation suite** — the executable "crown" for the
+  surfaces included in the supported stack. It proves the covered isolation
+  chain and lists any unsupported / ecosystem-owned surfaces as explicit
+  boundaries rather than claiming guarantees the suite cannot exercise.
 
 Each milestone is gated by its predecessor's decision; deferred items above are
 pulled forward only when their gate (a decision or an upstream seam) closes.

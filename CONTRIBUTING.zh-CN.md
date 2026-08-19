@@ -12,6 +12,28 @@
 
 当前的规格产物：`docs/specs/web-seam-map.md`（web surface）与 `docs/adr/web-enforcement.md`（硬结论 + 上游 seam 提案）。
 
+## 边界优先的决策规则
+
+增加实现之前，先判断讨论中的 surface 属于哪一类：
+
+1. **本仓库控制得住 → 严格强制。** 如果我们拥有可靠的 enforcement point，就默认拒绝，并用可执行测试证明安全不变量。
+2. **属于生态 → 制定标准。** 如果保证依赖 DSH 或第三方 seam，就定义最小、可复用的 contract / seam，发布一致性要求并优先向上游协作。本地 spike 是证据，不等于可以长期 fork 或重写上游子系统。
+3. **无法可靠强制 → 明确边界。** 直接说明 threat model / support boundary，把承诺限定在真正能证明的范围内。不要为了声称“已经覆盖”一个仍无法证明的 surface，而引入大范围工程复杂度。
+
+复杂度不是证据。一个 PR 如果主要效果是把上游或本仓库控制不了的责任强行吸收到本项目里，除非它证明了一个稳定、独立归属的边界，否则应该拒绝或延后。
+
+## 快速跟进 prerelease 的纪律
+
+DeepSeek Harness 仍在快速迭代，因此本项目优化的是**小而明确的兼容性增量**，而不是长期维护本地 fork。当前目标基线是 **DSH `0.1.0-rc.7`**。
+
+- 显式 pin prerelease 版本；兼容性绝不依赖未限定的 `latest` tag。
+- 每个 probe 或架构结论都记录实际验证所对应的 DSH 精确版本 / commit。
+- 历史证据就是历史证据：一个 RC6 proof 在受影响 seam 为 RC7 重新验证之前，继续标记为 RC6。不能因为源码看起来类似就直接改标签。
+- DSH 升级时，先识别哪些 seam 真正发生变化，只重跑受影响的 probe / conformance check；未变化的层不要重新设计。
+- 在实际可行时，把兼容性升级与无关功能扩张拆开，让回归与上游变化更容易 review 和 revert。
+
+当前目标与证据政策见 `docs/reference/compatibility.md`。
+
 ## 包约定
 
 - 一个包 = 一个**可独立组合 / 可替换的能力**，或一个**不可再分的安全边界**。绝不是代码量阈值，也绝不是一个安全不变量的碎片。
@@ -38,6 +60,8 @@
 ## 完成定义
 
 - 凡决定行为之处，规格 / ADR 均已更新。
+- 当一个变更依赖上游或其他本仓库控制不了的 surface 时，必须明确写出它属于哪一类边界。
+- 兼容性证据必须标出它实际验证所对应的 DSH 版本。
 - 契约与单元测试通过（`pnpm test`）。
 - `pnpm typecheck`、`pnpm build`、`pnpm verify`、`pnpm smoke` 通过。
 - 无 transport/vendor 依赖泄漏进内核。
