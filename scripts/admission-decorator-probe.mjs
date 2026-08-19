@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Admission-decorator runtime proof (M4 · ②-A): confirm that a plugin can wrap
+ * Admission-decorator runtime proof: confirm that a plugin can wrap
  * `ctx.agents` (the real AgentRegistry) so that a tenant-admission callback runs
  * inside the Agent `setup` hook — BEFORE `sessions.enter` — for all four genesis
- * paths, against a real `@deepseek-ai/dsh-agent-loop` runtime.
+ * paths, against the current pinned DSH prerelease.
  *
  *   P1  create    — admission sees `options.sessionId`; store not yet entered.
  *   P2  fork      — admission sees `options.meta.parentSession`; store not yet entered.
@@ -16,21 +16,22 @@
  * fresh prepared session for the resume path.
  *
  * Run from the repo root: `node scripts/admission-decorator-probe.mjs`.
- * Installs the pinned prerelease into a throwaway temp dir (not the workspace).
+ * Installs the current target into a throwaway temp dir (not the workspace).
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DSH_TARGET_VERSION } from './dsh-target.mjs'
 
 const tmp = mkdtempSync(join(tmpdir(), 'dsh-mt-admission-'))
 try {
   writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'admission-probe', private: true, type: 'module' }))
   execFileSync('pnpm', [
     'add',
-    '@deepseek-ai/dsh-agent-loop@0.1.0-rc.6',
-    '@deepseek-ai/dsh-agent@0.1.0-rc.6',
-    '@deepseek-ai/dsh-session@0.1.0-rc.6',
+    `@deepseek-ai/dsh-agent-loop@${DSH_TARGET_VERSION}`,
+    `@deepseek-ai/dsh-agent@${DSH_TARGET_VERSION}`,
+    `@deepseek-ai/dsh-session@${DSH_TARGET_VERSION}`,
     '@deepseek-ai/cordis@4.0.1',
   ], { cwd: tmp, stdio: 'ignore' })
 
@@ -53,8 +54,6 @@ try {
     '  });',
     '  await ctx.plugin(AgentLoop, { agents: [] });',
     '',
-    '  // The decorator: a plugin wraps the real AgentRegistry, prepending an',
-    '  // admission callback to `options.setup` on both `create` and `resume`.',
     '  const decorate = (agents) => {',
     '    const origCreate = agents.create.bind(agents);',
     '    const origResume = agents.resume.bind(agents);',
@@ -88,7 +87,6 @@ try {
     '  const inStore = (id) => ctx.sessions.get(id) !== undefined;',
     '  const result = { seen, afterCreate: { p1: inStore("p1"), c1: inStore("c1"), c2: inStore("c2"), r1: inStore("r1") } };',
     '',
-    '  // Assertions.',
     '  const assert = (cond, msg) => { if (!cond) throw new Error("ASSERT FAILED: " + msg); };',
     '  const [P1, P2, P3, P4] = seen;',
     '  assert(P1 && P1.via === "create" && P1.sessionId === "p1" && P1.inStore === false, "P1 create: admission runs in setup before enter");',
@@ -107,7 +105,7 @@ try {
   const out = execFileSync('node', ['probe.mjs'], { cwd: tmp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   const result = JSON.parse(out.trim())
   const rows = result.seen.map((s) => `${s.via.padEnd(6)} ${s.sessionId ?? s.resumeSessionId}  inStore@setup=${s.inStore}`).join('\n')
-  console.log('Admission decorator proof passed — admission runs in setup, before sessions.enter, for all four paths:\n' + rows)
+  console.log(`Admission decorator proof passed on DSH ${DSH_TARGET_VERSION}:\n${rows}`)
 } finally {
   rmSync(tmp, { recursive: true, force: true })
 }

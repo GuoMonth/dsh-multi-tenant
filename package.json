@@ -7,6 +7,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "verify": "node scripts/verify-packages.mjs",
+    "probe:dsh": "node scripts/session-genesis-probe.mjs && node scripts/admission-decorator-probe.mjs",
     "smoke": "node scripts/package-smoke.mjs"
   }
 }
