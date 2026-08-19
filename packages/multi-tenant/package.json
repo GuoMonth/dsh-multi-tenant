@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant",
   "version": "0.1.0",
-  "description": "Multi-tenant SaaS extension for DeepSeek Harness (DSH): tenant identity, session ownership, authorization boundaries, tenant-aware MCP, and audit.",
+  "description": "Multi-tenant primitives for DeepSeek Harness (DSH): tenant identity, immutable session ownership, fail-closed authorization, and a replaceable ownership-store contract.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
   "repository": {

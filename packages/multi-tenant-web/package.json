@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant-web",
   "version": "0.1.0",
-  "description": "DSH Web multi-tenant integration: principal binding, RPC/mux/WS authorization. Early spike.",
+  "description": "Experimental DSH Web tenant-bound ApiProxy enforcement; production request/connection principal binding depends on a DSH transport seam.",
   "license": "MIT",
   "engines": {
     "node": ">=22.19"

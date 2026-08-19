@@ -1,73 +1,92 @@
 [简体中文](./web-enforcement.zh-CN.md) | English
 
-# ADR — DSH Web Multi-Tenant Enforcement (converged)
+# ADR — DSH Web Multi-Tenant Enforcement (release-converged)
 
-> Status: **proposed**. Converges M2 (session genesis), M3.0 (admission
-> composition), and the web Seam Map (`../specs/web-seam-map.md`). Supersedes the
-> earlier web ADR (which predated M2/M3.0).
+> Status: **proposed**. Converges the session-genesis, admission-composition,
+> real-`ApiProxy`, and RC7 transport evidence. This ADR now follows the project
+> boundary rule: owned enforcement is implemented here; missing DSH transport
+> scope is an ecosystem seam, not a reason to fork the carrier.
 
 ## Context
 
-The core (`dsh-multi-tenant`) owns session ownership + fail-closed
-authorization. The question is the **minimal upstream seam** needed to enforce
-multi-tenancy across DSH Web's surfaces.
+The core (`dsh-multi-tenant`) owns session ownership and fail-closed
+authorization. The Web question is narrower: what is the smallest DSH seam
+needed to carry an authenticated request/connection identity into that owned
+enforcement without shared ambient state?
 
 ## Converged findings
 
 | Concern | Status |
 | --- | --- |
-| **H1 — session genesis** | **resolved (M2)** — the Agent `setup` hook is the before-visibility async admission point; no core change. |
-| **Admission composability** | **runtime-proven (M4 ②-A)** — a decorator can join `ctx.agents.create/resume` and its admission runs inside `setup` before `sessions.enter`; *unfailing transport/scope installation* remains part of ②-C. |
-| **Unary enforcement** | **runtime shape implemented (M4 ②-B)** — `bindTenant` wraps the real `ApiProxy` and every `RpcMethodMap` member is exhaustively classified at compile time. The policy is deliberately fail-closed: session points are guarded, only `session.list` is post-filtered, `session.create` is admission-gated, and unmodelled host/global management surfaces are denied. |
-| **Streams / respond** | **pending M4 ②-C** — currently denied. `events` needs principal-bound filtering; `respond` needs runtime proof of `rpcId → sessionId` correlation before authorization. |
-| **Ghost ownership** | **v0 security-safe tombstone** (M2) — session ids must not be reusable; cleanup semantics deferred. |
+| **H1 — session genesis** | **Resolved.** Agent `setup` is the before-visibility async admission point; no kernel change is required. |
+| **Admission composability** | **Runtime-proven on RC6; RC7 refresh is release compatibility work.** A decorator joins `ctx.agents.create/resume` and runs admission before `sessions.enter`. |
+| **Unary enforcement** | **Implemented as the real shape.** `bindTenant` wraps the real `ApiProxy`; every `RpcMethodMap` member is exhaustively classified and the policy fails closed. |
+| **H3 — request/connection principal scope** | **RC7 ecosystem gap.** Public `ConnectionRpcHandler` receives only decoded `(endpoint, payload, signal)`, while the DSH Web carrier owns the real HTTP/WS boundary and documents that it has no authentication layer. |
+| **Streams / respond** | **Deferred behind H3.** They remain denied in the spike. Implement them only when a real principal-scoped transport path exists. |
+| **Ghost ownership** | **v0 security-safe tombstone.** Session ids must not be reused; cleanup semantics are independent later work. |
 
-## The remaining transport question — H3
+## H3 under RC7 — ecosystem deliverable
 
-The facade takes a `TenantPrincipal`, but the principal is **dropped at the RPC
-boundary** (`ConnectionRpcHandler = (endpoint, payload, signal)`). It exists
-only at the transport boundary (HTTP fetch `new Request(req)`, WS upgrade
-`handleMux(req)`), and DSH then collapses into a shared singleton
-(`HostConnectionService`, one `ApiProxy`, one `WebSocketDownlinks`). There is
-currently no proven per-request/per-connection binding point for the tenant
-principal.
+The facade needs a `TenantPrincipal`, but RC7's public Connection RPC seam no
+longer has the transport request when the decoded handler runs. The real HTTP
+request / WS upgrade is held inside the DSH Web carrier, and the shipped carrier
+explicitly describes its host fence as reachability policy rather than
+authentication.
 
-The current hypothesis is therefore **H3**: the real transport needs a
-request/connection-scoped principal seam. M4 ②-C must prove that this is the
-only missing upstream requirement; the upstream proposal is not filed before
-that proof.
+That evidence is sufficient to classify H3 as **ecosystem-owned**. The project
+should not build and maintain a production replacement for DSH's Web transport
+just to make the local checklist complete.
 
-## Security policy for the v0 web surface
+The deliverable is a **minimal tenant-agnostic upstream seam** that lets a
+consumer derive or install request/connection-scoped API/security context from
+the actual HTTP request / WS upgrade. The proposal should preserve DSH's carrier
+ownership and be useful beyond this plugin.
 
-`RpcMethodMap` coverage is exhaustive, but exhaustive coverage does not mean
-that every host capability is tenant-safe. Until a resource or privilege model
-exists, v0 follows these rules:
+A small local probe may still be used to sharpen an API proposal, but a full
+HTTP/WS transport clone is no longer a prerequisite for the kernel release or
+for filing the upstream proposal.
+
+## v0 Web spike security policy
+
+`RpcMethodMap` coverage is exhaustive, but exhaustive coverage does not make
+host-global capabilities tenant-safe. Until real resource semantics and H3
+exist, the spike stays fail-closed:
 
 - session-keyed point operations → **GUARD**;
-- `session.list` → **FILTER** (post-filtering preserves its current semantics);
-- `session.create` → **ADMIT**, and is denied by the standalone facade until the
-  pre-publication admission bridge is installed;
-- `session.search` → **DENY** for now because DSH returns a globally ranked,
-  capped result set; post-filtering it is not a correct tenant-scoped query;
+- `session.list` → **FILTER** only while post-filtering preserves semantics;
+- `session.create` → **ADMIT**, denied until principal-scoped admission can be
+  installed before publication;
+- `session.search` → **DENY** for now; tenant-scoped ranking/visibility belongs
+  to a later search contract;
 - deployment/host management (`settings.*`, `credentials.*`, host/workspace,
   preset authoring, host-scoped LLM configuration/discovery) → **DENY**;
-- explicitly tenant-neutral read-only discovery may be **ALLOW** (currently
-  `agentPreset.list`).
+- explicitly tenant-neutral read-only discovery may be **ALLOW**.
+- streams, `respond`, and downloads stay **DENY** until their supported security
+  semantics are implemented.
 
-## Explicitly not required by current evidence
+## Explicitly not required
 
-- a kernel change (H1 resolved via `setup`);
-- a new global setup-contribution registry (the admission decorator is
-  runtime-feasible; installation ordering is verified in ②-C).
+Current evidence does **not** require:
 
-No claim is made yet that `respond` needs — or does not need — a dedicated
-upstream seam. The current implementation denies it until M4 ②-C proves a safe
-correlation path.
+- a kernel change;
+- a global setup-contribution registry;
+- a permanent fork or reimplementation of DSH Web transport;
+- JWT/OIDC/API-key logic inside the kernel;
+- making host-global DSH resources tenant-owned as part of v0.1.
+
+`respond` may require correlation state once a principal-scoped connection path
+exists. That is an enforcement detail to prove then, not a reason to expand the
+upstream proposal preemptively.
 
 ## Next
 
-②-A (admission decorator) and ②-B (real `ApiProxy` + exhaustive unary
-classification) are complete. Remaining M4 work is ②-C: real HTTP/WS transport,
-principal lifetime, mux/host filtering, `respond` correlation, and unfailing
-installation ordering. Only then file the upstream proposal and proceed to full
-web enforcement.
+1. **Release track:** refresh the affected admission/ApiProxy evidence on RC7;
+   this is enough for the kernel compatibility baseline.
+2. **Ecosystem track:** file the small request/connection-scope upstream
+   proposal, with concurrency and HTTP/WS lifetime conformance expectations.
+3. **After an adequate seam exists:** turn `dsh-multi-tenant-web` into a
+   production plugin and prove mux/host/respond plus unary/admission in a
+   two-tenant E2E suite.
+
+Production Web enforcement no longer blocks the first `dsh-multi-tenant`
+kernel prerelease.
