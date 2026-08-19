@@ -1,6 +1,7 @@
 {
   "name": "dsh-multi-tenant-web",
   "version": "0.1.0",
+  "private": true,
   "description": "Experimental DSH Web tenant-bound ApiProxy enforcement; production request/connection principal binding depends on a DSH transport seam.",
   "license": "MIT",
   "engines": {

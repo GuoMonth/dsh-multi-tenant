@@ -4,7 +4,7 @@
 
 实验性的 DSH Web tenant-bound `ApiProxy` enforcement 研究。
 
-> **目前还不是 production 多用户 Web package。** 当前代码证明了 fail-closed unary enforcement 与 admission composition。Production principal binding 依赖 DSH request/connection-scoped transport seam；本 package 不会为了掩盖这个依赖而替换 DSH Web carrier。
+> **在 0.1 kernel release 中仅保留在仓库。** 这个 workspace package 已设为 `private: true`，在 production principal-binding contract 仍依赖 DSH request/connection-scoped transport seam 时，刻意禁止发布。R3 只发布 `dsh-multi-tenant`。
 
 ## 状态
 
@@ -19,6 +19,6 @@ DSH RC7 公开的 `ConnectionRpcHandler` 只暴露解码后的 `(endpoint, paylo
 
 ## 下一步
 
-这个 package **不阻塞**第一次 `dsh-multi-tenant` kernel prerelease。Web 的下一项交付是一个小而通用的 upstream request/connection-scope proposal。DSH 提供足够 seam 以后，本 package 再增加 principal-bound HTTP/WS admission、streams、`respond` 与 two-tenant E2E suite，然后再冻结 production public contract。
+这个 package **不阻塞，也不会随第一次 `dsh-multi-tenant` kernel prerelease 一起发布**。Web 的下一项交付是一个小而通用的 upstream request/connection-scope proposal。DSH 提供足够 seam 以后，本 package 再增加 principal-bound HTTP/WS admission、streams、`respond` 与 two-tenant E2E suite，然后再冻结 production public contract。
 
 参见 [`ROADMAP.md`](../../ROADMAP.md) 与 [`docs/adr/web-enforcement.md`](../../docs/adr/web-enforcement.md)。
