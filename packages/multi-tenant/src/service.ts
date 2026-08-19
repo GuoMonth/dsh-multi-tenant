@@ -6,9 +6,9 @@
  * durable-store-compatible ownership contract.
  *
  * The service is storage-agnostic: it consumes the `tenantSessionStore` service
- * seam (a separate Cordis Service provider) and never constructs or inspects a
- * backend itself. Ownership is claim-once and immutable; the tenant boundary is
- * unconditional and checked before any other consideration.
+ * seam and never constructs or inspects a backend itself. Ownership is
+ * claim-once and immutable; the tenant boundary is unconditional and checked
+ * before the same-user ownership rule.
  *
  * @module dsh-multi-tenant/service
  */
@@ -20,7 +20,6 @@ import { validateSessionId, validateTenantPrincipal } from './validation.ts'
 import type { AccessDecision, SessionOwner, TenantPrincipal } from './types.ts'
 
 export class MultiTenantService extends Service {
-  /** The ownership backend is provided by a separate Cordis service. */
   static inject = ['tenantSessionStore']
 
   constructor(ctx: Context) {
@@ -31,18 +30,6 @@ export class MultiTenantService extends Service {
     return this.ctx.tenantSessionStore
   }
 
-  /**
-   * Claim ownership of `sessionId` for `principal`, exactly once.
-   *
-   * - Unclaimed → establishes ownership and succeeds.
-   * - Already claimed by the same tenant/user → idempotent success.
-   * - Already claimed by a different tenant/user → {@link SessionOwnershipConflictError};
-   *   the existing owner is never overwritten.
-   *
-   * There is deliberately no reassignment or release API: ownership is
-   * immutable, and lifecycle cleanup belongs to a future Admin/Session-lifecycle
-   * plane, not this core.
-   */
   async claimSession(sessionId: string, principal: TenantPrincipal): Promise<void> {
     validateSessionId(sessionId)
     validateTenantPrincipal(principal)
@@ -55,18 +42,11 @@ export class MultiTenantService extends Service {
       case 'conflict':
         throw new SessionOwnershipConflictError()
       default:
-        // Fail closed: a store result outside the ClaimResult contract must
-        // never be treated as a successful claim.
         throw new MultiTenantError('tenant session store returned an invalid claim result')
     }
   }
 
-  /**
-   * Return the recorded owner, or `undefined` if unknown.
-   *
-   * This is a trusted-facing lookup (server components, audit, tests) and is
-   * NOT a non-enumerating surface; the authorization methods are.
-   */
+  /** Trusted-facing owner lookup. */
   async getSessionOwner(sessionId: string): Promise<SessionOwner | undefined> {
     validateSessionId(sessionId)
     return this.store.get(sessionId)
@@ -77,35 +57,21 @@ export class MultiTenantService extends Service {
     return (await this.evaluateAccess(principal, sessionId)).allowed
   }
 
-  /**
-   * Authorization that throws on denial. The thrown {@link SessionAccessDeniedError}
-   * is uniform: it does not distinguish an unknown session from a foreign one,
-   * and it never carries owner tenant/user identity.
-   */
+  /** Throw a uniform, non-enumerating denial when access is not allowed. */
   async assertSessionAccess(principal: TenantPrincipal, sessionId: string): Promise<void> {
     const decision = await this.evaluateAccess(principal, sessionId)
-    if (!decision.allowed) {
-      throw new SessionAccessDeniedError()
-    }
+    if (!decision.allowed) throw new SessionAccessDeniedError()
   }
 
-  /**
-   * Internal authorization decision with a diagnostic reason.
-   *
-   * `protected` so tests, future audit, and observability can inspect the
-   * reason. The PUBLIC API (`canAccessSession` / `assertSessionAccess`) never
-   * exposes it — the reason is diagnostic, not a transport value.
-   */
+  /** Internal diagnostic decision; denial reasons never cross the public API. */
   protected async evaluateAccess(principal: TenantPrincipal, sessionId: string): Promise<AccessDecision> {
     validateSessionId(sessionId)
     validateTenantPrincipal(principal)
     const owner = await this.store.get(sessionId)
-    if (!owner) {
-      return { allowed: false, reason: 'UNKNOWN_SESSION' }
-    }
-    // The tenant boundary is unconditional and checked first: no role, present
-    // or future, may cross it. Cross-tenant inspection is a separate Admin /
-    // Audit Plane concern, not `canAccessSession`.
+    if (!owner) return { allowed: false, reason: 'UNKNOWN_SESSION' }
+
+    // Cross-tenant access is unconditionally denied. Policy attributes outside
+    // this minimal ownership kernel cannot override this boundary.
     if (owner.tenantId !== principal.tenantId) {
       return { allowed: false, reason: 'TENANT_MISMATCH' }
     }

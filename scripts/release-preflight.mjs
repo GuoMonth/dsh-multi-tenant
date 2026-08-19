@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 /**
- * Release-manifest preflight for the first kernel prerelease.
- *
+ * Release-manifest preflight for the current kernel prerelease.
  * Runtime/API behavior is covered by verify/test/smoke/probe:dsh; this script
- * prevents packaging/publication mistakes and keeps the R3 release contract
- * executable.
+ * prevents packaging/publication drift.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -13,7 +11,7 @@ import { join } from 'node:path'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packagesDir = join(root, 'packages')
 const expectedKernelName = 'dsh-multi-tenant'
-const expectedKernelVersion = '0.1.0-rc.1'
+const expectedKernelVersion = '0.1.0-rc.2'
 const expectedTag = 'next'
 const expectedRepository = 'git+https://github.com/GuoMonth/dsh-multi-tenant.git'
 const errors = []
@@ -65,9 +63,18 @@ const web = packages.find(({ pkg }) => pkg.name === 'dsh-multi-tenant-web')
 if (!web) errors.push('dsh-multi-tenant-web: package not found')
 else if (web.pkg.private !== true) errors.push('dsh-multi-tenant-web: must stay private until its production contract is ready')
 
+const releaseWorkflowPath = join(root, '.github/workflows/release.yml')
+if (!existsSync(releaseWorkflowPath)) {
+  errors.push('release artifact missing: .github/workflows/release.yml')
+} else {
+  const workflow = readFileSync(releaseWorkflowPath, 'utf8')
+  if (!workflow.includes('id-token: write')) errors.push('release workflow must grant id-token: write for npm OIDC')
+  if (!workflow.includes('environment: npm-release')) errors.push('release workflow must use the npm-release environment')
+  if (workflow.includes('NPM_BOOTSTRAP_TOKEN')) errors.push('release workflow must be OIDC-only; bootstrap token fallback is not allowed')
+}
+
 for (const requiredPath of [
-  '.github/workflows/release.yml',
-  'docs/releases/v0.1.0-rc.1.md',
+  'docs/releases/v0.1.0-rc.2.md',
   'scripts/registry-preflight.mjs',
   'scripts/registry-smoke.mjs',
 ]) {
@@ -79,4 +86,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedKernelName}@${expectedKernelVersion} -> dist-tag ${expectedTag}, provenance enabled; experimental Web package is private`)
+console.log(`release preflight passed: ${expectedKernelName}@${expectedKernelVersion} -> ${expectedTag}; OIDC-only publishing; experimental Web package is private`)

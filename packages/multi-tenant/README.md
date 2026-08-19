@@ -2,13 +2,13 @@
 
 # dsh-multi-tenant
 
-Multi-tenant kernel primitives for DeepSeek Harness (DSH): tenant identity,
-immutable session ownership, fail-closed authorization, and a replaceable
-ownership-store contract.
+Multi-tenant kernel primitives for DeepSeek Harness (DSH): minimal tenant/user
+identity, immutable session ownership, fail-closed authorization, and a
+replaceable ownership-store contract.
 
-> **Release candidate: `0.1.0-rc.1`.** This package is intentionally small. It
-> is the only publishable artifact in the first 0.1 release line; Web/auth/MCP/
-> runtime isolation are separate integration or ecosystem concerns. The current
+> **Release candidate: `0.1.0-rc.2`.** The kernel stays intentionally small. It
+> is the only publishable artifact in this 0.1 release line; Web/auth/MCP/runtime
+> isolation remain integration, ecosystem, or deployment concerns. The current
 > DSH compatibility target is `0.1.0-rc.7`.
 
 ## Supported guarantee
@@ -18,13 +18,13 @@ to opaque DSH session ids through a fail-closed ownership contract.
 
 It provides two Cordis services:
 
-- `ctx.tenantSessionStore` — the replaceable ownership-storage seam;
+- `ctx.tenantSessionStore` — replaceable ownership storage;
 - `ctx.multiTenant` — claim-once ownership and authorization.
 
 The kernel guarantees:
 
 - **claim-once, immutable ownership**;
-- **unconditional tenant boundary** — no role can cross tenants;
+- **unconditional tenant boundary** — cross-tenant access is always denied;
 - **same-user ownership in v0.1** — same tenant but different user is denied;
 - **fail-closed authorization** — unknown and foreign sessions are denied;
 - **non-enumerating public denial** — unknown vs foreign is not disclosed;
@@ -44,8 +44,13 @@ This package is **not**:
 - billing, UI, organization/user administration, or a general RBAC framework;
 - a team-sharing/ACL/reassignment model.
 
-Those items are not all “future kernel features”. The project rule is:
-**control → enforce, ecosystem → standardize, outside control → bound**.
+Roles, permissions, admin flags, and other policy attributes are deliberately
+**not part of `TenantPrincipal`**. If same-tenant sharing or RBAC becomes a real
+requirement, it belongs to a separate policy plane rather than this ownership
+kernel.
+
+Project rule: **control → enforce, ecosystem → standardize, outside control →
+bound**.
 
 ## Core API
 
@@ -55,7 +60,6 @@ Those items are not all “future kernel features”. The project rule is:
 interface TenantPrincipal {
   tenantId: string
   userId: string
-  roles: readonly string[]
 }
 
 interface SessionOwner {
@@ -65,10 +69,6 @@ interface SessionOwner {
 ```
 
 ### `TenantSessionStore` (`ctx.tenantSessionStore`)
-
-The storage seam is a Cordis `Service`. `claim` is one atomic contract operation
-so durable providers can implement it with their native conditional-write
-primitive.
 
 ```ts
 type ClaimResult = 'created' | 'idempotent' | 'conflict'
@@ -80,11 +80,9 @@ abstract class TenantSessionStore extends Service {
 ```
 
 There is deliberately no release/reassign API in the 0.1 contract. Ownership is
-immutable. `InMemoryTenantSessionStore` is the reference provider and is intended
-for tests/bootstrap, not production durability.
-
-Third-party providers should run the shared contract suite exported from
-`dsh-multi-tenant/testing`.
+immutable. `InMemoryTenantSessionStore` is the reference provider for
+tests/bootstrap, not production durability. Third-party providers should run the
+shared contract suite exported from `dsh-multi-tenant/testing`.
 
 ### `MultiTenantService` (`ctx.multiTenant`)
 
@@ -93,7 +91,7 @@ Third-party providers should run the shared contract suite exported from
 | `claimSession(sessionId, principal)` | Unclaimed → create; same owner → idempotent; other owner → conflict. |
 | `getSessionOwner(sessionId)` | Trusted-facing owner lookup. |
 | `canAccessSession(principal, sessionId)` | Fail-closed boolean authorization. |
-| `assertSessionAccess(principal, sessionId)` | Same policy, throwing a uniform `SessionAccessDeniedError` on denial. |
+| `assertSessionAccess(principal, sessionId)` | Same policy, throwing uniform `SessionAccessDeniedError` on denial. |
 
 Authorization is exact-match and opaque: the kernel never parses tenant identity
 from a session id and never authorizes by prefix.
@@ -106,21 +104,18 @@ user identity is never included in the public error.
 
 ## Install / composition
 
-The first npm prerelease is published on the **`next`** dist-tag, not `latest`.
-After R3 publishes it, install into a DSH profile with:
+Prereleases are published on the **`next`** dist-tag, not `latest`:
 
 ```sh
 dsh plugin --profile <profile> add dsh-multi-tenant@next
 ```
 
-The package declares `dsh.bundle`; DSH therefore adds its bundle layer to the
-profile. The bundled layer mounts the in-memory `tenantSessionStore` reference
-and the `multiTenant` service. A deployment that needs durability should replace
-the store provider rather than modify the kernel.
+The package declares `dsh.bundle`; DSH adds its bundle layer to the profile. The
+bundled layer mounts the in-memory `tenantSessionStore` reference and
+`multiTenant`. Deployments needing durability replace the store provider rather
+than modify the kernel.
 
 ## Release verification
-
-From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -128,9 +123,9 @@ pnpm release:check
 ```
 
 `release:check` covers package/architecture invariants, release-manifest
-preflight, typecheck, unit/contract tests, build, a packed external-consumer
-smoke test, and the RC7 DSH runtime proofs. See
-[`docs/reference/release.md`](../../docs/reference/release.md).
+preflight, typecheck, unit/contract tests, build, packed external-consumer smoke,
+and the RC7 DSH runtime proofs. Publication uses npm Trusted Publishing/OIDC;
+see [`docs/reference/release.md`](../../docs/reference/release.md).
 
 Production Web principal binding, durable providers, auth providers, search,
 MCP, audit, and deployment recipes are independent follow-ups. See

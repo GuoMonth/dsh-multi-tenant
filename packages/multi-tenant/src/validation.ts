@@ -13,8 +13,6 @@ import { ValidationError } from './errors.ts'
 import type { TenantPrincipal } from './types.ts'
 
 export const MAX_IDENTIFIER_LENGTH = 256
-export const MAX_ROLE_COUNT = 32
-export const MAX_ROLE_LENGTH = 64
 
 /** An opaque identifier must be a non-empty, trimmed string of bounded length. */
 function requireOpaqueId(value: unknown, label: string): void {
@@ -37,7 +35,7 @@ export function validateSessionId(sessionId: unknown): void {
   requireOpaqueId(sessionId, 'sessionId')
 }
 
-/** Reject a malformed principal (empty/whitespace/over-long identity, bad roles). */
+/** Reject a malformed minimal ownership principal. Extra policy fields are ignored. */
 export function validateTenantPrincipal(principal: unknown): void {
   if (typeof principal !== 'object' || principal === null) {
     throw new ValidationError('principal must be an object')
@@ -45,19 +43,4 @@ export function validateTenantPrincipal(principal: unknown): void {
   const p = principal as TenantPrincipal
   requireOpaqueId(p.tenantId, 'tenantId')
   requireOpaqueId(p.userId, 'userId')
-
-  if (!Array.isArray(p.roles)) {
-    throw new ValidationError('roles must be an array')
-  }
-  if (p.roles.length > MAX_ROLE_COUNT) {
-    throw new ValidationError(`roles exceeds ${MAX_ROLE_COUNT} entries`)
-  }
-  for (const role of p.roles) {
-    if (typeof role !== 'string' || role.length === 0 || role !== role.trim()) {
-      throw new ValidationError('roles must contain only non-empty strings without surrounding whitespace')
-    }
-    if (role.length > MAX_ROLE_LENGTH) {
-      throw new ValidationError(`a role exceeds ${MAX_ROLE_LENGTH} characters`)
-    }
-  }
 }
