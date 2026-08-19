@@ -18,6 +18,47 @@ Current spec artifacts: `docs/specs/web-seam-map.md` (web surfaces) and
 `docs/adr/web-enforcement.md` (hard conclusions + upstream seam
 proposal).
 
+## Boundary-first decision rule
+
+Before adding implementation, classify the surface being discussed:
+
+1. **Controlled by this repository → enforce it.** If we own the reliable
+   enforcement point, make the rule fail-closed and prove the invariant with
+   executable tests.
+2. **Owned by the ecosystem → standardize it.** If the guarantee depends on a
+   DSH or third-party seam, define the smallest reusable contract / seam,
+   publish conformance expectations, and collaborate upstream. A local spike is
+   evidence; it is not permission to permanently fork or reimplement the
+   upstream subsystem.
+3. **Not reliably enforceable → bound it.** State the threat-model / support
+   boundary and keep the promise narrow. Do not add broad architectural
+   machinery merely to claim coverage over a surface we still cannot prove.
+
+Complexity is not evidence. A PR whose main effect is to absorb an upstream or
+uncontrolled responsibility into this repository should be rejected or
+deferred unless it demonstrates a stable, independently owned boundary.
+
+## Prerelease-following discipline
+
+DeepSeek Harness is moving quickly, so this project optimizes for **small,
+explicit compatibility deltas** rather than long-lived local forks. The current
+target baseline is **DSH `0.1.0-rc.7`**.
+
+- Pin explicit prerelease versions; never make compatibility depend on an
+  unqualified `latest` tag.
+- Record the exact DSH version / commit used by a probe or architectural
+  conclusion.
+- Historical evidence is immutable evidence: an RC6 proof stays labelled RC6
+  until the affected seam is revalidated for RC7. Do not rewrite the label just
+  because source looks similar.
+- On a DSH bump, identify which seams changed and rerun only the affected
+  probes / conformance checks. Do not redesign unchanged layers.
+- Keep compatibility upgrades separate from unrelated feature expansion when
+  practical, so regressions and upstream changes remain easy to review and
+  revert.
+
+See `docs/reference/compatibility.md` for the current target and evidence policy.
+
 ## Package conventions
 
 - One package = one **independently composable / replaceable capability**, or
@@ -67,6 +108,9 @@ Two test kinds prove different things:
 ## Definition of done
 
 - Spec / ADR updated wherever behavior is decided.
+- The boundary classification is explicit when a change depends on an upstream
+  or otherwise uncontrolled surface.
+- Compatibility evidence names the DSH version it was actually validated on.
 - Contract and unit tests green (`pnpm test`).
 - `pnpm typecheck`, `pnpm build`, `pnpm verify`, and `pnpm smoke` green.
 - No transport/vendor dependency leaked into the kernel.
