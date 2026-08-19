@@ -2,12 +2,11 @@
 /**
  * Release-manifest preflight for the first kernel prerelease.
  *
- * This intentionally checks only release-owned facts. Runtime/API behavior is
- * covered by verify/test/smoke/probe:dsh; this script prevents packaging and
- * publication mistakes such as publishing the experimental Web package or
- * accidentally tagging a prerelease as latest.
+ * Runtime/API behavior is covered by verify/test/smoke/probe:dsh; this script
+ * prevents packaging/publication mistakes and keeps the R3 release contract
+ * executable.
  */
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
@@ -16,6 +15,7 @@ const packagesDir = join(root, 'packages')
 const expectedKernelName = 'dsh-multi-tenant'
 const expectedKernelVersion = '0.1.0-rc.1'
 const expectedTag = 'next'
+const expectedRepository = 'git+https://github.com/GuoMonth/dsh-multi-tenant.git'
 const errors = []
 
 const packages = readdirSync(packagesDir).map((dirName) => {
@@ -34,22 +34,15 @@ if (!kernel) {
   errors.push(`${expectedKernelName}: package not found`)
 } else {
   const { pkg, dir } = kernel
-  if (pkg.version !== expectedKernelVersion) {
-    errors.push(`${expectedKernelName}: version must be ${expectedKernelVersion}, got ${String(pkg.version)}`)
-  }
-  if (pkg.publishConfig?.access !== 'public') {
-    errors.push(`${expectedKernelName}: publishConfig.access must be public`)
-  }
-  if (pkg.publishConfig?.tag !== expectedTag) {
-    errors.push(`${expectedKernelName}: publishConfig.tag must be ${expectedTag}`)
-  }
+  if (pkg.version !== expectedKernelVersion) errors.push(`${expectedKernelName}: version must be ${expectedKernelVersion}, got ${String(pkg.version)}`)
+  if (pkg.publishConfig?.access !== 'public') errors.push(`${expectedKernelName}: publishConfig.access must be public`)
+  if (pkg.publishConfig?.tag !== expectedTag) errors.push(`${expectedKernelName}: publishConfig.tag must be ${expectedTag}`)
+  if (pkg.publishConfig?.provenance !== true) errors.push(`${expectedKernelName}: publishConfig.provenance must be true`)
   if (pkg.license !== 'MIT') errors.push(`${expectedKernelName}: license must be MIT`)
-  if (!pkg.repository?.url) errors.push(`${expectedKernelName}: repository.url is required`)
+  if (pkg.repository?.url !== expectedRepository) errors.push(`${expectedKernelName}: repository.url must be ${expectedRepository}`)
   if (!pkg.homepage) errors.push(`${expectedKernelName}: homepage is required`)
   if (!pkg.bugs?.url) errors.push(`${expectedKernelName}: bugs.url is required`)
-  if (pkg.dsh?.bundle?.patch !== './cordis.patch.yml') {
-    errors.push(`${expectedKernelName}: dsh.bundle.patch must be ./cordis.patch.yml`)
-  }
+  if (pkg.dsh?.bundle?.patch !== './cordis.patch.yml') errors.push(`${expectedKernelName}: dsh.bundle.patch must be ./cordis.patch.yml`)
   if (!pkg.scripts?.prepare) errors.push(`${expectedKernelName}: prepare script is required for source installs`)
 
   const files = new Set(pkg.files ?? [])
@@ -69,10 +62,16 @@ if (!kernel) {
 }
 
 const web = packages.find(({ pkg }) => pkg.name === 'dsh-multi-tenant-web')
-if (!web) {
-  errors.push('dsh-multi-tenant-web: package not found')
-} else if (web.pkg.private !== true) {
-  errors.push('dsh-multi-tenant-web: must stay private until its production contract is ready')
+if (!web) errors.push('dsh-multi-tenant-web: package not found')
+else if (web.pkg.private !== true) errors.push('dsh-multi-tenant-web: must stay private until its production contract is ready')
+
+for (const requiredPath of [
+  '.github/workflows/release.yml',
+  'docs/releases/v0.1.0-rc.1.md',
+  'scripts/registry-preflight.mjs',
+  'scripts/registry-smoke.mjs',
+]) {
+  if (!existsSync(join(root, requiredPath))) errors.push(`release artifact missing: ${requiredPath}`)
 }
 
 if (errors.length) {
@@ -80,4 +79,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedKernelName}@${expectedKernelVersion} -> dist-tag ${expectedTag}; experimental Web package is private`)
+console.log(`release preflight passed: ${expectedKernelName}@${expectedKernelVersion} -> dist-tag ${expectedTag}, provenance enabled; experimental Web package is private`)
