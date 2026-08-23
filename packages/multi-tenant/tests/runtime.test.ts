@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { InMemoryTenantSessionStore, MultiTenantService } from '../src/index.ts'
 import {
   RuntimeDefinitionConflictError,
+  RuntimeRegistryClosedError,
   TenantRuntimeService,
   principalOf,
   runtimeIdentityOf,
@@ -157,6 +158,31 @@ describe('TenantRuntimeService runtime contract', () => {
     const replacement = await runtime.tenants.ensure('acme', { isolateServices: ['lifecycleMarker'] })
     expect(replacement).not.toBe(tenant)
     expect(replacement.state).toBe('active')
+  })
+
+  it('closes child admission and cancels unpublished principal setup during tenant teardown', async () => {
+    const { runtime } = await createRuntime()
+    const tenant = await runtime.tenants.ensure('acme')
+    const started = Promise.withResolvers<void>()
+
+    const pendingAlice = tenant.principals.ensure('alice', {
+      setup: async ({ signal }) => {
+        started.resolve()
+        await new Promise<never>((_, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+        })
+      },
+    })
+
+    await started.promise
+    expect(tenant.principals.get('alice')).toBeUndefined()
+
+    const disposing = tenant.dispose()
+    await expect(pendingAlice).rejects.toThrow(RuntimeRegistryClosedError)
+    await disposing
+
+    expect(tenant.state).toBe('disposed')
+    await expect(tenant.principals.ensure('bob')).rejects.toThrow(RuntimeRegistryClosedError)
   })
 
   it('keeps ownership authorization shared across the runtime tree', async () => {
