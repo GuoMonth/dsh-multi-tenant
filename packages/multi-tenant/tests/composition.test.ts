@@ -15,7 +15,12 @@ import {
 } from '../src/composition.ts'
 import { InMemoryTenantSessionStore } from '../src/store.ts'
 import { MultiTenantService } from '../src/service.ts'
-import { TenantRuntimeService } from '../src/runtime.ts'
+import {
+  RuntimeDefinitionConflictError,
+  TenantRuntimeService,
+  principalOf,
+  tenantIdOf,
+} from '../src/runtime.ts'
 
 async function createRuntime(): Promise<{ ctx: Context; runtime: TenantRuntimeService }> {
   const ctx = new Context()
@@ -63,6 +68,7 @@ describe('v0.3 composition compiler', () => {
     })
 
     expect(second).toEqual(first)
+    expect(second.fingerprint).toBe(first.fingerprint)
     expect(first.bootstrapOrder).toEqual([
       'ambient-agents',
       'tenant-config',
@@ -83,15 +89,21 @@ describe('v0.3 composition compiler', () => {
     expect(() => compileSaaSDefinition({
       capabilities: [{ key: 'credentials', scope: 'principal', required: true }],
       providers: [
-        { id: 'a', capability: 'credentials', scope: 'principal' },
-        { id: 'b', capability: 'credentials', scope: 'principal' },
+        { id: 'a', capability: 'credentials', scope: 'principal', setup() {} },
+        { id: 'b', capability: 'credentials', scope: 'principal', setup() {} },
       ],
     })).toThrow(AmbiguousCapabilityProviderError)
 
     expect(() => compileSaaSDefinition({
       capabilities: [{ key: 'tenantConfig', scope: 'tenant', required: true }],
-      providers: [{ id: 'wrong', capability: 'tenantConfig', scope: 'principal' }],
+      providers: [{ id: 'wrong', capability: 'tenantConfig', scope: 'principal', setup() {} }],
     })).toThrow(CapabilityScopeMismatchError)
+
+    const falseScopedAmbient = {
+      capabilities: [{ key: 'credentials', scope: 'principal', required: true }],
+      providers: [{ id: 'ambient-principal', capability: 'credentials', scope: 'principal' }],
+    } as unknown as SaaSDefinition
+    expect(() => compileSaaSDefinition(falseScopedAmbient)).toThrow(CapabilityScopeMismatchError)
   })
 
   it('rejects dependency visibility violations and cycles structurally', () => {
@@ -106,8 +118,9 @@ describe('v0.3 composition compiler', () => {
           capability: 'tenantPolicy',
           scope: 'tenant',
           requires: ['principalSecret'],
+          setup() {},
         },
-        { id: 'principal-secret', capability: 'principalSecret', scope: 'principal' },
+        { id: 'principal-secret', capability: 'principalSecret', scope: 'principal', setup() {} },
       ],
     })).toThrow(CapabilityDependencyVisibilityError)
 
@@ -117,10 +130,55 @@ describe('v0.3 composition compiler', () => {
         { key: 'b', scope: 'principal', required: true },
       ],
       providers: [
-        { id: 'a-provider', capability: 'a', scope: 'principal', requires: ['b'] },
-        { id: 'b-provider', capability: 'b', scope: 'principal', requires: ['a'] },
+        { id: 'a-provider', capability: 'a', scope: 'principal', requires: ['b'], setup() {} },
+        { id: 'b-provider', capability: 'b', scope: 'principal', requires: ['a'], setup() {} },
       ],
     })).toThrow(CapabilityDependencyCycleError)
+  })
+
+  it('uses the plan fingerprint to reject canonical Runtime drift without blocking equivalent joins', async () => {
+    const { ctx, runtime } = await createRuntime()
+    const capabilities = [{ key: 'tenantConfig', scope: 'tenant', required: true }] as const
+    const firstPlan = compileSaaSDefinition({
+      capabilities,
+      providers: [{
+        id: 'tenant-config-v1',
+        capability: 'tenantConfig',
+        scope: 'tenant',
+        definitionKey: 'profile-v1',
+        setup({ ctx: tenantCtx }) { tenantCtx.provide('tenantConfig', 'v1') },
+      }],
+    })
+    const equivalentPlan = compileSaaSDefinition({
+      capabilities: reorder(capabilities),
+      providers: [{
+        id: 'tenant-config-v1',
+        capability: 'tenantConfig',
+        scope: 'tenant',
+        definitionKey: 'profile-v1',
+        setup({ ctx: tenantCtx }) { tenantCtx.provide('tenantConfig', 'equivalent-v1') },
+      }],
+    })
+    const conflictingPlan = compileSaaSDefinition({
+      capabilities,
+      providers: [{
+        id: 'tenant-config-v2',
+        capability: 'tenantConfig',
+        scope: 'tenant',
+        definitionKey: 'profile-v2',
+        setup({ ctx: tenantCtx }) { tenantCtx.provide('tenantConfig', 'v2') },
+      }],
+    })
+
+    expect(equivalentPlan.fingerprint).toBe(firstPlan.fingerprint)
+    const tenant = await runtime.tenants.ensure('acme', tenantDefinitionFromPlan(firstPlan))
+    await expect(runtime.tenants.ensure('acme', tenantDefinitionFromPlan(equivalentPlan))).resolves.toBe(tenant)
+    await expect(runtime.tenants.ensure('acme', tenantDefinitionFromPlan(conflictingPlan)))
+      .rejects.toThrow(RuntimeDefinitionConflictError)
+    expect(tenant.ctx.get('tenantConfig')).toBe('v1')
+
+    await tenant.dispose()
+    await ctx.fiber.dispose()
   })
 
   it('materializes one plan through deployment, Tenant, Principal and Operation scopes', async () => {
@@ -144,7 +202,7 @@ describe('v0.3 composition compiler', () => {
           capability: 'tenantConfig',
           scope: 'tenant',
           setup({ ctx: tenantCtx }) {
-            tenantCtx.provide('tenantConfig', `config:${String(tenantCtx.tenantRuntime === runtime)}`)
+            tenantCtx.provide('tenantConfig', `tenant:${tenantIdOf(tenantCtx)}`)
           },
         },
         {
@@ -153,8 +211,8 @@ describe('v0.3 composition compiler', () => {
           scope: 'principal',
           requires: ['tenantConfig'],
           setup({ ctx: principalCtx }) {
-            const identity = principalCtx.tenantRuntime === runtime
-            principalCtx.provide('credentials', `credential:${String(identity)}`)
+            const principal = principalOf(principalCtx)
+            principalCtx.provide('credentials', `credential:${principal?.tenantId}/${principal?.userId}`)
           },
         },
         {
@@ -163,7 +221,8 @@ describe('v0.3 composition compiler', () => {
           scope: 'operation',
           requires: ['credentials'],
           setup({ ctx: operationCtx }) {
-            operationCtx.provide('requestMarker', 'operation-ready')
+            const principal = principalOf(operationCtx)
+            operationCtx.provide('requestMarker', `operation:${principal?.tenantId}/${principal?.userId}`)
           },
         },
       ],
@@ -190,9 +249,9 @@ describe('v0.3 composition compiler', () => {
 
     await expect(operation.result).resolves.toEqual({
       agents: 'deployment-agents',
-      tenant: 'config:true',
-      credential: 'credential:true',
-      operation: 'operation-ready',
+      tenant: 'tenant:acme',
+      credential: 'credential:acme/alice',
+      operation: 'operation:acme/alice',
     })
     expect(operation.state).toBe('disposed')
 
