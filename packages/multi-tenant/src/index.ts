@@ -17,6 +17,18 @@ export { MultiTenantService }
 export default MultiTenantService
 
 export {
+  defineCapability,
+  assertCapabilityToken,
+  provideCapability,
+  getCapability,
+} from './capability.ts'
+export type {
+  CapabilityScope,
+  CapabilityToken,
+  CapabilityValue,
+} from './capability.ts'
+
+export {
   TenantRuntimeService,
   MultiTenantRuntimeError,
   RuntimeDefinitionConflictError,
@@ -81,15 +93,16 @@ export {
   CapabilityProviderUnavailableError,
 } from './composition.ts'
 export type {
-  CapabilityScope,
   CapabilityDefinition,
   CapabilityProviderSetupCommit,
   CapabilityProviderPreparation,
   CapabilityProviderSetup,
   CapabilityProviderDefinition,
+  CapabilityProviderSelection,
   SaaSDefinition,
   PlannedCapability,
   PlannedProvider,
+  CompositionScopeFingerprints,
   CompositionPlan,
   DeploymentComposition,
 } from './composition.ts'
