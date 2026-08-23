@@ -4,13 +4,10 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('real Cordis Loader composition', () => {
-  it('loads dsh-multi-tenant through the Loader and authorizes via ctx.multiTenant', async () => {
+  it('loads the shared kernel and context-native tenant runtime', async () => {
     // Boundary: this exercises the REAL Cordis Loader + Include path over
-    // `demo/cordis.yml`, proving the plugin is a genuine loadable Cordis
-    // Service (both the store seam and the service), NOT a mock construction.
-    // It resolves entries by relative SOURCE path (`../src/*.ts`); it does not
-    // exercise the packaged `exports`/`dsh.bundle` name resolution, which the
-    // static `bundle.manifest.test.ts` covers.
+    // `demo/cordis.yml`, proving the store, kernel, and runtime are genuine
+    // loadable Cordis services rather than only direct test constructions.
     const projectRoot = resolve(import.meta.dirname, '..')
     const demoScript = resolve(projectRoot, 'demo/run-loader.ts')
     const child = spawn(process.execPath, ['--import', 'tsx', demoScript], {
@@ -32,5 +29,9 @@ describe('real Cordis Loader composition', () => {
     expect(output).toContain('"crossTenantAllowed":false')
     expect(output).toContain('"denialName":"SessionAccessDeniedError"')
     expect(output).toContain('"denialMessage":"Access to session denied."')
+    expect(output).toContain('"acmeAuth":"auth-acme"')
+    expect(output).toContain('"evilcorpAuth":"auth-evilcorp"')
+    // JSON.stringify omits undefined, so a leaked rootAuth would add this key.
+    expect(output).not.toContain('"rootAuth"')
   }, 30_000)
 })

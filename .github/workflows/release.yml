@@ -1,4 +1,4 @@
-name: Publish kernel prerelease
+name: Publish runtime prerelease
 
 run-name: Publish dsh-multi-tenant ${{ inputs.version }}
 
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact package version to publish (for example 0.1.0-rc.2)
+        description: Exact package version to publish (for example 0.2.0-rc.1)
         required: true
         type: string
 
@@ -15,7 +15,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: npm-kernel-release
+  group: npm-dsh-multi-tenant-release
   cancel-in-progress: false
 
 jobs:

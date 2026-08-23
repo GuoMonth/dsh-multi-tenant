@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.1.0-rc.2",
-  "description": "Multi-tenant primitives for DeepSeek Harness (DSH): tenant identity, immutable session ownership, fail-closed authorization, and a replaceable ownership-store contract.",
+  "version": "0.2.0-rc.1",
+  "description": "Context-native multi-tenant runtime for DeepSeek Harness: tenant/principal capability scopes plus immutable session ownership and fail-closed authorization.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
   "repository": {
@@ -26,6 +26,10 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
+    "./runtime": {
+      "types": "./dist/runtime.d.mts",
+      "import": "./dist/runtime.mjs"
+    },
     "./store": {
       "types": "./dist/store.d.mts",
       "import": "./dist/store.mjs"
@@ -47,6 +51,7 @@
     "dsh-plugin",
     "cordis",
     "multi-tenant",
+    "multi-tenant-runtime",
     "saas",
     "authorization",
     "tenant-isolation"

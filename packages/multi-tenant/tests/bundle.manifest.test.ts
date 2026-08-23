@@ -19,21 +19,27 @@ describe('DeepSeek Harness bundle contract', () => {
     expect(existsSync(patchPath)).toBe(true)
   })
 
-  it('exposes the service and store seams as package entry points', () => {
+  it('exposes kernel, runtime, and store seams as package entry points', () => {
     const main = packageManifest.exports?.['.'] as { import?: string; types?: string } | undefined
+    const runtime = packageManifest.exports?.['./runtime'] as { import?: string; types?: string } | undefined
     const store = packageManifest.exports?.['./store'] as { import?: string; types?: string } | undefined
     expect(main?.import).toBe('./dist/index.mjs')
     expect(main?.types).toBe('./dist/index.d.mts')
+    expect(runtime?.import).toBe('./dist/runtime.mjs')
+    expect(runtime?.types).toBe('./dist/runtime.d.mts')
     expect(store?.import).toBe('./dist/store.mjs')
     expect(store?.types).toBe('./dist/store.d.mts')
   })
 
-  it('assembles the store provider and the service as two rows', () => {
+  it('assembles the shared kernel before the context-native runtime', () => {
     const patch = readFileSync(patchPath, 'utf8')
     expect(patch).toContain('insert:')
     expect(patch).toContain('id: tenant-session-store')
     expect(patch).toContain('name: dsh-multi-tenant/store')
     expect(patch).toContain('id: multi-tenant')
     expect(patch).toContain('name: dsh-multi-tenant')
+    expect(patch).toContain('id: tenant-runtime')
+    expect(patch).toContain('name: dsh-multi-tenant/runtime')
+    expect(patch.indexOf('id: multi-tenant')).toBeLessThan(patch.indexOf('id: tenant-runtime'))
   })
 })

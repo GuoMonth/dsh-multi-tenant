@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Release-manifest preflight for the current kernel prerelease.
+ * Release-manifest preflight for the current v0.2 runtime prerelease.
  * Runtime/API behavior is covered by verify/test/smoke/probe:dsh; this script
  * prevents packaging/publication drift.
  */
@@ -10,8 +10,8 @@ import { join } from 'node:path'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packagesDir = join(root, 'packages')
-const expectedKernelName = 'dsh-multi-tenant'
-const expectedKernelVersion = '0.1.0-rc.2'
+const expectedPackageName = 'dsh-multi-tenant'
+const expectedVersion = '0.2.0-rc.1'
 const expectedTag = 'next'
 const expectedRepository = 'git+https://github.com/GuoMonth/dsh-multi-tenant.git'
 const errors = []
@@ -23,39 +23,39 @@ const packages = readdirSync(packagesDir).map((dirName) => {
 })
 
 const publishable = packages.filter(({ pkg }) => pkg.private !== true)
-if (publishable.length !== 1 || publishable[0]?.pkg.name !== expectedKernelName) {
-  errors.push(`exactly one workspace package must be publishable (${expectedKernelName}); got ${publishable.map(({ pkg }) => pkg.name).join(', ') || 'none'}`)
+if (publishable.length !== 1 || publishable[0]?.pkg.name !== expectedPackageName) {
+  errors.push(`exactly one workspace package must be publishable (${expectedPackageName}); got ${publishable.map(({ pkg }) => pkg.name).join(', ') || 'none'}`)
 }
 
-const kernel = packages.find(({ pkg }) => pkg.name === expectedKernelName)
-if (!kernel) {
-  errors.push(`${expectedKernelName}: package not found`)
+const runtime = packages.find(({ pkg }) => pkg.name === expectedPackageName)
+if (!runtime) {
+  errors.push(`${expectedPackageName}: package not found`)
 } else {
-  const { pkg, dir } = kernel
-  if (pkg.version !== expectedKernelVersion) errors.push(`${expectedKernelName}: version must be ${expectedKernelVersion}, got ${String(pkg.version)}`)
-  if (pkg.publishConfig?.access !== 'public') errors.push(`${expectedKernelName}: publishConfig.access must be public`)
-  if (pkg.publishConfig?.tag !== expectedTag) errors.push(`${expectedKernelName}: publishConfig.tag must be ${expectedTag}`)
-  if (pkg.publishConfig?.provenance !== true) errors.push(`${expectedKernelName}: publishConfig.provenance must be true`)
-  if (pkg.license !== 'MIT') errors.push(`${expectedKernelName}: license must be MIT`)
-  if (pkg.repository?.url !== expectedRepository) errors.push(`${expectedKernelName}: repository.url must be ${expectedRepository}`)
-  if (!pkg.homepage) errors.push(`${expectedKernelName}: homepage is required`)
-  if (!pkg.bugs?.url) errors.push(`${expectedKernelName}: bugs.url is required`)
-  if (pkg.dsh?.bundle?.patch !== './cordis.patch.yml') errors.push(`${expectedKernelName}: dsh.bundle.patch must be ./cordis.patch.yml`)
-  if (!pkg.scripts?.prepare) errors.push(`${expectedKernelName}: prepare script is required for source installs`)
+  const { pkg, dir } = runtime
+  if (pkg.version !== expectedVersion) errors.push(`${expectedPackageName}: version must be ${expectedVersion}, got ${String(pkg.version)}`)
+  if (pkg.publishConfig?.access !== 'public') errors.push(`${expectedPackageName}: publishConfig.access must be public`)
+  if (pkg.publishConfig?.tag !== expectedTag) errors.push(`${expectedPackageName}: publishConfig.tag must be ${expectedTag}`)
+  if (pkg.publishConfig?.provenance !== true) errors.push(`${expectedPackageName}: publishConfig.provenance must be true`)
+  if (pkg.license !== 'MIT') errors.push(`${expectedPackageName}: license must be MIT`)
+  if (pkg.repository?.url !== expectedRepository) errors.push(`${expectedPackageName}: repository.url must be ${expectedRepository}`)
+  if (!pkg.homepage) errors.push(`${expectedPackageName}: homepage is required`)
+  if (!pkg.bugs?.url) errors.push(`${expectedPackageName}: bugs.url is required`)
+  if (pkg.dsh?.bundle?.patch !== './cordis.patch.yml') errors.push(`${expectedPackageName}: dsh.bundle.patch must be ./cordis.patch.yml`)
+  if (!pkg.scripts?.prepare) errors.push(`${expectedPackageName}: prepare script is required for source installs`)
 
   const files = new Set(pkg.files ?? [])
   for (const required of ['dist', 'README.md', 'LICENSE', 'cordis.patch.yml']) {
-    if (!files.has(required)) errors.push(`${expectedKernelName}: files must include ${required}`)
+    if (!files.has(required)) errors.push(`${expectedPackageName}: files must include ${required}`)
   }
 
   const exports = pkg.exports ?? {}
-  for (const required of ['.', './store', './testing', './cordis.patch.yml']) {
-    if (!(required in exports)) errors.push(`${expectedKernelName}: exports must include ${required}`)
+  for (const required of ['.', './runtime', './store', './testing', './cordis.patch.yml']) {
+    if (!(required in exports)) errors.push(`${expectedPackageName}: exports must include ${required}`)
   }
 
   const readme = readFileSync(join(dir, 'README.md'), 'utf8')
-  for (const heading of ['## Supported guarantee', '## Explicit boundaries']) {
-    if (!readme.includes(heading)) errors.push(`${expectedKernelName}: README missing ${heading}`)
+  for (const heading of ['## Supported guarantee', '## Explicit boundaries', '## Context-native runtime']) {
+    if (!readme.includes(heading)) errors.push(`${expectedPackageName}: README missing ${heading}`)
   }
 }
 
@@ -76,6 +76,7 @@ if (!existsSync(releaseWorkflowPath)) {
 }
 
 for (const requiredPath of [
+  'docs/releases/v0.2.0-rc.1.md',
   'docs/releases/v0.1.0-rc.2.md',
   'scripts/registry-preflight.mjs',
   'scripts/registry-smoke.mjs',
@@ -88,4 +89,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedKernelName}@${expectedKernelVersion} -> ${expectedTag}; OIDC-only publishing; experimental Web package is private`)
+console.log(`release preflight passed: ${expectedPackageName}@${expectedVersion} -> ${expectedTag}; v0.1 frozen; context-native runtime included; OIDC-only publishing`)

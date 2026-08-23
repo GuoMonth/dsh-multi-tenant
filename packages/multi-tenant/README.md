@@ -1,60 +1,108 @@
-[简体中文](./README.zh-CN.md) | English
-
 # dsh-multi-tenant
 
-Multi-tenant kernel primitives for DeepSeek Harness (DSH): minimal tenant/user
-identity, immutable session ownership, fail-closed authorization, and a
-replaceable ownership-store contract.
+Context-native multi-tenant runtime primitives for DeepSeek Harness (DSH).
 
-> **Release candidate: `0.1.0-rc.2`.** The kernel stays intentionally small. It
-> is the only publishable artifact in this 0.1 release line; Web/auth/MCP/runtime
-> isolation remain integration, ecosystem, or deployment concerns. The current
-> DSH compatibility target is `0.1.0-rc.7`.
+> **v0.2 line:** `0.2.0-rc.1` moves the project from an authorization-only kernel toward a real multi-tenant runtime. The published v0.1 tags are frozen historical contracts: immutable session ownership + fail-closed authorization. v0.2 keeps that kernel and adds tenant/principal Cordis capability scopes.
+>
+> Executable DSH compatibility target remains the proven `0.1.0-rc.7` closure for this architecture PR. Current upstream `0.1.1-rc.2` scope behavior was reviewed; dependency/lockfile upgrade is a separate follow-up.
 
 ## Supported guarantee
 
-Given an authenticated `TenantPrincipal`, this package owns and authorizes access
-to opaque DSH session ids through a fail-closed ownership contract.
+v0.2 has two enforcement layers:
 
-It provides two Cordis services:
+1. **Context-native capability isolation** — `ctx.tenantRuntime` mints real Cordis child lifecycles. Selected service names receive tenant-local and optionally principal-local isolation labels. Plugins/providers mounted below those contexts resolve inside that capability graph rather than through an application-level `tenantId -> service` registry.
+2. **Persistent ownership authorization** — the v0.1 `ctx.multiTenant` service remains deployment-global and enforces immutable `(tenantId, userId)` session ownership with fail-closed access decisions.
 
-- `ctx.tenantSessionStore` — replaceable ownership storage;
-- `ctx.multiTenant` — claim-once ownership and authorization.
+The ownership kernel still guarantees:
 
-The kernel guarantees:
+- claim-once immutable ownership;
+- unconditional cross-tenant denial;
+- same-user ownership in v0.x;
+- unknown/foreign sessions fail closed;
+- non-enumerating public denial errors;
+- a replaceable async `TenantSessionStore` seam.
 
-- **claim-once, immutable ownership**;
-- **unconditional tenant boundary** — cross-tenant access is always denied;
-- **same-user ownership in v0.1** — same tenant but different user is denied;
-- **fail-closed authorization** — unknown and foreign sessions are denied;
-- **non-enumerating public denial** — unknown vs foreign is not disclosed;
-- **async storage contract** so a durable provider can replace the in-memory
-  reference without changing the kernel API.
+The runtime additionally guarantees:
 
-## Explicit boundaries
+- one canonical live tenant capability graph per `TenantRuntimeService`;
+- exact tenant/principal identity binding to the returned contexts;
+- tenant-local Cordis service resolution for explicitly isolated services;
+- principal-local Cordis service resolution for explicitly isolated services;
+- the ownership kernel, runtime manager, and Cordis core services cannot be accidentally isolated away;
+- tenant/principal scope disposal follows Cordis fiber lifecycle.
 
-This package is **not**:
+## Context-native runtime
 
-- an authentication or HTTP/WebSocket transport layer;
-- a production multi-user DSH Web integration;
-- a durable database provider (the bundled in-memory provider is bootstrap/dev);
-- an MCP credential/context implementation;
-- an audit/usage store;
-- process, shell, filesystem, container, credential, or network isolation;
-- billing, UI, organization/user administration, or a general RBAC framework;
-- a team-sharing/ACL/reassignment model.
+The runtime deliberately uses Cordis as the scope system instead of inventing another dependency container.
 
-Roles, permissions, admin flags, and other policy attributes are deliberately
-**not part of `TenantPrincipal`**. If same-tenant sharing or RBAC becomes a real
-requirement, it belongs to a separate policy plane rather than this ownership
-kernel.
+```ts
+const acme = ctx.tenantRuntime.createTenant('acme', {
+  isolateServices: ['tenantAuth', 'tenantMcp'],
+})
 
-Project rule: **control → enforce, ecosystem → standardize, outside control →
-bound**.
+await acme.ctx.plugin(authProvider, acmeAuthConfig)
+await acme.ctx.plugin(mcpProvider, acmeMcpConfig)
 
-## Core API
+const alice = acme.createPrincipal(
+  { tenantId: 'acme', userId: 'alice' },
+  { isolateServices: ['userCredentials'] },
+)
 
-### Types
+await alice.ctx.plugin(credentialsProvider, aliceCredentials)
+```
+
+Conceptually:
+
+```text
+Deployment / Root Context
+│
+├── shared ownership kernel (ctx.multiTenant)
+├── shared durable ownership store
+│
+├── Tenant A Context
+│   ├── tenant-local auth / MCP / providers
+│   └── Principal Alice Context
+│       └── user-local credentials
+│
+└── Tenant B Context
+    ├── tenant-local auth / MCP / providers
+    └── Principal Bob Context
+        └── user-local credentials
+```
+
+`tenantIdOf(ctx)` and `principalOf(ctx)` expose the trusted same-process contextual identity to plugins. They are routing/composition metadata, **not authorization decisions**. Durable/session boundaries must still use `ctx.multiTenant`.
+
+### Two scope planes, on purpose
+
+DSH already has `@deepseek-ai/dsh-scope` for Agent/Preset registration visibility. v0.2 does **not** reuse that single parent chain as the tenant authority graph because Agent Presets already use the Agent scope parent relation.
+
+- **Cordis service isolation:** tenant/principal capability providers.
+- **DSH scope chain:** Agent/Preset tools, prompt contributions, listeners and other registration views.
+
+Keeping these planes separate avoids competing parent bindings and makes the security boundary explicit.
+
+## Core APIs
+
+### `ctx.tenantRuntime`
+
+```ts
+interface TenantScopeOptions {
+  isolateServices?: readonly string[]
+}
+
+interface PrincipalScopeOptions {
+  isolateServices?: readonly string[]
+}
+
+ctx.tenantRuntime.createTenant(tenantId, options)
+ctx.tenantRuntime.get(tenantId)
+```
+
+A live tenant id may have only one runtime scope. Dispose it before recreating the same tenant.
+
+### `ctx.multiTenant`
+
+The v0.1 kernel remains supported:
 
 ```ts
 interface TenantPrincipal {
@@ -62,58 +110,36 @@ interface TenantPrincipal {
   userId: string
 }
 
-interface SessionOwner {
-  tenantId: string
-  userId: string
-}
+ctx.multiTenant.claimSession(sessionId, principal)
+ctx.multiTenant.canAccessSession(principal, sessionId)
+ctx.multiTenant.assertSessionAccess(principal, sessionId)
 ```
 
-### `TenantSessionStore` (`ctx.tenantSessionStore`)
+## Explicit boundaries
 
-```ts
-type ClaimResult = 'created' | 'idempotent' | 'conflict'
+This package is **not** a process/container sandbox. Cordis contexts isolate service resolution and lifecycle, not arbitrary same-process code. A trusted plugin can still reach process globals, filesystem, network, environment variables, or deliberately walk to `ctx.root`.
 
-abstract class TenantSessionStore extends Service {
-  claim(sessionId: string, owner: SessionOwner): Promise<ClaimResult>
-  get(sessionId: string): Promise<SessionOwner | undefined>
-}
-```
+Strong process/filesystem/network/shell isolation belongs to deployment boundaries such as one tenant per container/Pod.
 
-There is deliberately no release/reassign API in the 0.1 contract. Ownership is
-immutable. `InMemoryTenantSessionStore` is the reference provider for
-tests/bootstrap, not production durability. Third-party providers should run the
-shared contract suite exported from `dsh-multi-tenant/testing`.
+v0.2 RC1 also does **not** claim that every existing DSH plugin is automatically tenant-aware. Providers must be compatible with being instantiated below a tenant context. Known example from the reviewed current upstream: the DSH MCP client reserves `serverName` against `ctx.root`, so identical server names across tenant-local MCP instances still require an upstream/provider change or unique names. That is an ecosystem compatibility gap, not something this package hides with a second registry.
 
-### `MultiTenantService` (`ctx.multiTenant`)
+The package also does not provide billing, organization UI, a general RBAC framework, or a full HTTP/WebSocket authentication transport. An authenticated boundary must select/create the correct tenant/principal context before driving DSH work.
 
-| Method | Semantics |
-| --- | --- |
-| `claimSession(sessionId, principal)` | Unclaimed → create; same owner → idempotent; other owner → conflict. |
-| `getSessionOwner(sessionId)` | Trusted-facing owner lookup. |
-| `canAccessSession(principal, sessionId)` | Fail-closed boolean authorization. |
-| `assertSessionAccess(principal, sessionId)` | Same policy, throwing uniform `SessionAccessDeniedError` on denial. |
+## Install
 
-Authorization is exact-match and opaque: the kernel never parses tenant identity
-from a session id and never authorizes by prefix.
-
-## Error privacy
-
-`assertSessionAccess` exposes one non-enumerating denial. Unknown sessions and
-foreign sessions are intentionally indistinguishable to callers; owner tenant or
-user identity is never included in the public error.
-
-## Install / composition
-
-Prereleases are published on the **`next`** dist-tag, not `latest`:
+Prereleases use the `next` dist-tag:
 
 ```sh
 dsh plugin --profile <profile> add dsh-multi-tenant@next
 ```
 
-The package declares `dsh.bundle`; DSH adds its bundle layer to the profile. The
-bundled layer mounts the in-memory `tenantSessionStore` reference and
-`multiTenant`. Deployments needing durability replace the store provider rather
-than modify the kernel.
+The bundle installs three deployment-global rows:
+
+- `ctx.tenantSessionStore` — in-memory reference provider;
+- `ctx.multiTenant` — persistent ownership/authorization kernel;
+- `ctx.tenantRuntime` — context-native tenant runtime manager.
+
+Production deployments should replace the in-memory ownership store with a durable provider.
 
 ## Release verification
 
@@ -122,23 +148,7 @@ pnpm install --frozen-lockfile
 pnpm release:check
 ```
 
-`release:check` covers package/architecture invariants, release-manifest
-preflight, typecheck, unit/contract tests, build, packed external-consumer smoke,
-and the RC7 DSH runtime proofs. Publication uses npm Trusted Publishing/OIDC;
-see [`docs/reference/release.md`](../../docs/reference/release.md).
-
-Production Web principal binding, durable providers, auth providers, search,
-MCP, audit, and deployment recipes are independent follow-ups. See
-[`ROADMAP.md`](../../ROADMAP.md).
-
-## Development
-
-```sh
-pnpm install
-pnpm typecheck
-pnpm test
-pnpm build
-```
+The release gates cover package invariants, typecheck, unit/contract tests, packed external-consumer smoke, and the pinned DSH runtime probes.
 
 ## License
 
