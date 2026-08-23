@@ -11,7 +11,7 @@ import { join } from 'node:path'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packagesDir = join(root, 'packages')
 const expectedPackageName = 'dsh-multi-tenant'
-const expectedVersion = '0.2.0-rc.1'
+const expectedVersion = '0.2.0-rc.2'
 const expectedTag = 'next'
 const expectedRepository = 'git+https://github.com/GuoMonth/dsh-multi-tenant.git'
 const errors = []
@@ -54,7 +54,7 @@ if (!runtime) {
   }
 
   const readme = readFileSync(join(dir, 'README.md'), 'utf8')
-  for (const heading of ['## Supported guarantee', '## Explicit boundaries', '## Context-native runtime']) {
+  for (const heading of ['## Runtime model', '## Supported guarantee', '## Canonical publication', '## Explicit boundaries']) {
     if (!readme.includes(heading)) errors.push(`${expectedPackageName}: README missing ${heading}`)
   }
 }
@@ -76,8 +76,10 @@ if (!existsSync(releaseWorkflowPath)) {
 }
 
 for (const requiredPath of [
+  'docs/releases/v0.2.0-rc.2.md',
   'docs/releases/v0.2.0-rc.1.md',
   'docs/releases/v0.1.0-rc.2.md',
+  'scripts/agent-owner-context-probe.mjs',
   'scripts/registry-preflight.mjs',
   'scripts/registry-smoke.mjs',
 ]) {
@@ -89,4 +91,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedPackageName}@${expectedVersion} -> ${expectedTag}; v0.1 frozen; context-native runtime included; OIDC-only publishing`)
+console.log(`release preflight passed: ${expectedPackageName}@${expectedVersion} -> ${expectedTag}; v0.1 frozen; canonical runtime contract included; OIDC-only publishing`)
