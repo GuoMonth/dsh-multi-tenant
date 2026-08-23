@@ -8,9 +8,9 @@
  * caller context.
  */
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DSH_TARGET } from './dsh-target.mjs'
 
@@ -19,20 +19,9 @@ const tmp = mkdtempSync(join(tmpdir(), 'dsh-mt-saas-core-'))
 const src = join(tmp, 'src')
 
 try {
-  mkdirSync(src)
-  for (const name of [
-    'composition.ts',
-    'operation.ts',
-    'scope.ts',
-    'runtime.ts',
-    'service.ts',
-    'store.ts',
-    'types.ts',
-    'errors.ts',
-    'validation.ts',
-  ]) {
-    copyFileSync(join(root, 'packages', 'multi-tenant', 'src', name), join(src, basename(name)))
-  }
+  // Treat the module as one refactorable source unit. Evidence should verify
+  // behavior, not pin an internal file list that becomes architectural drag.
+  cpSync(join(root, 'packages', 'multi-tenant', 'src'), src, { recursive: true })
 
   writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'saas-core-probe', private: true, type: 'module' }))
   writeFileSync(join(tmp, 'pnpm-workspace.yaml'), 'allowBuilds:\n  esbuild: false\n')
