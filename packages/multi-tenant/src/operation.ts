@@ -201,10 +201,13 @@ class PrincipalOperationRegistryImpl implements PrincipalOperationRegistry {
         const operationCtx = ownerFiber.ctx
 
         operationCtx.effect(() => () => {
-          if (!abort.signal.aborted) {
+          // A structural owner disappearing while semantic work is still live
+          // is cancellation. Normal/failed/cancelling teardown has already
+          // entered a terminal state and must not rewrite completion as abort.
+          if ((state === 'preparing' || state === 'active') && !abort.signal.aborted) {
             abort.abort(new OperationCancelledError('operation owner disposed'))
           }
-        }, 'principalOperation.abortOnOwnerDispose()')
+        }, 'principalOperation.abortOnUnexpectedOwnerDispose()')
 
         if (definition.setup !== undefined) {
           const prepared = await raceAbort(
