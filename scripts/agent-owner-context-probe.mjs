@@ -7,6 +7,11 @@
  * fiber derived from the Principal Context and explicitly injecting `agents`.
  * DSH must carry that caller-bound derived context into the Agent factory as
  * ownerCtx, preserving Principal identity and tenant capability resolution.
+ *
+ * The probe intentionally does not model Agent-local tool/prompt registration as
+ * a Cordis service. Those registrations belong to DSH's separate scope-aware
+ * registries; here we prove only the public owner/composition seam between the
+ * two planes.
  */
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -70,6 +75,9 @@ root.agents.setFactory({
       ownerFiberName: ownerCtx.fiber.name,
     })
 
+    // This is only an Agent-owned context token for exercising the public
+    // setup callback. Real AgentLoop supplies its own dsh-scope context and
+    // scope-aware registries for tools/prompts/listeners.
     const agentCtx = root.extend({})
     const commit = await options.setup?.(agentCtx)
     commit?.commit()
@@ -94,21 +102,23 @@ const bob = await globex.principals.ensure('bob')
 
 async function createFromPrincipal(principalScope, sessionId) {
   let handle
-  let projected
+  let composedCapability
+  let setupContextIsCordis = false
   const ownerFiber = principalScope.ctx.inject(['agents'], async (ownerCtx) => {
     handle = await ownerCtx.agents.create({
       sessionId,
       setup(agentCtx) {
-        // Projection is explicit. The source value is resolved through the
-        // Principal-derived owner context, not through a root/global registry.
-        agentCtx.provide('projectedCapability', ownerCtx.get('tenantCapability'))
-        projected = agentCtx.get('projectedCapability')
+        // The composition reads from the Principal-derived ownerCtx. What a
+        // concrete integration registers onto agentCtx is intentionally left to
+        // DSH's scope-aware subsystems rather than faked as a Cordis service.
+        composedCapability = ownerCtx.get('tenantCapability')
+        setupContextIsCordis = Context.is(agentCtx)
       },
     })
   })
   await ownerFiber
   if (handle === undefined) throw new Error('agent handle was not created')
-  return { handle, ownerFiber, projected }
+  return { handle, ownerFiber, composedCapability, setupContextIsCordis }
 }
 
 const agentA = await createFromPrincipal(alice, 'agent-a')
@@ -119,7 +129,8 @@ assert(observed.length === 2, 'factory must receive both creates')
 assert(observed[0].tenantId === 'acme' && observed[0].principal?.userId === 'alice', 'Agent A owner context must derive from Alice principal')
 assert(observed[1].tenantId === 'globex' && observed[1].principal?.userId === 'bob', 'Agent B owner context must derive from Bob principal')
 assert(observed[0].capability === 'A' && observed[1].capability === 'B', 'owner context capability graph must stay tenant-specific')
-assert(agentA.projected === 'A' && agentB.projected === 'B', 'Agent setup must compose from the correct principal runtime')
+assert(agentA.composedCapability === 'A' && agentB.composedCapability === 'B', 'Agent setup must compose from the correct principal runtime')
+assert(agentA.setupContextIsCordis && agentB.setupContextIsCordis, 'Agent setup must receive a Cordis context')
 
 await agentA.handle.dispose()
 await agentB.handle.dispose()
@@ -128,7 +139,7 @@ await agentB.ownerFiber.dispose()
 await acme.dispose()
 await globex.dispose()
 
-console.log(JSON.stringify({ observed, projectedA: agentA.projected, projectedB: agentB.projected }))
+console.log(JSON.stringify({ observed, composedA: agentA.composedCapability, composedB: agentB.composedCapability }))
 `)
 
   const out = execFileSync('pnpm', ['exec', 'tsx', 'probe.ts'], {
