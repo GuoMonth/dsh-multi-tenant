@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.2.0-rc.1",
-  "description": "Context-native multi-tenant runtime for DeepSeek Harness: tenant/principal capability scopes plus immutable session ownership and fail-closed authorization.",
+  "version": "0.2.0-rc.2",
+  "description": "Context-native multi-tenant runtime for DeepSeek Harness: canonical tenant/principal publication, capability isolation, immutable session ownership, and fail-closed authorization.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
   "repository": {
