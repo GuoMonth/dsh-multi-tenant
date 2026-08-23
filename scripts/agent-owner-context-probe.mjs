@@ -30,6 +30,11 @@ try {
   }
 
   writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'agent-owner-probe', private: true, type: 'module' }))
+  // Mirror the repository's explicit pnpm 11 build-script policy. esbuild's
+  // platform binary arrives through its optional dependency, so acknowledging
+  // and denying its redundant postinstall is sufficient for this throwaway probe.
+  writeFileSync(join(tmp, 'pnpm-workspace.yaml'), 'allowBuilds:\n  esbuild: false\n')
+
   try {
     execFileSync('pnpm', [
       'add',
@@ -74,9 +79,6 @@ root.agents.setFactory({
     }
     observed.push(record)
 
-    // This fake factory intentionally models only the public composition seam:
-    // Agent setup receives an Agent-owned context; runtime capabilities are
-    // projected explicitly from ownerCtx rather than inherited implicitly.
     const agentCtx = root.extend({})
     const commit = await options.setup?.(agentCtx)
     commit?.commit()
