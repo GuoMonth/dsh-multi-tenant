@@ -96,6 +96,7 @@ Preparing transaction 本身也是 first-class lifecycle resource。Registry tea
 
 - **Structure before patches** —— 先设计 ownership、数据结构、状态流转，让正确行为自然长出来；
 - **Strong semantic types** —— 用 TypeScript 类型系统 / 泛型表达 identity 与 lifecycle 语义，避免松散字段拼接；
+- **相关性优先于“正确性展示”** —— 技术上正确的实验，如果已经不服务于当前架构，就不继续占据 live tree；
 - **控制得住 -> 严格强制** —— 仓库拥有的边界 fail closed；
 - **需要生态协作 -> 制定标准** —— 用可执行 provider / integration contract，而不是把所有实现塞进 core；
 - **控制不住 -> 明确边界** —— Cordis Context 不是 hostile-code / process sandbox；
@@ -104,19 +105,19 @@ Preparing transaction 本身也是 first-class lifecycle resource。Registry tea
 
 ## Compatibility Evidence
 
-CI 用两份独立证据证明选定的 DSH baseline：
+CI 只证明当前架构真正依赖的 DSH seam：
 
-- checkout 精确的上游 DSH release commit，并验证 root package version；
-- 对精确 npm 版本运行 session genesis、admission/publication、Agent owner/composition executable probes。
+- checkout 精确上游 DSH release commit，并验证 root package version；
+- 证明 session publication / rollback 语义；
+- 对精确发布包证明 Principal-derived Agent owner/context composition。
 
-未来要升级 DSH 时，由我们显式更新 baseline，再重新跑整套证据。
+历史 Web/ApiProxy 与全局 admission-decorator 实验继续存在于 Git history，但不再作为 live package 或 blocking evidence。
 
-## Packages
+## 当前 Package
 
-| Package | Distribution | 作用 |
-| --- | --- | --- |
-| [`packages/multi-tenant`](./packages/multi-tenant) | npm `dsh-multi-tenant`（`latest`） | v0.2 Runtime Contract + 冻结的 v0.1 ownership kernel。 |
-| [`packages/multi-tenant-web`](./packages/multi-tenant-web) | private workspace | Web/API enforcement 实验；production transport composition 进入 SaaS Framework 阶段。 |
+[`packages/multi-tenant`](./packages/multi-tenant) 是当前唯一 live workspace package，通过 npm `dsh-multi-tenant`（`latest`）发布，包含 v0.2 Runtime Contract 与冻结的 v0.1 ownership kernel。
+
+v0.3 不会提前创建 package 名称或 scaffold。Auth、Transport、Credentials、MCP、各类 provider 与 SaaS Distribution，只有在独立 contract / lifecycle / replacement boundary 真正出现时才成为 package。
 
 参见 [ROADMAP.zh-CN.md](./ROADMAP.zh-CN.md)、[`docs/releases/v0.2.0-rc.3.md`](./docs/releases/v0.2.0-rc.3.md) 与 [CONTRIBUTING.zh-CN.md](./CONTRIBUTING.zh-CN.md)。
 

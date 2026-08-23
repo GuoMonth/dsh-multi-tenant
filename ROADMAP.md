@@ -17,11 +17,9 @@ v0.1 owns the durable authorization invariant:
 
 This layer should remain small and boring.
 
-### v0.2 — Multi-Tenant Runtime Contract
+### v0.2 — published Multi-Tenant Runtime Contract
 
-v0.2 makes tenancy a first-class runtime structure rather than repeated `tenantId` plumbing.
-
-This line is complete when the final convergence PR is green and merged. Its contract is:
+`dsh-multi-tenant@0.2.0-rc.3` is the published Runtime foundation for v0.3.
 
 ```text
 Deployment / Root
@@ -30,7 +28,7 @@ Deployment / Root
        └─ Tenant                  canonical capability node
             └─ Principal         canonical capability node
                  └─ derived integration fibers
-                      └─ DSH Agent / transport / provider operations
+                      └─ DSH Agent / future product operations
 ```
 
 #### Canonical runtime structure
@@ -42,7 +40,7 @@ Deployment / Root
 
 #### Publication and lifecycle
 
-- creation reserves canonical identity before doing asynchronous work;
+- creation reserves canonical identity before asynchronous work;
 - setup runs on an unpublished Cordis subtree;
 - optional synchronous `commit()` owns the exact publication boundary;
 - concurrent `ensure()` calls single-flight;
@@ -72,24 +70,25 @@ Current explicit baseline:
 
 The baseline is manually advanced. Blocking CI never follows floating upstream state.
 
-CI proves both:
+CI proves only the seams the current architecture depends on:
 
-1. exact upstream source identity by checking out the pinned release commit;
-2. exact published runtime behavior through session genesis, admission/publication and Agent owner/composition probes.
+1. exact upstream source identity;
+2. Session publication/rollback semantics;
+3. Principal-derived Agent owner/context composition.
+
+Historical Web/ApiProxy and global admission-decorator research is preserved by Git history, not by the live workspace.
 
 #### Release model
-
-The project currently keeps release mechanics deliberately simple:
 
 - package version lives in `packages/multi-tenant/package.json`;
 - manual GitHub release workflow derives that version automatically;
 - npm publishes to `latest` only;
 - registry smoke verifies that `latest` resolves to the just-published version;
-- prerelease/stable meaning belongs to the SemVer version itself, not a second npm channel.
+- prerelease/stable meaning belongs to SemVer itself.
 
 ## v0.3 — SaaS Framework
 
-After v0.2 freezes, the main line becomes the SaaS Framework.
+The main development line now moves to the SaaS Framework.
 
 The target is **an opinionated, out-of-the-box SaaS product experience built from a replaceable Plugin Family**, not a monolithic super-plugin.
 
@@ -111,14 +110,18 @@ Conceptually:
                  Runtime Contract + Kernel
 ```
 
+This diagram describes target capability ownership, **not pre-approved package names**. The repository will not scaffold these packages in advance.
+
 ### v0.3 priorities
 
 1. **SaaS composition model** — define provider slots and a typed configuration/composition graph.
-2. **Authenticated transport binding** — authenticate at wire boundaries, resolve canonical Tenant/Principal runtime, then run work from a derived integration fiber.
+2. **Authenticated product boundary** — authenticate at real wire/product boundaries, resolve canonical Tenant/Principal runtime, then run work from a derived integration fiber.
 3. **Agent orchestration** — create/resume/drive DSH Agents through the Principal-owned integration boundary while preserving DSH Agent/Preset scope semantics.
-4. **Reference provider family** — Auth, credential/token storage, MCP tenancy, durable stores, audit/usage where justified.
-5. **Distribution defaults** — one recommended composition that works out of the box while allowing every provider slot to be replaced.
+4. **Reference provider family** — Auth, credential/token storage, MCP tenancy, durable stores, audit/usage only where an independent contract/lifecycle boundary is demonstrated.
+5. **Distribution defaults** — one recommended composition that works out of the box while allowing provider slots to be replaced.
 6. **Diagnostics and compatibility** — startup validation, health, provider conformance, migrations and a clear compatibility matrix.
+
+A new package is created only when an independently useful API, replacement boundary, lifecycle, versioning boundary or distribution boundary is real. Research and experiments remain tests/scripts/docs until then.
 
 Strong isolation remains a deployment profile, not a Context promise. A future K8S profile may map one Tenant to one Pod while preserving the same higher-level SaaS contracts.
 
@@ -128,10 +131,12 @@ Strong isolation remains a deployment profile, not a Context promise. A future K
 - prefer structures that make invalid states unrepresentable;
 - model lifecycle/state transitions explicitly;
 - use TypeScript strong types and generics to carry semantics;
+- optimize for relevance as well as technical correctness;
 - keep one source of truth for identities such as package version and DSH baseline;
 - do not preserve prerelease compatibility when it degrades the long-term model;
+- do not preserve obsolete experiments in the live tree when Git history is sufficient;
 - use Cordis/DSH native abstractions rather than parallel registries or local forks;
-- where this repository controls the boundary, enforce it; where the ecosystem owns it, standardize it; where neither applies, document the boundary.
+- create package boundaries only after their independent value is demonstrated.
 
 ## Explicit security boundary
 

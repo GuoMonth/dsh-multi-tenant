@@ -96,6 +96,7 @@ That contract is the base of the future Plugin Family: the SaaS Framework may sh
 
 - **Structure before patches** — design ownership, data structures and state transitions so correct behavior grows naturally.
 - **Strong semantic types** — use TypeScript types/generics to encode lifecycle and identity meaning rather than passing loosely related fields.
+- **Relevance over correctness theater** — technically valid experiments do not stay in the live tree unless they serve the current architecture.
 - **Control -> enforce** — fail closed where this repository owns the boundary.
 - **Ecosystem -> standardize** — define executable provider/integration contracts instead of absorbing every implementation.
 - **Outside control -> bound** — Cordis Context is not a hostile-code or process sandbox.
@@ -104,19 +105,19 @@ That contract is the base of the future Plugin Family: the SaaS Framework may sh
 
 ## Compatibility evidence
 
-CI proves the selected DSH baseline in two independent ways:
+CI proves only the DSH seams the current architecture depends on:
 
 - checks out the exact upstream DSH release commit and verifies its root package version;
-- runs executable session genesis, admission/publication and Agent owner/composition probes against the exact published npm packages.
+- proves session publication/rollback semantics;
+- proves Principal-derived Agent owner/context composition against the exact published DSH packages.
 
-The baseline is explicit and manually refreshed when we choose to move DSH forward.
+Historical Web/ApiProxy and global admission-decorator experiments remain available in Git history, not as live packages or blocking evidence.
 
-## Packages
+## Current package
 
-| Package | Distribution | Role |
-| --- | --- | --- |
-| [`packages/multi-tenant`](./packages/multi-tenant) | npm `dsh-multi-tenant` (`latest`) | v0.2 Runtime Contract + frozen v0.1 ownership kernel. |
-| [`packages/multi-tenant-web`](./packages/multi-tenant-web) | private workspace | Experimental Web/API enforcement research; production transport composition belongs to the SaaS Framework stage. |
+[`packages/multi-tenant`](./packages/multi-tenant) is the only live workspace package and is published as npm `dsh-multi-tenant` (`latest`). It contains the v0.2 Runtime Contract and frozen v0.1 ownership kernel.
+
+v0.3 will not pre-create package names or scaffolds. Auth, Transport, Credentials, MCP, providers and the SaaS Distribution become packages only when their independent contract/lifecycle/replacement boundary is real.
 
 See [ROADMAP.md](./ROADMAP.md), [`docs/releases/v0.2.0-rc.3.md`](./docs/releases/v0.2.0-rc.3.md), and [CONTRIBUTING.md](./CONTRIBUTING.md).
 

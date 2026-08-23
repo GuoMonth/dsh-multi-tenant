@@ -259,6 +259,8 @@ The runtime package keeps transport/vendor implementations out of core. A future
                  Runtime Contract + Kernel
 ```
 
+This is a **capability/composition map, not a package map**. Names such as Auth, Transport or MCP describe responsibilities. They become separate packages only if an independent consumer API, replacement boundary, lifecycle or release boundary is demonstrated.
+
 The Framework provides the product experience and opinionated defaults. The Plugin Family provides the replaceable architecture.
 
 ## 12. Explicit boundary

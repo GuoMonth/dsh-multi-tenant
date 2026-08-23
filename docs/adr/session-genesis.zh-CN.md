@@ -2,13 +2,11 @@
 
 # ADR —— Session / Agent Publication Boundary
 
-> Status：**事实已接受；实现指导已由 v0.2 Runtime Contract 更新**。
+> Status：**已接受的 Runtime 事实**。
 
 ## Decision
 
-DSH Agent `setup` 是 Agent create / resume 流程中受支持的 before-publication composition window。
-
-关键生命周期：
+DSH Agent `setup` 是 Agent 创建流程中受支持的 before-publication composition window。
 
 ```text
 prepare Session + Agent
@@ -22,23 +20,20 @@ sessions.enter / agents.enter
 announce / start
 ```
 
-必须在 Agent 对外可见前完成的 tenant admission 或 product composition 应进入 setup transaction，而不是依赖 Session 已进入 registry 之后的 `session/created`。
+必须在 Agent 对外可见前完成的工作，应进入这段 transaction，而不是依赖 registry publication 之后的 `session/created`。
 
-## Evidence
+## 当前 Evidence
 
-最初静态调查保留在 [`../specs/session-genesis-map.zh-CN.md`](../specs/session-genesis-map.zh-CN.md)。
+Blocking CI 只重新证明现在仍然影响架构的事实：
 
-当前 blocking CI 会在精确 DSH baseline `0.1.1-rc.2` 上重新证明：
+- `scripts/session-genesis-probe.mjs` —— Session visibility / rollback 语义；
+- `scripts/agent-owner-context-probe.mjs` —— Principal-derived Context 作为 caller-bound `ownerCtx` 进入 Agent creation，并保持 tenant / principal capability resolution。
 
-- `scripts/session-genesis-probe.mjs`：SessionStore visibility / rollback 语义；
-- `scripts/admission-decorator-probe.mjs`：create / fork / subagent / resume 的 setup-before-entry；
-- `scripts/agent-owner-context-probe.mjs`：Principal-derived caller Context 作为 `ownerCtx` 进入 Agent creation。
+早期关于全局 decorate `ctx.agents`、Web transport enforcement、静态 source map 的实验仍然保留在 Git history 中，但不再属于当前 architecture contract。
 
-## 更新后的 Composition Guidance
+## Composition Guidance
 
-早期调查曾建议全局 wrap `ctx.agents`，让所有调用自动注入 admission logic。这个技术仍然可以作为兼容性手段和 probe，但它**不是目标 SaaS architecture**。
-
-v0.2 / v0.3 的结构路径是：
+目标结构路径：
 
 ```text
 canonical Tenant
@@ -52,19 +47,20 @@ ownerCtx.agents.create(...)
 Agent setup transaction
 ```
 
-SaaS Framework 自己拥有 authenticated product entry point，因此 Agent operation 应自然从正确的 Principal-derived integration boundary 发起，而不是依赖 ambient global middleware。
+SaaS Framework 自己拥有 authenticated product entry point，因此 Agent work 应自然从正确的 Principal-derived boundary 发起，而不是依赖 ambient global middleware。
 
 ## Durable Ownership Interaction
 
-v0.1 `TenantSessionStore` ownership claim 是持久状态，与进程内 Agent lifecycle 独立。如果调用方在最终 Agent publication 前已经 reserve / claim Session identity，而之后 publication 失败，这个 durable claim 可能继续作为 ownership reservation 存在。
+v0.1 `TenantSessionStore` ownership claim 是持久状态，与进程内 Agent lifecycle 独立。如果产品层在最终 Agent publication 前已经 reserve ownership，而之后 publication 失败，这个 durable ownership reservation 可能保留。
 
-它不会造成 cross-tenant takeover：ownership immutable，同 owner reclaim idempotent。但如果 v0.3 产品层需要回收、失败会话清理等语义，应显式建模 reservation / finalization，而不是偷偷把 immutable ownership 改成 rollbackable authorization state。
+它不会造成 cross-tenant takeover，因为 ownership immutable，同 owner reclaim idempotent。如果 v0.3 需要 reclaim 或失败会话清理，应显式建模 reservation / finalization，而不是让 authorization state 隐式可 rollback。
 
 ## Consequences
 
 - `session/created` 是 observation，不是 async admission；
-- DSH Agent setup 与 v0.2 Tenant / Principal setup 刻意共享 unpublished setup -> optional commit -> publication 语义；
-- Principal identity / capability 来自 caller-owned Runtime boundary；`Agent.ctx` 继续属于 DSH Agent / Preset scope；
+- DSH Agent setup 与 Tenant / Principal setup 刻意共享 unpublished setup → optional commit → publication 语义；
+- Principal identity / capability 来自 caller-owned Runtime boundary；
+- `Agent.ctx` 继续属于 DSH Agent / Preset scope；
 - persistent ownership 保持独立 defense-in-depth plane。
 
 当前架构权威：[`../specs/architecture.zh-CN.md`](../specs/architecture.zh-CN.md)。

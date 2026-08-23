@@ -13,8 +13,9 @@
 3. **Semantic Types** —— identity / capability / lifecycle 的哪些语义应该由 TypeScript 类型系统表达，而不是散落成松散字段？
 4. **Native Framework Structure** —— Cordis / DSH 是否已经能表达 dependency、lifecycle 或 registration plane，而不需要新 registry / facade？
 5. **Executable Contract** —— 什么 test / conformance harness 能独立证明抽象，而不是只证明某个 implementation？
+6. **相关性** —— 这个组件是否仍然服务于当前产品方向，还是只是一段技术上正确的历史工作？
 
-然后再实现最小但完整的结构。不要围绕一个弱模型不断叠加局部补丁。
+然后再实现最小但完整的结构。不要围绕弱模型叠加局部补丁，也不要因为旧实验“技术上正确”就让它长期占据 live tree。
 
 ## Boundary-first Decision Rule
 
@@ -70,10 +71,10 @@ Root -> Tenant -> Principal -> derived integration fibers -> DSH operations
 一次 DSH refresh 必须：
 
 1. 选择明确 version + release commit；
-2. 所有 DSH-facing pin 一致更新；
-3. 从真实 registry 重新生成 lockfile；
+2. 更新届时仍然存在的 DSH-facing pin；
+3. workspace graph 变化时从真实 registry 重新生成 lockfile；
 4. GitHub Actions 验证精确 upstream source identity；
-5. 重跑精确 npm 版本的 runtime probes；
+5. 只重跑当前架构真正依赖的精确版本 runtime probe；
 6. contract 失败时从结构上修，不削弱 evidence；
 7. 当前文档更新到新 baseline，同时历史 release evidence 不改写。
 
@@ -81,11 +82,25 @@ Root -> Tenant -> Principal -> derived integration fibers -> DSH operations
 
 ## Package Conventions
 
+**不要因为一个目录看起来有用就创建 package。只有独立边界真实存在时，package 才应该存在。**
+
+一个 package 至少要拥有下面一种独立价值：
+
+- consumer-facing contract / API；
+- replaceable provider capability；
+- independent lifecycle / composition boundary；
+- independent versioning / release boundary；
+- product distribution boundary。
+
+Research、compatibility exploration、一次性 evidence 默认应该放在聚焦的 test / script / docs 或 Git history 中，而不是长期 workspace package。只有研究结果真正成为当前 architecture 的一部分时，才把它提升成 package。
+
+通用规则：
+
 - 一个 package = 一个 independently composable / replaceable capability、integration boundary 或不可拆 security invariant；
 - 优先使用 DSH / Cordis 原生 Service、Context、Fiber、scope 与 typed protocol seam；
 - 早期 contract 与 default implementation 可以同 package；只有 replacement / lifecycle / versioning 价值真实出现时再拆；
-- 不创建 speculative package；
-- 未来 SaaS Framework 应该是由 Plugin Family 组装的 opinionated Distribution，而不是 monolithic implementation package。
+- 不提前 scaffold v0.3 的 speculative package 或 package name；
+- SaaS Framework 应该是由 Plugin Family 组装的 opinionated Distribution，而不是 monolithic implementation package。
 
 ## Dependency Direction
 
@@ -93,21 +108,23 @@ Root -> Tenant -> Principal -> derived integration fibers -> DSH operations
 Runtime/kernel primitives <- capability contracts <- providers <- SaaS distribution
 ```
 
-Runtime core 不引入 transport / vendor implementation。Auth 产品、数据库、HTTP/WebSocket transport、MCP 产品集成、audit/usage implementation 与 deployment profile 都在 Runtime Contract 之上组合。
+Runtime core 不引入 transport / vendor implementation。Auth 产品、数据库、HTTP/WebSocket transport、MCP 产品集成、audit/usage implementation 与 deployment profile，只有在对应边界真正具体化后才在 Runtime Contract 上层组合。
 
 ## Tests：Contract vs Conformance
 
 - **Provider contract suite** 证明可替换 seam，例如 `TenantSessionStore`、Runtime Capability Provider Contract；
 - **Conformance / invariant suite** 证明跨组件属性，例如 tenant isolation、publication ordering、lifecycle ownership；
-- **Compatibility probe** 证明对精确外部 DSH version 的假设；
+- **Compatibility probe** 只证明当前 active architecture 对精确外部 DSH version 的真实依赖；
 - **Packed / registry smoke** 证明用户真正安装到的 artifact，而不是只证明 workspace source。
 
 ## Definition of Done
 
 - 从 architecture / data / state / type 维度完成全局审查；
+- 变更与当前产品方向存在明确相关性；
 - 行为决策涉及的当前 docs / ADR / spec 已同步；
 - upstream / boundary ownership 明确；
 - 相关精确 DSH compatibility evidence 全绿；
 - `pnpm release:check` 全绿；
 - transport / vendor implementation 没有泄漏进 runtime kernel；
+- 没有在真实边界出现前引入 speculative package / scaffold；
 - 不为了保留过时 prerelease abstraction 添加 compatibility shim。
