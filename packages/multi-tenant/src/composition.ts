@@ -1,4 +1,9 @@
 import type { Context, Fiber } from '@deepseek-ai/cordis'
+import {
+  assertCapabilityToken,
+  type CapabilityScope,
+  type CapabilityToken,
+} from './capability.ts'
 import type { OperationScopeDefinition, OperationScopePreparation } from './operation.ts'
 import type {
   PrincipalScopeDefinition,
@@ -9,11 +14,10 @@ import type {
 import type { TenantPrincipal } from './types.ts'
 import { disposeFiber, normalizeServiceNames, raceAbort } from './scope.ts'
 
-export type CapabilityScope = 'deployment' | 'tenant' | 'principal' | 'operation'
+export type { CapabilityScope, CapabilityToken } from './capability.ts'
 
-export interface CapabilityDefinition {
-  readonly key: string
-  readonly scope: CapabilityScope
+export interface CapabilityDefinition<C extends CapabilityToken = CapabilityToken> {
+  readonly capability: C
   readonly required?: boolean
   readonly defaultProvider?: string
 }
@@ -24,6 +28,7 @@ export interface CapabilityProviderSetupCommit {
 
 export interface CapabilityProviderPreparation {
   readonly ctx: Context
+  readonly capability: CapabilityToken
   readonly scope: CapabilityScope
   readonly signal: AbortSignal
 }
@@ -32,60 +37,55 @@ export type CapabilityProviderSetup = (
   preparation: CapabilityProviderPreparation,
 ) => CapabilityProviderSetupCommit | PromiseLike<CapabilityProviderSetupCommit | void> | void
 
-interface CapabilityProviderBase {
+export interface CapabilityProviderDefinition<C extends CapabilityToken = CapabilityToken> {
   readonly id: string
-  readonly capability: string
-  readonly requires?: readonly string[]
+  readonly capability: C
+  readonly requires?: readonly CapabilityToken[]
   /**
-   * Optional stable identity for provider configuration that is not otherwise
-   * visible in the structural definition (for example a named config profile).
-   * Semantically different creation recipes must not reuse the same key.
+   * Stable semantic identity for provider configuration that is not represented
+   * by provider id/dependency topology. Callback object identity is never part
+   * of a CompositionPlan fingerprint.
    */
   readonly definitionKey?: string
+  readonly setup?: CapabilityProviderSetup
 }
 
-/**
- * A provider is either deployment-ambient or explicitly materialized.
- *
- * Ambient means the capability already exists in the application Context, so
- * it can only truthfully be deployment-owned. Tenant/Principal/Operation
- * providers must have setup code that materializes them inside that scope.
- */
-export type CapabilityProviderDefinition =
-  | (CapabilityProviderBase & {
-      readonly scope: 'deployment'
-      readonly setup?: CapabilityProviderSetup
-    })
-  | (CapabilityProviderBase & {
-      readonly scope: Exclude<CapabilityScope, 'deployment'>
-      readonly setup: CapabilityProviderSetup
-    })
+export interface CapabilityProviderSelection {
+  readonly capability: CapabilityToken
+  readonly providerId: string
+}
 
 export interface SaaSDefinition {
   readonly capabilities: readonly CapabilityDefinition[]
   readonly providers?: readonly CapabilityProviderDefinition[]
-  readonly select?: Readonly<Record<string, string>>
+  readonly select?: readonly CapabilityProviderSelection[]
 }
 
 export interface PlannedCapability {
-  readonly key: string
-  readonly scope: CapabilityScope
+  readonly capability: CapabilityToken
   readonly required: boolean
   readonly providerId?: string
 }
 
 export interface PlannedProvider {
   readonly id: string
-  readonly capability: string
-  readonly scope: CapabilityScope
-  readonly requires: readonly string[]
+  readonly capability: CapabilityToken
+  readonly requires: readonly CapabilityToken[]
   readonly definitionKey?: string
   readonly setup?: CapabilityProviderSetup
 }
 
+export type CompositionScopeFingerprints = Readonly<Record<CapabilityScope, string>>
+
 export interface CompositionPlan {
-  /** Stable structural identity excluding executable callback object identity. */
+  /** Full-plan identity for diagnostics and exact whole-definition comparison. */
   readonly fingerprint: string
+  /**
+   * Scope-local dependency-closure identities. Canonical Tenant/Principal nodes
+   * use these rather than the full Plan so unrelated descendant changes do not
+   * invalidate an otherwise identical parent Runtime node.
+   */
+  readonly scopeFingerprints: CompositionScopeFingerprints
   readonly capabilities: readonly PlannedCapability[]
   readonly providers: readonly PlannedProvider[]
   readonly bootstrapOrder: readonly string[]
@@ -157,39 +157,74 @@ function optionalSemanticName(value: string | undefined, label: string): string 
   return value === undefined ? undefined : semanticName(value, label)
 }
 
-function normalizeDependencies(names: readonly string[] | undefined): readonly string[] {
-  if (names === undefined) return Object.freeze([])
-  const unique = new Set<string>()
-  for (const name of names) unique.add(semanticName(name, 'capability dependency'))
-  return Object.freeze([...unique].sort())
+function canonicalCapability(
+  token: CapabilityToken,
+  capabilities: ReadonlyMap<string, CapabilityToken>,
+  label: string,
+): CapabilityToken {
+  assertCapabilityToken(token, label)
+  const canonical = capabilities.get(token.key)
+  if (canonical === undefined) throw new UnknownCapabilityError(`${label} references unknown capability "${token.key}"`)
+  if (canonical.scope !== token.scope) {
+    throw new CapabilityScopeMismatchError(
+      `${label} references capability "${token.key}" as ${token.scope}-scoped but it is ${canonical.scope}-scoped`,
+    )
+  }
+  return canonical
 }
 
-function freezeProvider(provider: CapabilityProviderDefinition): PlannedProvider {
+function normalizeDependencies(
+  values: readonly CapabilityToken[] | undefined,
+  capabilities: ReadonlyMap<string, CapabilityToken>,
+  label: string,
+): readonly CapabilityToken[] {
+  if (values === undefined) return Object.freeze([])
+  const unique = new Map<string, CapabilityToken>()
+  for (const value of values) {
+    const dependency = canonicalCapability(value, capabilities, label)
+    unique.set(dependency.key, dependency)
+  }
+  return Object.freeze([...unique.values()].sort((a, b) => a.key.localeCompare(b.key)))
+}
+
+function freezeProvider(
+  provider: CapabilityProviderDefinition,
+  capability: CapabilityToken,
+  requires: readonly CapabilityToken[],
+): PlannedProvider {
   const definitionKey = optionalSemanticName(provider.definitionKey, `definitionKey for provider "${provider.id}"`)
   const base = {
     id: semanticName(provider.id, 'provider id'),
-    capability: semanticName(provider.capability, 'provider capability'),
-    scope: provider.scope,
-    requires: normalizeDependencies(provider.requires),
+    capability,
+    requires,
   }
   const identified = definitionKey === undefined ? base : { ...base, definitionKey }
   return Object.freeze(provider.setup === undefined ? identified : { ...identified, setup: provider.setup })
 }
 
 function freezeCapability(
-  capability: CapabilityDefinition,
+  capability: CapabilityToken,
+  required: boolean,
   providerId: string | undefined,
 ): PlannedCapability {
-  const base = {
-    key: semanticName(capability.key, 'capability key'),
-    scope: capability.scope,
-    required: capability.required ?? false,
-  }
+  const base = { capability, required }
   return Object.freeze(providerId === undefined ? base : { ...base, providerId })
 }
 
-function validateScope(scope: string, label: string): asserts scope is CapabilityScope {
-  if (!(scope in SCOPE_RANK)) throw new TypeError(`${label} has unsupported scope "${scope}"`)
+function serializeProvider(provider: PlannedProvider): object {
+  return {
+    id: provider.id,
+    capability: {
+      key: provider.capability.key,
+      scope: provider.capability.scope,
+    },
+    requires: provider.requires.map(dependency => ({
+      key: dependency.key,
+      scope: dependency.scope,
+    })),
+    definitionKey: provider.definitionKey ?? null,
+    materialization: provider.setup === undefined ? 'ambient' : 'managed',
+  }
 }
 
 function createPlanFingerprint(
@@ -199,20 +234,53 @@ function createPlanFingerprint(
 ): string {
   return JSON.stringify({
     capabilities: capabilities.map(capability => ({
-      key: capability.key,
-      scope: capability.scope,
+      key: capability.capability.key,
+      scope: capability.capability.scope,
       required: capability.required,
       providerId: capability.providerId ?? null,
     })),
-    providers: providers.map(provider => ({
-      id: provider.id,
-      capability: provider.capability,
-      scope: provider.scope,
-      requires: provider.requires,
-      definitionKey: provider.definitionKey ?? null,
-      materialization: provider.setup === undefined ? 'ambient' : 'managed',
-    })),
+    providers: providers.map(serializeProvider),
     bootstrapOrder,
+  })
+}
+
+function createScopeFingerprints(
+  providers: readonly PlannedProvider[],
+  bootstrapOrder: readonly string[],
+): CompositionScopeFingerprints {
+  const providerById = new Map(providers.map(provider => [provider.id, provider] as const))
+  const providerByCapability = new Map(providers.map(provider => [provider.capability.key, provider] as const))
+
+  const closureFor = (scope: CapabilityScope): readonly PlannedProvider[] => {
+    const included = new Set<string>()
+    const visit = (provider: PlannedProvider): void => {
+      if (included.has(provider.id)) return
+      included.add(provider.id)
+      for (const dependency of provider.requires) {
+        const dependencyProvider = providerByCapability.get(dependency.key)
+        if (dependencyProvider !== undefined) visit(dependencyProvider)
+      }
+    }
+
+    for (const provider of providers) {
+      if (provider.capability.scope === scope) visit(provider)
+    }
+
+    return bootstrapOrder
+      .filter(providerId => included.has(providerId))
+      .map(providerId => providerById.get(providerId)!)
+  }
+
+  const fingerprintFor = (scope: CapabilityScope): string => JSON.stringify({
+    scope,
+    providers: closureFor(scope).map(serializeProvider),
+  })
+
+  return Object.freeze({
+    deployment: fingerprintFor('deployment'),
+    tenant: fingerprintFor('tenant'),
+    principal: fingerprintFor('principal'),
+    operation: fingerprintFor('operation'),
   })
 }
 
@@ -220,55 +288,63 @@ export function compileSaaSDefinition(definition: SaaSDefinition): CompositionPl
   if (definition === null || typeof definition !== 'object') throw new TypeError('SaaSDefinition must be an object')
   if (!Array.isArray(definition.capabilities)) throw new TypeError('SaaSDefinition.capabilities must be an array')
 
+  const capabilityTokens = new Map<string, CapabilityToken>()
   const capabilityDefs = new Map<string, CapabilityDefinition>()
   for (const raw of definition.capabilities) {
-    const key = semanticName(raw.key, 'capability key')
-    validateScope(raw.scope, `capability "${key}"`)
-    if (capabilityDefs.has(key)) throw new DuplicateCapabilityError(`capability "${key}" is declared more than once`)
+    if (typeof raw !== 'object' || raw === null) throw new TypeError('capability definition must be an object')
+    assertCapabilityToken(raw.capability, 'capability definition')
+    const key = raw.capability.key
+    const existing = capabilityTokens.get(key)
+    if (existing !== undefined) {
+      throw new DuplicateCapabilityError(`capability "${key}" is declared more than once`)
+    }
     if (raw.defaultProvider !== undefined) semanticName(raw.defaultProvider, `default provider for "${key}"`)
+    capabilityTokens.set(key, raw.capability)
     capabilityDefs.set(key, raw)
   }
 
   const providerDefs = new Map<string, PlannedProvider>()
   const providersByCapability = new Map<string, PlannedProvider[]>()
   for (const raw of definition.providers ?? []) {
-    validateScope(raw.scope, `provider "${raw.id}"`)
-    if (raw.setup === undefined && raw.scope !== 'deployment') {
+    const id = semanticName(raw.id, 'provider id')
+    if (providerDefs.has(id)) {
+      throw new DuplicateProviderDefinitionError(`provider "${id}" is declared more than once`)
+    }
+    const capability = canonicalCapability(raw.capability, capabilityTokens, `provider "${id}"`)
+    if (raw.setup === undefined && capability.scope !== 'deployment') {
       throw new CapabilityScopeMismatchError(
-        `provider "${raw.id}" declares ${raw.scope} ownership but has no scoped materializer; ambient providers are deployment-only`,
+        `provider "${id}" declares ${capability.scope} ownership but has no scoped materializer; ambient providers are deployment-only`,
       )
     }
-    const provider = freezeProvider(raw)
-    if (providerDefs.has(provider.id)) {
-      throw new DuplicateProviderDefinitionError(`provider "${provider.id}" is declared more than once`)
-    }
-    const capability = capabilityDefs.get(provider.capability)
-    if (capability === undefined) {
-      throw new UnknownCapabilityError(`provider "${provider.id}" targets unknown capability "${provider.capability}"`)
-    }
-    if (capability.scope !== provider.scope) {
-      throw new CapabilityScopeMismatchError(
-        `provider "${provider.id}" is ${provider.scope}-scoped but capability "${provider.capability}" is ${capability.scope}-scoped`,
-      )
-    }
+    const requires = normalizeDependencies(raw.requires, capabilityTokens, `provider "${id}" dependency`)
+    const provider = freezeProvider({ ...raw, id }, capability, requires)
     providerDefs.set(provider.id, provider)
-    const list = providersByCapability.get(provider.capability) ?? []
+    const list = providersByCapability.get(capability.key) ?? []
     list.push(provider)
-    providersByCapability.set(provider.capability, list)
+    providersByCapability.set(capability.key, list)
   }
 
-  for (const key of Object.keys(definition.select ?? {})) {
-    if (!capabilityDefs.has(key)) throw new UnknownCapabilityError(`selection targets unknown capability "${key}"`)
+  const selections = new Map<string, string>()
+  for (const selection of definition.select ?? []) {
+    const capability = canonicalCapability(selection.capability, capabilityTokens, 'provider selection')
+    const providerId = semanticName(selection.providerId, `selected provider for "${capability.key}"`)
+    const existing = selections.get(capability.key)
+    if (existing !== undefined && existing !== providerId) {
+      throw new InvalidProviderSelectionError(
+        `capability "${capability.key}" selects conflicting providers "${existing}" and "${providerId}"`,
+      )
+    }
+    selections.set(capability.key, providerId)
   }
 
   const capabilities: PlannedCapability[] = []
   const selectedProviders = new Map<string, PlannedProvider>()
 
-  for (const key of [...capabilityDefs.keys()].sort()) {
-    const capability = capabilityDefs.get(key)!
+  for (const key of [...capabilityTokens.keys()].sort()) {
+    const capability = capabilityTokens.get(key)!
+    const definitionForCapability = capabilityDefs.get(key)!
     const candidates = [...(providersByCapability.get(key) ?? [])].sort((a, b) => a.id.localeCompare(b.id))
-    const explicit = definition.select?.[key]
-    const requested = explicit ?? capability.defaultProvider
+    const requested = selections.get(key) ?? definitionForCapability.defaultProvider
     let selected: PlannedProvider | undefined
 
     if (requested !== undefined) {
@@ -287,30 +363,24 @@ export function compileSaaSDefinition(definition: SaaSDefinition): CompositionPl
       )
     }
 
-    if (selected === undefined && (capability.required ?? false)) {
+    if (selected === undefined && (definitionForCapability.required ?? false)) {
       throw new MissingCapabilityProviderError(`required capability "${key}" has no provider`)
     }
     if (selected !== undefined) selectedProviders.set(key, selected)
-    capabilities.push(freezeCapability(capability, selected?.id))
+    capabilities.push(freezeCapability(capability, definitionForCapability.required ?? false, selected?.id))
   }
 
   for (const provider of selectedProviders.values()) {
-    for (const dependencyKey of provider.requires) {
-      const dependency = capabilityDefs.get(dependencyKey)
-      if (dependency === undefined) {
-        throw new CapabilityDependencyError(
-          `provider "${provider.id}" depends on unknown capability "${dependencyKey}"`,
-        )
-      }
-      const selectedDependency = selectedProviders.get(dependencyKey)
+    for (const dependency of provider.requires) {
+      const selectedDependency = selectedProviders.get(dependency.key)
       if (selectedDependency === undefined) {
         throw new CapabilityDependencyError(
-          `provider "${provider.id}" depends on unbound capability "${dependencyKey}"`,
+          `provider "${provider.id}" depends on unbound capability "${dependency.key}"`,
         )
       }
-      if (SCOPE_RANK[dependency.scope] > SCOPE_RANK[provider.scope]) {
+      if (SCOPE_RANK[dependency.scope] > SCOPE_RANK[provider.capability.scope]) {
         throw new CapabilityDependencyVisibilityError(
-          `${provider.scope}-scoped provider "${provider.id}" cannot depend on descendant ${dependency.scope}-scoped capability "${dependencyKey}"`,
+          `${provider.capability.scope}-scoped provider "${provider.id}" cannot depend on descendant ${dependency.scope}-scoped capability "${dependency.key}"`,
         )
       }
     }
@@ -318,13 +388,13 @@ export function compileSaaSDefinition(definition: SaaSDefinition): CompositionPl
 
   const providers = [...selectedProviders.values()].sort((a, b) => a.id.localeCompare(b.id))
   const providerById = new Map(providers.map(provider => [provider.id, provider] as const))
-  const providerByCapability = new Map(providers.map(provider => [provider.capability, provider] as const))
+  const providerByCapability = new Map(providers.map(provider => [provider.capability.key, provider] as const))
   const indegree = new Map<string, number>(providers.map(provider => [provider.id, 0]))
   const dependents = new Map<string, string[]>()
 
   for (const provider of providers) {
-    for (const dependencyKey of provider.requires) {
-      const dependencyProvider = providerByCapability.get(dependencyKey)!
+    for (const dependency of provider.requires) {
+      const dependencyProvider = providerByCapability.get(dependency.key)!
       indegree.set(provider.id, (indegree.get(provider.id) ?? 0) + 1)
       const list = dependents.get(dependencyProvider.id) ?? []
       list.push(provider.id)
@@ -332,7 +402,7 @@ export function compileSaaSDefinition(definition: SaaSDefinition): CompositionPl
     }
   }
 
-  const ready = [...providers]
+  const ready = providers
     .filter(provider => indegree.get(provider.id) === 0)
     .map(provider => provider.id)
     .sort()
@@ -367,9 +437,11 @@ export function compileSaaSDefinition(definition: SaaSDefinition): CompositionPl
   const frozenProviders = Object.freeze(providers)
   const frozenOrder = Object.freeze(bootstrapOrder)
   const fingerprint = createPlanFingerprint(frozenCapabilities, frozenProviders, frozenOrder)
+  const scopeFingerprints = createScopeFingerprints(frozenProviders, frozenOrder)
 
   return Object.freeze({
     fingerprint,
+    scopeFingerprints,
     capabilities: frozenCapabilities,
     providers: frozenProviders,
     bootstrapOrder: frozenOrder,
@@ -380,11 +452,11 @@ function selectedProvidersAt(plan: CompositionPlan, scope: CapabilityScope): rea
   const byId = new Map(plan.providers.map(provider => [provider.id, provider] as const))
   return plan.bootstrapOrder
     .map(id => byId.get(id)!)
-    .filter(provider => provider.scope === scope)
+    .filter(provider => provider.capability.scope === scope)
 }
 
 function scopeIsolation(plan: CompositionPlan, scope: Exclude<CapabilityScope, 'deployment'>): readonly string[] {
-  return normalizeServiceNames(selectedProvidersAt(plan, scope).map(provider => provider.capability))
+  return normalizeServiceNames(selectedProvidersAt(plan, scope).map(provider => provider.capability.key))
 }
 
 async function prepareCapabilityScope(
@@ -397,15 +469,20 @@ async function prepareCapabilityScope(
   for (const provider of selectedProvidersAt(plan, scope)) {
     if (signal.aborted) throw signal.reason
     for (const dependency of provider.requires) {
-      if (ctx.get(dependency) === undefined) {
+      if (ctx.get(dependency.key) === undefined) {
         throw new CapabilityProviderUnavailableError(
-          `provider "${provider.id}" cannot resolve dependency "${dependency}" while preparing ${scope} scope`,
+          `provider "${provider.id}" cannot resolve dependency "${dependency.key}" while preparing ${scope} scope`,
         )
       }
     }
 
     if (provider.setup !== undefined) {
-      const result = await raceAbort(provider.setup({ ctx, scope, signal }), signal)
+      const result = await raceAbort(provider.setup({
+        ctx,
+        capability: provider.capability,
+        scope,
+        signal,
+      }), signal)
       if (result !== undefined) {
         if (typeof result !== 'object' || result === null || typeof result.commit !== 'function') {
           throw new TypeError(`provider "${provider.id}" setup must return void or { commit(): void }`)
@@ -414,9 +491,9 @@ async function prepareCapabilityScope(
       }
     }
 
-    if (ctx.get(provider.capability) === undefined) {
+    if (ctx.get(provider.capability.key) === undefined) {
       throw new CapabilityProviderUnavailableError(
-        `provider "${provider.id}" did not make capability "${provider.capability}" available in ${scope} scope`,
+        `provider "${provider.id}" did not make capability "${provider.capability.key}" available in ${scope} scope`,
       )
     }
   }
@@ -430,7 +507,7 @@ async function prepareCapabilityScope(
 }
 
 function runtimeDefinitionKey(plan: CompositionPlan, scope: 'tenant' | 'principal'): string {
-  return `saas:${scope}:${plan.fingerprint}`
+  return `saas:${scope}:${plan.scopeFingerprints[scope]}`
 }
 
 export function tenantDefinitionFromPlan(plan: CompositionPlan): TenantScopeDefinition {
