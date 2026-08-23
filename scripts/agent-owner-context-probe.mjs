@@ -3,16 +3,14 @@
  * DSH Agent owner-context proof.
  *
  * The multi-tenant runtime does not pretend that Agent.ctx directly inherits
- * Tenant/Principal Cordis service isolation: DSH AgentLoop owns a separate
- * Agent/Preset registration scope. What must stay true for SaaS composition is
- * that `principal.ctx.agents.create()` reaches the Agent factory with the exact
- * caller-bound Principal context as ownerCtx. That owner context can then drive
- * explicit Agent setup/projection without global tenant state.
+ * Tenant/Principal Cordis service isolation. The public contract we need is
+ * narrower and stronger: `principal.ctx.agents.create()` must carry that exact
+ * caller-bound Principal Context into the Agent factory as ownerCtx, from which
+ * Agent setup can explicitly compose/project runtime capabilities.
  *
- * This probe executes the real @deepseek-ai/dsh-agent registry API at the
- * repository's pinned DSH target. It copies the runtime sources into the
- * throwaway install so no workspace dependency install is required by the DSH
- * compatibility CI job.
+ * The probe declares only the public packages it directly consumes. Their own
+ * package manifests own the rest of the dependency graph; duplicating that
+ * graph here would make this compatibility proof depend on DSH internals.
  */
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -32,19 +30,25 @@ try {
   }
 
   writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'agent-owner-probe', private: true, type: 'module' }))
-  const dshPeers = [
-    '@deepseek-ai/dsh-agent',
-    '@deepseek-ai/dsh-invariants',
-    '@deepseek-ai/dsh-llm',
-    '@deepseek-ai/dsh-scope',
-    '@deepseek-ai/dsh-session',
-    '@deepseek-ai/dsh-system-prompt',
-    '@deepseek-ai/dsh-typert-protocol',
-  ].map(name => `${name}@${DSH_TARGET_VERSION}`)
-  execFileSync('pnpm', ['add', '@deepseek-ai/cordis@4.0.1', 'tsx@4', ...dshPeers], {
-    cwd: tmp,
-    stdio: 'ignore',
-  })
+  try {
+    execFileSync('pnpm', [
+      'add',
+      '@deepseek-ai/cordis@4.0.1',
+      'tsx@4',
+      `@deepseek-ai/dsh-agent@${DSH_TARGET_VERSION}`,
+    ], {
+      cwd: tmp,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  } catch (error) {
+    const stdout = String(error.stdout ?? '').trim()
+    const stderr = String(error.stderr ?? '').trim()
+    throw new Error(
+      `failed to install public DSH Agent contract at ${DSH_TARGET_VERSION}\n${stdout}\n${stderr}`,
+      { cause: error },
+    )
+  }
 
   writeFileSync(join(tmp, 'probe.ts'), `
 import { Context } from '@deepseek-ai/cordis'
@@ -69,6 +73,10 @@ root.agents.setFactory({
       capability: ownerCtx.get('tenantCapability'),
     }
     observed.push(record)
+
+    // This fake factory intentionally models only the public composition seam:
+    // Agent setup receives an Agent-owned context; runtime capabilities are
+    // projected explicitly from ownerCtx rather than inherited implicitly.
     const agentCtx = root.extend({})
     const commit = await options.setup?.(agentCtx)
     commit?.commit()
