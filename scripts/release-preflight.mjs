@@ -2,9 +2,9 @@
 /**
  * Release-manifest preflight.
  *
- * package.json is the single source of truth for the release version and npm
- * channel. Runtime/API behavior is covered by verify/test/smoke/probe:dsh;
- * this script prevents packaging, workflow and documentation drift.
+ * package.json is the single source of truth for release version/channel.
+ * Runtime/Framework behavior is covered by verify/test/smoke/platform probes;
+ * this script prevents packaging, workflow and live-documentation drift.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -17,7 +17,6 @@ const expectedTag = 'latest'
 const expectedRepository = 'git+https://github.com/GuoMonth/dsh-multi-tenant.git'
 const errors = []
 
-/** Extract executable GitHub Action references from workflow `uses:` steps. */
 function workflowActionRefs(source) {
   const refs = []
   for (const line of source.split('\n')) {
@@ -62,12 +61,27 @@ if (!runtime) {
   }
 
   const exports = pkg.exports ?? {}
-  for (const required of ['.', './runtime', './store', './testing', './cordis.patch.yml']) {
+  for (const required of [
+    '.',
+    './runtime',
+    './operation',
+    './composition',
+    './store',
+    './testing',
+    './cordis.patch.yml',
+  ]) {
     if (!(required in exports)) errors.push(`${expectedPackageName}: exports must include ${required}`)
   }
 
   const readme = readFileSync(join(dir, 'README.md'), 'utf8')
-  for (const heading of ['## Runtime model', '## Supported guarantee', '## Canonical publication', '## Explicit boundaries']) {
+  for (const heading of [
+    '## Runtime model',
+    '## Supported guarantee',
+    '## Canonical publication',
+    '## SaaS Composition',
+    '## One-shot Operation boundary',
+    '## Explicit boundaries',
+  ]) {
     if (!readme.includes(heading)) errors.push(`${expectedPackageName}: README missing ${heading}`)
   }
 }
@@ -84,7 +98,7 @@ if (!existsSync(releaseWorkflowPath)) {
   if (!actionRefs.has('actions/checkout@v7')) errors.push('release workflow must use actions/checkout@v7')
   if (!actionRefs.has('actions/setup-node@v7')) errors.push('release workflow must use actions/setup-node@v7 so npm Trusted Publishing remains available')
   if (!actionRefs.has('pnpm/setup@v2')) errors.push('release workflow must use pnpm/setup@v2 for pnpm 11+')
-  if ([...actionRefs].some((ref) => ref.startsWith('pnpm/action-setup@'))) errors.push('release workflow must not execute legacy pnpm/action-setup')
+  if ([...actionRefs].some(ref => ref.startsWith('pnpm/action-setup@'))) errors.push('release workflow must not execute legacy pnpm/action-setup')
   if (workflow.includes('registry-url:')) errors.push('release workflow must not let setup-node generate token auth; npm Trusted Publishing owns registry authentication')
   if (workflow.includes('NPM_BOOTSTRAP_TOKEN')) errors.push('release workflow must be OIDC-only; bootstrap token fallback is not allowed')
   if (workflow.includes('inputs.version')) errors.push('release workflow must derive the version from package.json instead of duplicating version input')
@@ -96,8 +110,12 @@ for (const requiredPath of [
   'docs/releases/v0.2.0-rc.2.md',
   'docs/releases/v0.2.0-rc.1.md',
   'docs/releases/v0.1.0-rc.2.md',
+  'docs/specs/v0.3-assumptions.json',
   'scripts/session-genesis-probe.mjs',
   'scripts/agent-owner-context-probe.mjs',
+  'scripts/cordis-operation-lifecycle-probe.mjs',
+  'scripts/saas-core-vertical-slice-probe.mjs',
+  'scripts/package-smoke.mjs',
   'scripts/registry-preflight.mjs',
   'scripts/registry-smoke.mjs',
 ]) {
@@ -109,4 +127,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; canonical v0.2 runtime; OIDC-only publishing`)
+console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; single-package Runtime/Framework graph; OIDC-only publishing`)
