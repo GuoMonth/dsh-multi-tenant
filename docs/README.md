@@ -7,13 +7,20 @@ Navigation hub for the live `dsh-multi-tenant` architecture and release contract
 ## Guides
 
 - [README](../README.md) — project overview and current Runtime Contract
-- [CONTRIBUTING](../CONTRIBUTING.md) — engineering and compatibility policy
+- [CONTRIBUTING](../CONTRIBUTING.md) — engineering, relevance and assumption-first policy
 - [ROADMAP](../ROADMAP.md) — v0.2 foundation and v0.3 SaaS Framework direction
 
 ## Current architecture
 
 - [Architecture](./specs/architecture.md) — canonical Tenant/Principal Runtime model
 - [Session / Agent publication boundary](./adr/session-genesis.md) — current DSH setup/publication decision
+
+## v0.3 P0 specs
+
+- [P0 foundation](./specs/v0.3-foundation.md) — scope, development sequence and promotion gates
+- [SaaS composition](./specs/saas-composition.md) — `SaaSDefinition -> CompositionPlan -> Runtime Composition`
+- [Principal operation lifecycle](./specs/operation-lifecycle.md) — Principal-owned one-shot work and Agent boundary
+- [`v0.3-assumptions.json`](./specs/v0.3-assumptions.json) — machine-readable blocking assumptions and executable proofs
 
 ## Reference
 

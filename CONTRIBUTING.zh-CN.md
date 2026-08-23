@@ -80,6 +80,22 @@ Root -> Tenant -> Principal -> derived integration fibers -> DSH operations
 
 参见 `docs/reference/compatibility.zh-CN.md`。
 
+## v0.3 Assumption-first Discipline
+
+P0 同时采用 spec-driven、test-driven 和 assumption-first。任何由 DSH / Cordis 等外部框架拥有的行为，在 executable proof 之前都只能算 assumption。
+
+强制顺序：
+
+```text
+Spec -> Assumption Ledger -> executable probe / contract -> 强类型 / 状态 -> failing behavior test -> implementation
+```
+
+`docs/specs/v0.3-assumptions.json` 是机器可读 ledger。Blocking assumption 在探索阶段可以是 `open`，但必须明确它阻塞哪个 public / design gate；只有对应 proof artifact 和 root proof command 已存在并进入 CI 后，才能标记为 `proven`。
+
+读 upstream source 可以解释“为什么这个行为大概率存在”，但不能替代我们 public architecture 真实依赖边界上的 executable proof。
+
+尤其不能在 blocking `open` assumption 上冻结 P0 public API。要么先证明 assumption，要么重新设计，让 API 不再依赖它。
+
 ## Package Conventions
 
 **不要因为一个目录看起来有用就创建 package。只有独立边界真实存在时，package 才应该存在。**
@@ -114,7 +130,7 @@ Runtime core 不引入 transport / vendor implementation。Auth 产品、数据�
 
 - **Provider contract suite** 证明可替换 seam，例如 `TenantSessionStore`、Runtime Capability Provider Contract；
 - **Conformance / invariant suite** 证明跨组件属性，例如 tenant isolation、publication ordering、lifecycle ownership；
-- **Compatibility probe** 只证明当前 active architecture 对精确外部 DSH version 的真实依赖；
+- **Compatibility probe** 证明当前 active architecture 对精确外部 DSH / Cordis 行为的真实依赖；
 - **Packed / registry smoke** 证明用户真正安装到的 artifact，而不是只证明 workspace source。
 
 ## Definition of Done
@@ -122,8 +138,9 @@ Runtime core 不引入 transport / vendor implementation。Auth 产品、数据�
 - 从 architecture / data / state / type 维度完成全局审查；
 - 变更与当前产品方向存在明确相关性；
 - 行为决策涉及的当前 docs / ADR / spec 已同步；
+- blocking external assumption 已证明，或显式阻塞尚未完成的 API design；
 - upstream / boundary ownership 明确；
-- 相关精确 DSH compatibility evidence 全绿；
+- 相关精确 DSH / Cordis compatibility evidence 全绿；
 - `pnpm release:check` 全绿；
 - transport / vendor implementation 没有泄漏进 runtime kernel；
 - 没有在真实边界出现前引入 speculative package / scaffold；

@@ -80,6 +80,22 @@ A DSH refresh must:
 
 See `docs/reference/compatibility.md`.
 
+## v0.3 assumption-first discipline
+
+P0 development is spec-driven and test-driven, but it also treats external framework behavior as an explicit assumption until proven.
+
+The required order is:
+
+```text
+Spec -> Assumption Ledger -> executable probe/contract -> strong types/state -> failing behavior test -> implementation
+```
+
+`docs/specs/v0.3-assumptions.json` is the machine-readable ledger. A blocking assumption may be `open` while design is still exploratory, but then it must name the public/design gate it blocks. A blocking assumption may be marked `proven` only when its proof artifact and root proof command exist and run in CI.
+
+Source reading can explain *why* a behavior probably exists; it does not replace the executable proof for a boundary our public architecture will depend on.
+
+In particular, do not freeze a public P0 API on top of a blocking `open` assumption. Resolve the assumption first or redesign so the API no longer depends on it.
+
 ## Package conventions
 
 **Do not create a package because a directory seems useful. Create it only when an independent boundary is real.**
@@ -114,7 +130,7 @@ The runtime package keeps transport/vendor implementations out of core. Auth pro
 
 - **Provider contract suites** prove a replaceable seam (for example `TenantSessionStore` or Runtime Capability Provider Contract).
 - **Conformance/invariant suites** prove cross-component properties such as tenant isolation, publication ordering and lifecycle ownership.
-- **Compatibility probes** prove assumptions about exact external DSH versions that the active architecture relies on.
+- **Compatibility probes** prove assumptions about exact external DSH/Cordis behavior that the active architecture relies on.
 - **Packed/registry smoke** proves the artifact users actually install, not only workspace source.
 
 ## Definition of done
@@ -122,8 +138,9 @@ The runtime package keeps transport/vendor implementations out of core. Auth pro
 - architecture/data/state/type implications reviewed globally;
 - the change is demonstrably relevant to the current product direction;
 - current docs/ADR/spec updated where behavior is decided;
+- blocking external assumptions are proven or explicitly gate unfinished API design;
 - upstream/boundary ownership is explicit;
-- exact DSH compatibility evidence is green when relevant;
+- exact DSH/Cordis compatibility evidence is green when relevant;
 - `pnpm release:check` is green;
 - no transport/vendor implementation leaks into the runtime kernel;
 - no speculative package/scaffold is introduced without a real boundary;

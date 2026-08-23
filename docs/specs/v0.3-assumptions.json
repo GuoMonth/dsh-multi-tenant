@@ -1,0 +1,79 @@
+{
+  "version": "v0.3-p0",
+  "policy": {
+    "rule": "A blocking external assumption must be proven by an executable repository artifact before public API depends on it.",
+    "allowedStatus": ["proven", "open"],
+    "proofKinds": ["probe", "contract-test"]
+  },
+  "assumptions": [
+    {
+      "id": "A1",
+      "owner": "dsh",
+      "claim": "DSH Agent creation preserves the caller-bound Principal-derived context as ownerCtx.",
+      "status": "proven",
+      "blocking": true,
+      "proof": {
+        "kind": "probe",
+        "path": "scripts/agent-owner-context-probe.mjs",
+        "command": "pnpm probe:dsh"
+      }
+    },
+    {
+      "id": "A2",
+      "owner": "dsh",
+      "claim": "Agent setup runs before Session/Agent publication, so pre-publication composition can fail without exposing a partial Agent.",
+      "status": "proven",
+      "blocking": true,
+      "proof": {
+        "kind": "probe",
+        "path": "scripts/session-genesis-probe.mjs",
+        "command": "pnpm probe:dsh"
+      }
+    },
+    {
+      "id": "A3",
+      "owner": "cordis",
+      "claim": "A derived child fiber is lifetime-owned by its parent fiber and parent disposal waits for child cleanup.",
+      "status": "proven",
+      "blocking": true,
+      "proof": {
+        "kind": "probe",
+        "path": "scripts/cordis-operation-lifecycle-probe.mjs",
+        "command": "pnpm probe:cordis"
+      }
+    },
+    {
+      "id": "A4",
+      "owner": "cordis",
+      "claim": "ctx.inject is dependency-reactive: losing and restoring a required service unloads and may re-run the injected callback.",
+      "status": "proven",
+      "blocking": true,
+      "proof": {
+        "kind": "probe",
+        "path": "scripts/cordis-operation-lifecycle-probe.mjs",
+        "command": "pnpm probe:cordis"
+      }
+    },
+    {
+      "id": "A5",
+      "owner": "dsh-multi-tenant",
+      "claim": "Runtime capability providers preserve Tenant/Principal isolation, descendant inheritance, teardown and unpublished setup semantics.",
+      "status": "proven",
+      "blocking": true,
+      "proof": {
+        "kind": "contract-test",
+        "path": "packages/multi-tenant/tests/runtime-capability.contract.test.ts",
+        "command": "pnpm test"
+      }
+    },
+    {
+      "id": "A6",
+      "owner": "v0.3-design",
+      "claim": "The final one-shot Operation abstraction can safely acquire reactive Cordis dependencies without duplicate externally visible work during provider churn.",
+      "status": "open",
+      "blocking": true,
+      "gate": "operation-public-api",
+      "proof": null
+    }
+  ]
+}

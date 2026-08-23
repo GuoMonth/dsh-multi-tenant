@@ -75,7 +75,7 @@ jobs:
       - name: Install dependencies (frozen)
         run: pnpm install --frozen-lockfile
 
-      - name: Verify package and architecture invariants
+      - name: Verify package, architecture and v0.3 foundation invariants
         run: pnpm verify
 
       - name: Verify release manifest
@@ -93,8 +93,8 @@ jobs:
       - name: Packed consumer smoke
         run: pnpm smoke
 
-  dsh-compat:
-    name: DSH compatibility (Node ${{ matrix.node }})
+  platform-compat:
+    name: Platform assumptions (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -109,5 +109,5 @@ jobs:
           runtime: node@${{ matrix.node }}
           install: false
 
-      - name: Run published DSH runtime proofs
-        run: pnpm probe:dsh
+      - name: Run executable DSH + Cordis assumption proofs
+        run: pnpm probe:platform
