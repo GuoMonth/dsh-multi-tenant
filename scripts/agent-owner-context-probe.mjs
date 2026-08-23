@@ -2,15 +2,11 @@
 /**
  * DSH Agent owner-context proof.
  *
- * The multi-tenant runtime does not pretend that Agent.ctx directly inherits
- * Tenant/Principal Cordis service isolation. The public contract we need is
- * narrower and stronger: `principal.ctx.agents.create()` must carry that exact
- * caller-bound Principal Context into the Agent factory as ownerCtx, from which
- * Agent setup can explicitly compose/project runtime capabilities.
- *
- * The probe declares only the public packages it directly consumes. Their own
- * package manifests own the rest of the dependency graph; duplicating that
- * graph here would make this compatibility proof depend on DSH internals.
+ * A canonical Principal Context is a capability/composition root, not a bypass
+ * around Cordis injection. Agent creation therefore runs in an ephemeral plugin
+ * fiber derived from the Principal Context and explicitly injecting `agents`.
+ * DSH must carry that caller-bound derived context into the Agent factory as
+ * ownerCtx, preserving Principal identity and tenant capability resolution.
  */
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -30,9 +26,6 @@ try {
   }
 
   writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'agent-owner-probe', private: true, type: 'module' }))
-  // Mirror the repository's explicit pnpm 11 build-script policy. esbuild's
-  // platform binary arrives through its optional dependency, so acknowledging
-  // and denying its redundant postinstall is sufficient for this throwaway probe.
   writeFileSync(join(tmp, 'pnpm-workspace.yaml'), 'allowBuilds:\n  esbuild: false\n')
 
   try {
@@ -47,10 +40,8 @@ try {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
   } catch (error) {
-    const stdout = String(error.stdout ?? '').trim()
-    const stderr = String(error.stderr ?? '').trim()
     throw new Error(
-      `failed to install public DSH Agent contract at ${DSH_TARGET_VERSION}\n${stdout}\n${stderr}`,
+      `failed to install public DSH Agent contract at ${DSH_TARGET_VERSION}\n${String(error.stdout ?? '').trim()}\n${String(error.stderr ?? '').trim()}`,
       { cause: error },
     )
   }
@@ -71,13 +62,13 @@ await root.plugin(AgentRegistry)
 const observed = []
 root.agents.setFactory({
   async createAgent(ownerCtx, options) {
-    const record = {
+    observed.push({
       sessionId: options.sessionId,
       tenantId: tenantIdOf(ownerCtx),
       principal: principalOf(ownerCtx),
       capability: ownerCtx.get('tenantCapability'),
-    }
-    observed.push(record)
+      ownerFiberName: ownerCtx.fiber.name,
+    })
 
     const agentCtx = root.extend({})
     const commit = await options.setup?.(agentCtx)
@@ -101,31 +92,43 @@ const globex = await root.tenantRuntime.tenants.ensure('globex', {
 const alice = await acme.principals.ensure('alice')
 const bob = await globex.principals.ensure('bob')
 
-let projectedA
-let projectedB
-await alice.ctx.agents.create({
-  sessionId: 'agent-a',
-  setup(agentCtx) {
-    agentCtx.provide('projectedCapability', alice.ctx.get('tenantCapability'))
-    projectedA = agentCtx.get('projectedCapability')
-  },
-})
-await bob.ctx.agents.create({
-  sessionId: 'agent-b',
-  setup(agentCtx) {
-    agentCtx.provide('projectedCapability', bob.ctx.get('tenantCapability'))
-    projectedB = agentCtx.get('projectedCapability')
-  },
-})
+async function createFromPrincipal(principalScope, sessionId) {
+  let handle
+  let projected
+  const ownerFiber = principalScope.ctx.inject(['agents'], async (ownerCtx) => {
+    handle = await ownerCtx.agents.create({
+      sessionId,
+      setup(agentCtx) {
+        // Projection is explicit. The source value is resolved through the
+        // Principal-derived owner context, not through a root/global registry.
+        agentCtx.provide('projectedCapability', ownerCtx.get('tenantCapability'))
+        projected = agentCtx.get('projectedCapability')
+      },
+    })
+  })
+  await ownerFiber
+  if (handle === undefined) throw new Error('agent handle was not created')
+  return { handle, ownerFiber, projected }
+}
+
+const agentA = await createFromPrincipal(alice, 'agent-a')
+const agentB = await createFromPrincipal(bob, 'agent-b')
 
 const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT FAILED: ' + msg) }
 assert(observed.length === 2, 'factory must receive both creates')
-assert(observed[0].tenantId === 'acme' && observed[0].principal?.userId === 'alice', 'Agent A ownerCtx must be Alice principal context')
-assert(observed[1].tenantId === 'globex' && observed[1].principal?.userId === 'bob', 'Agent B ownerCtx must be Bob principal context')
-assert(observed[0].capability === 'A' && observed[1].capability === 'B', 'ownerCtx capability graph must stay tenant-specific')
-assert(projectedA === 'A' && projectedB === 'B', 'Agent setup must compose from the correct principal runtime')
+assert(observed[0].tenantId === 'acme' && observed[0].principal?.userId === 'alice', 'Agent A owner context must derive from Alice principal')
+assert(observed[1].tenantId === 'globex' && observed[1].principal?.userId === 'bob', 'Agent B owner context must derive from Bob principal')
+assert(observed[0].capability === 'A' && observed[1].capability === 'B', 'owner context capability graph must stay tenant-specific')
+assert(agentA.projected === 'A' && agentB.projected === 'B', 'Agent setup must compose from the correct principal runtime')
 
-console.log(JSON.stringify({ observed, projectedA, projectedB }))
+await agentA.handle.dispose()
+await agentB.handle.dispose()
+await agentA.ownerFiber.dispose()
+await agentB.ownerFiber.dispose()
+await acme.dispose()
+await globex.dispose()
+
+console.log(JSON.stringify({ observed, projectedA: agentA.projected, projectedB: agentB.projected }))
 `)
 
   const out = execFileSync('pnpm', ['exec', 'tsx', 'probe.ts'], {
