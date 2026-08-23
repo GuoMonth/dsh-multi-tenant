@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Package smoke: prove the packed tarball is a valid distributable for an
- * external consumer. Build → pack → verify contents/exports → install into a
- * clean temp consumer → exercise both the v0.1 kernel and v0.2 runtime.
+ * external consumer. Build -> pack -> verify contents/exports -> install into a
+ * clean temp consumer -> exercise both the v0.1 kernel and v0.2 runtime.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -64,7 +64,7 @@ try {
     'import Store from "dsh-multi-tenant/store";',
     'import Service from "dsh-multi-tenant";',
     'import Runtime from "dsh-multi-tenant/runtime";',
-    'import { assertTenantSessionStoreContract } from "dsh-multi-tenant/testing";',
+    'import { assertTenantSessionStoreContract, assertRuntimeCapabilityProviderContract } from "dsh-multi-tenant/testing";',
     'const ctx = new Context();',
     'await ctx.plugin(Store);',
     'await ctx.plugin(Service);',
@@ -72,15 +72,23 @@ try {
     'const alice = { tenantId: "acme", userId: "alice" };',
     'await ctx.multiTenant.claimSession("s1", alice);',
     'if ((await ctx.multiTenant.canAccessSession(alice, "s1")) !== true) throw new Error("smoke: same-user should be allowed");',
-    'const tenant = ctx.tenantRuntime.createTenant("acme", { isolateServices: ["tenantAuth"] });',
-    'await tenant.ctx.plugin((c, value) => { c.provide("tenantAuth", value); }, "auth-A");',
+    'const tenant = await ctx.tenantRuntime.tenants.ensure("acme", {',
+    '  isolateServices: ["tenantAuth"],',
+    '  setup: ({ ctx: tenantCtx }) => { tenantCtx.provide("tenantAuth", "auth-A"); },',
+    '});',
     'if (tenant.ctx.get("tenantAuth") !== "auth-A") throw new Error("smoke: tenant capability did not resolve");',
     'if (ctx.get("tenantAuth") !== undefined) throw new Error("smoke: tenant capability leaked to root");',
-    'const principal = tenant.createPrincipal(alice);',
-    'await principal.ctx.multiTenant.claimSession("s2", principal.principal);',
+    'const principal = await tenant.principals.ensure("alice");',
+    'await principal.ctx.multiTenant.claimSession("s2", principal.identity);',
     'const ownerFromRoot = await ctx.multiTenant.getSessionOwner("s2");',
     'if (ownerFromRoot?.tenantId !== "acme" || ownerFromRoot?.userId !== "alice") throw new Error("smoke: ownership kernel state did not cross context boundary");',
     'await assertTenantSessionStoreContract(async (c) => { await c.plugin(Store); return c.tenantSessionStore });',
+    'await assertRuntimeCapabilityProviderContract({',
+    '  serviceName: "smokeCapability",',
+    '  level: "tenant",',
+    '  mount: (scopeCtx, marker) => { scopeCtx.provide("smokeCapability", marker); },',
+    '  fingerprint: scopeCtx => scopeCtx.get("smokeCapability"),',
+    '});',
     'await tenant.dispose();',
     'console.log("consumer smoke passed");',
   ].join('\n'))

@@ -1,14 +1,11 @@
 /**
  * Context-native multi-tenant runtime primitives for DeepSeek Harness.
  *
- * v0.2 separates two independent planes:
- *
- * - Cordis service isolation owns tenant/principal capability graphs.
- * - DSH scope routing keeps owning agent/preset registration visibility.
- *
- * The v0.1 session-ownership kernel remains shared and is deliberately NOT
- * isolated. It is the persistent fail-closed authorization invariant under the
- * runtime capability boundary.
+ * v0.2 models runtime tenancy as a canonical ownership tree. Tenant and
+ * Principal nodes share one lifecycle vocabulary and one publication model:
+ * reserve identity -> prepare unpublished scope -> setup -> optional commit ->
+ * publish. Preparing transactions are cancellable structural resources, so
+ * parent teardown can close admission and abort/drain unpublished children.
  *
  * @module dsh-multi-tenant/runtime
  */
@@ -18,7 +15,6 @@ import { ValidationError } from './errors.ts'
 import type { TenantPrincipal } from './types.ts'
 import { validateTenantId, validateTenantPrincipal } from './validation.ts'
 
-/** Services that must remain shared for Cordis itself or the v0.1 security kernel. */
 const RESERVED_SHARED_SERVICES = new Set([
   'events',
   'logger',
@@ -29,59 +25,80 @@ const RESERVED_SHARED_SERVICES = new Set([
   'multiTenant',
 ])
 
-/** Metadata inherited by every context below one tenant scope. */
 const kTenantRuntime = Symbol('dsh-multi-tenant.tenant-runtime')
-/** Metadata shadowed on a principal scope below its tenant. */
 const kPrincipalRuntime = Symbol('dsh-multi-tenant.principal-runtime')
 
-interface TenantMetadata {
+export interface TenantIdentity {
   readonly tenantId: string
 }
 
-/** Runtime options for a tenant capability boundary. */
-export interface TenantScopeOptions {
-  /**
-   * Cordis service names that receive independent tenant-local isolation labels.
-   * Providers for these names must be mounted below the returned tenant context.
-   */
-  isolateServices?: readonly string[]
+export interface RuntimeContextIdentity {
+  readonly tenant: Readonly<TenantIdentity>
+  readonly principal?: Readonly<TenantPrincipal>
 }
 
-/** Runtime options for one authenticated principal below a tenant. */
-export interface PrincipalScopeOptions {
-  /**
-   * Cordis service names that receive independent user/principal-local labels.
-   * Use this for user OAuth credentials or other per-principal capabilities.
-   */
-  isolateServices?: readonly string[]
+export type RuntimeScopeState = 'active' | 'disposing' | 'disposed'
+
+export interface RuntimeScopeSetupCommit {
+  commit(): void
 }
 
-/** One authenticated principal capability scope. */
-export interface PrincipalRuntimeScope {
-  /** Exact authenticated identity bound to this scope. */
-  readonly principal: Readonly<TenantPrincipal>
-  /** Context used to mount and resolve principal-local capabilities. */
+export interface RuntimeScopePreparation<I> {
   readonly ctx: Context
-  /** Dispose every plugin/effect owned by this principal scope. */
+  readonly identity: Readonly<I>
+  readonly signal: AbortSignal
+}
+
+export type RuntimeScopeSetup<I> = (
+  preparation: RuntimeScopePreparation<I>,
+) => RuntimeScopeSetupCommit | PromiseLike<RuntimeScopeSetupCommit | void> | void
+
+export interface RuntimeScopeDefinition<I> {
+  readonly isolateServices?: readonly string[]
+  readonly setup?: RuntimeScopeSetup<I>
+}
+
+export type TenantScopeDefinition = RuntimeScopeDefinition<TenantIdentity>
+export type PrincipalScopeDefinition = RuntimeScopeDefinition<TenantPrincipal>
+
+export interface RuntimeScope<K extends 'tenant' | 'principal', I> {
+  readonly kind: K
+  readonly identity: Readonly<I>
+  readonly ctx: Context
+  readonly state: RuntimeScopeState
   dispose(): Promise<void>
 }
 
-/** One tenant capability graph. */
-export interface TenantRuntimeScope {
-  /** Opaque tenant identifier. */
-  readonly tenantId: string
-  /** Context used to mount and resolve tenant-local capabilities. */
-  readonly ctx: Context
+export interface RuntimeScopeRegistry<Key, Scope, Definition> {
+  get(key: Key): Scope | undefined
   /**
-   * Create an authenticated principal scope below this tenant.
-   * The principal tenant id must exactly match this scope.
+   * Join the canonical active node, or create it when absent.
+   *
+   * Omitting `definition` means the caller only depends on identity and does
+   * not need to know the creation recipe of an already-live node. Supplying a
+   * definition opts into structural-drift validation.
    */
-  createPrincipal(principal: TenantPrincipal, options?: PrincipalScopeOptions): PrincipalRuntimeScope
-  /** Dispose the tenant scope and every descendant principal/plugin lifecycle. */
-  dispose(): Promise<void>
+  ensure(key: Key, definition?: Definition): Promise<Scope>
 }
 
-/** Shared no-op plugin used only to mint an owned Cordis fiber for a scope. */
+export interface PrincipalRuntimeScope extends RuntimeScope<'principal', TenantPrincipal> {}
+
+export interface TenantRuntimeScope extends RuntimeScope<'tenant', TenantIdentity> {
+  readonly principals: RuntimeScopeRegistry<string, PrincipalRuntimeScope, PrincipalScopeDefinition>
+}
+
+export class MultiTenantRuntimeError extends Error {
+  override name = 'MultiTenantRuntimeError'
+}
+
+export class RuntimeDefinitionConflictError extends MultiTenantRuntimeError {
+  override name = 'RuntimeDefinitionConflictError'
+}
+
+export class RuntimeRegistryClosedError extends MultiTenantRuntimeError {
+  override name = 'RuntimeRegistryClosedError'
+}
+
 function runtimeScopeOwner(): void {}
 
 function normalizeServiceNames(names: readonly string[] | undefined): string[] {
@@ -92,128 +109,416 @@ function normalizeServiceNames(names: readonly string[] | undefined): string[] {
       throw new ValidationError('isolated service names must be non-empty trimmed strings')
     }
     if (RESERVED_SHARED_SERVICES.has(name)) {
-      throw new ValidationError(`service "${name}" is shared/reserved and cannot be tenant-isolated`)
+      throw new ValidationError(`service "${name}" is shared/reserved and cannot be runtime-isolated`)
     }
     unique.add(name)
   }
-  return [...unique]
+  return [...unique].sort()
+}
+
+interface NormalizedDefinition<I> {
+  readonly services: readonly string[]
+  readonly signature: string
+  readonly setup: RuntimeScopeSetup<I> | undefined
+}
+
+function normalizeDefinition<I>(definition: RuntimeScopeDefinition<I> = {}): NormalizedDefinition<I> {
+  const services = normalizeServiceNames(definition.isolateServices)
+  return {
+    services,
+    signature: JSON.stringify(services),
+    setup: definition.setup,
+  }
 }
 
 function isolatedContext(base: Context, names: readonly string[], scopeKind: 'tenant' | 'principal'): Context {
   let current = base
   for (const name of names) {
-    // Symbol identity, not its diagnostic description, is the isolation key.
-    // Keep tenant/user identifiers out of framework diagnostics by design.
     current = current.isolate(name, Symbol(`${scopeKind}:${name}`))
   }
   return current
 }
 
-/** Await a Cordis fiber's complete quiescent disposal. */
 async function disposeFiber(fiber: Fiber): Promise<void> {
   await Promise.resolve(fiber.dispose())
   while (fiber.inertia !== undefined) await fiber.inertia
 }
 
+async function raceAbort<T>(operation: PromiseLike<T> | T, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    throw signal.reason instanceof Error ? signal.reason : new Error('runtime scope setup aborted')
+  }
+  const aborted = Promise.withResolvers<never>()
+  const listener = (): void => {
+    aborted.reject(signal.reason instanceof Error ? signal.reason : new Error('runtime scope setup aborted'))
+  }
+  signal.addEventListener('abort', listener, { once: true })
+  try {
+    return await Promise.race([Promise.resolve(operation), aborted.promise])
+  } finally {
+    signal.removeEventListener('abort', listener)
+  }
+}
+
+interface PreparedScope<I> {
+  readonly ctx: Context
+  readonly fiber: Fiber
+  readonly identity: Readonly<I>
+}
+
+interface ScopeCreation<Scope> {
+  readonly ready: Promise<Scope>
+  cancel(reason: Error): Promise<void>
+}
+
 /**
- * Read the tenant selected by the nearest runtime scope.
+ * Start an unpublished, cancellable scope transaction.
  *
- * This is contextual identity for trusted same-process plugins. It is not an
- * authorization decision; durable/session boundaries must still use
- * `ctx.multiTenant` ownership checks.
+ * `ready` resolves only after setup and its optional synchronous commit have
+ * completed. `cancel()` can run while setup is pending; it aborts the setup
+ * signal and structurally disposes the unpublished Cordis subtree.
  */
+function prepareScope<I>(
+  parent: Context,
+  kind: 'tenant' | 'principal',
+  identity: Readonly<I>,
+  definition: NormalizedDefinition<I>,
+  metadata: Record<PropertyKey, unknown>,
+): ScopeCreation<PreparedScope<I>> {
+  const base = isolatedContext(parent, definition.services, kind)
+  const fiber = base.plugin(runtimeScopeOwner)
+  const ctx = fiber.ctx.extend(metadata)
+  const abort = new AbortController()
+  let disposal: Promise<void> | undefined
+
+  const cancel = (reason: Error): Promise<void> => {
+    if (!abort.signal.aborted) abort.abort(reason)
+    return (disposal ??= disposeFiber(fiber))
+  }
+
+  ctx.effect(() => () => {
+    if (!abort.signal.aborted) {
+      abort.abort(new MultiTenantRuntimeError(`${kind} runtime setup owner disposed`))
+    }
+  }, `tenantRuntime.${kind}.setupAbort()`)
+
+  const ready = (async (): Promise<PreparedScope<I>> => {
+    try {
+      const result = definition.setup === undefined
+        ? undefined
+        : await raceAbort(definition.setup({ ctx, identity, signal: abort.signal }), abort.signal)
+
+      fiber.assertActive()
+      if (result !== undefined) {
+        if (typeof result !== 'object' || result === null || typeof result.commit !== 'function') {
+          throw new TypeError('runtime scope setup must return void or { commit(): void }')
+        }
+        result.commit()
+      }
+      fiber.assertActive()
+      return { ctx, fiber, identity }
+    } catch (error) {
+      await cancel(error instanceof Error ? error : new Error(String(error)))
+      throw error
+    }
+  })()
+
+  return { ready, cancel }
+}
+
+interface CanonicalEntry<Scope> {
+  readonly signature: string
+  readonly creation: ScopeCreation<Scope>
+  scope: Scope | undefined
+}
+
+type PublishedScope = RuntimeScope<'tenant' | 'principal', unknown>
+
+/**
+ * Generic canonical registry shared by Tenant and Principal nodes.
+ *
+ * The registry owns both unpublished creation transactions and published
+ * scopes. Closing it first stops admission, then cancels/drains every entry.
+ */
+class CanonicalRuntimeRegistry<Key, Scope extends PublishedScope, Identity, Definition extends RuntimeScopeDefinition<Identity>>
+implements RuntimeScopeRegistry<Key, Scope, Definition> {
+  private readonly entries = new Map<Key, CanonicalEntry<Scope>>()
+  private accepting = true
+  private closing: Promise<void> | undefined
+
+  constructor(
+    private readonly normalize: (definition: Definition | undefined) => NormalizedDefinition<Identity>,
+    private readonly create: (
+      key: Key,
+      definition: NormalizedDefinition<Identity>,
+      retire: (scope: Scope) => void,
+    ) => ScopeCreation<Scope>,
+  ) {}
+
+  get(key: Key): Scope | undefined {
+    if (!this.accepting) return undefined
+    const scope = this.entries.get(key)?.scope
+    return scope?.state === 'active' ? scope : undefined
+  }
+
+  async ensure(key: Key, definition?: Definition): Promise<Scope> {
+    if (!this.accepting) throw new RuntimeRegistryClosedError('runtime scope registry is closing')
+
+    const definitionSupplied = definition !== undefined
+    const normalized = this.normalize(definition)
+    const existing = this.entries.get(key)
+    if (existing !== undefined) {
+      if (definitionSupplied && existing.signature !== normalized.signature) {
+        throw new RuntimeDefinitionConflictError(
+          'canonical runtime scope already exists with a different isolated-service definition',
+        )
+      }
+      const scope = await existing.creation.ready
+      if (!this.accepting) throw new RuntimeRegistryClosedError('runtime scope registry is closing')
+      if (scope.state !== 'active') {
+        await scope.dispose()
+        return this.ensure(key, definition)
+      }
+      return scope
+    }
+
+    let entry!: CanonicalEntry<Scope>
+    const retire = (scope: Scope): void => {
+      if (this.entries.get(key) === entry && entry.scope === scope) this.entries.delete(key)
+    }
+    const rawCreation = this.create(key, normalized, retire)
+    const creation: ScopeCreation<Scope> = {
+      cancel: reason => rawCreation.cancel(reason),
+      ready: rawCreation.ready.then(
+        (scope) => {
+          if (this.entries.get(key) === entry) entry.scope = scope
+          return scope
+        },
+        (error) => {
+          if (this.entries.get(key) === entry) this.entries.delete(key)
+          throw error
+        },
+      ),
+    }
+    entry = { signature: normalized.signature, creation, scope: undefined }
+    this.entries.set(key, entry)
+
+    const scope = await creation.ready
+    if (!this.accepting) {
+      await scope.dispose()
+      throw new RuntimeRegistryClosedError('runtime scope registry is closing')
+    }
+    return scope
+  }
+
+  disposeAll(): Promise<void> {
+    if (this.closing !== undefined) return this.closing
+    this.accepting = false
+    const reason = new RuntimeRegistryClosedError('runtime scope registry is closing')
+    const entries = [...this.entries.values()]
+
+    this.closing = (async () => {
+      await Promise.all(entries.map(async (entry) => {
+        try {
+          await entry.creation.cancel(reason)
+        } catch {
+          // Continue draining siblings even if one provider cleanup fails.
+        }
+        try {
+          const scope = await entry.creation.ready
+          if (scope.state !== 'disposed') await scope.dispose()
+        } catch {
+          // A cancelled/failed unpublished creation has no published scope.
+        }
+      }))
+      this.entries.clear()
+    })()
+    return this.closing
+  }
+}
+
+function createScopeLifecycle(
+  fiber: Fiber,
+  beforeDispose: () => Promise<void>,
+  onDisposed: () => void,
+): { readonly state: RuntimeScopeState; dispose(): Promise<void> } {
+  let state: RuntimeScopeState = 'active'
+  let disposing: Promise<void> | undefined
+
+  return {
+    get state() {
+      return state
+    },
+    dispose() {
+      if (disposing !== undefined) return disposing
+      if (state === 'disposed') return Promise.resolve()
+      state = 'disposing'
+      disposing = (async () => {
+        try {
+          await beforeDispose()
+          await disposeFiber(fiber)
+        } finally {
+          state = 'disposed'
+          onDisposed()
+        }
+      })()
+      return disposing
+    },
+  }
+}
+
+function bindPreparedScope<Scope extends PublishedScope, I>(
+  preparation: ScopeCreation<PreparedScope<I>>,
+  build: (prepared: PreparedScope<I>) => Scope,
+): ScopeCreation<Scope> {
+  let scope: Scope | undefined
+  let cancellation: Promise<void> | undefined
+
+  const ready = preparation.ready.then((prepared) => {
+    prepared.fiber.assertActive()
+    scope = build(prepared)
+    return scope
+  })
+
+  return {
+    ready,
+    cancel(reason: Error): Promise<void> {
+      if (cancellation !== undefined) return cancellation
+      cancellation = (async () => {
+        if (scope !== undefined) {
+          await scope.dispose()
+          return
+        }
+        await preparation.cancel(reason)
+        try {
+          const published = await ready
+          if (published.state !== 'disposed') await published.dispose()
+        } catch {
+          // Cancellation or setup failure prevented publication.
+        }
+      })()
+      return cancellation
+    },
+  }
+}
+
+export function runtimeIdentityOf(ctx: Context): RuntimeContextIdentity | undefined {
+  const tenant = (ctx as Context & { [kTenantRuntime]?: Readonly<TenantIdentity> })[kTenantRuntime]
+  if (tenant === undefined) return undefined
+  const principal = (ctx as Context & { [kPrincipalRuntime]?: Readonly<TenantPrincipal> })[kPrincipalRuntime]
+  return principal === undefined ? { tenant } : { tenant, principal }
+}
+
 export function tenantIdOf(ctx: Context): string | undefined {
-  const metadata = (ctx as Context & { [kTenantRuntime]?: TenantMetadata })[kTenantRuntime]
-  return metadata?.tenantId
+  return runtimeIdentityOf(ctx)?.tenant.tenantId
 }
 
-/**
- * Read the authenticated principal selected by the nearest principal scope.
- * Returns undefined in root/tenant-only contexts.
- */
 export function principalOf(ctx: Context): Readonly<TenantPrincipal> | undefined {
-  return (ctx as Context & { [kPrincipalRuntime]?: Readonly<TenantPrincipal> })[kPrincipalRuntime]
+  return runtimeIdentityOf(ctx)?.principal
 }
 
-/**
- * Runtime manager that mints canonical tenant contexts over one shared DSH
- * process/service graph.
- *
- * The service itself is deployment-global. Each tenant gets a real Cordis
- * child lifecycle plus independent isolation labels for explicitly selected
- * capability services. This avoids a second ad-hoc `tenantId -> service Map`
- * resolver while keeping the v0.1 ownership kernel globally authoritative.
- */
 export class TenantRuntimeService extends Service {
   static inject = ['multiTenant']
 
   private readonly selfCtx: Context
-  private readonly tenants = new Map<string, TenantRuntimeScope>()
+  private readonly tenantRegistry: CanonicalRuntimeRegistry<
+    string,
+    TenantRuntimeScope,
+    TenantIdentity,
+    TenantScopeDefinition
+  >
+  readonly tenants: RuntimeScopeRegistry<string, TenantRuntimeScope, TenantScopeDefinition>
 
   constructor(ctx: Context) {
     super(ctx, 'tenantRuntime')
     this.selfCtx = ctx
+    this.tenantRegistry = new CanonicalRuntimeRegistry(
+      definition => normalizeDefinition(definition),
+      (tenantId, definition, retire) => this.prepareTenant(tenantId, definition, retire),
+    )
+    this.tenants = this.tenantRegistry
+    ctx.effect(() => () => this.tenantRegistry.disposeAll(), 'tenantRuntime.disposeAll()')
   }
 
-  /** Return the currently live tenant scope, if one exists. */
-  get(tenantId: string): TenantRuntimeScope | undefined {
+  private prepareTenant(
+    tenantId: string,
+    definition: NormalizedDefinition<TenantIdentity>,
+    retire: (scope: TenantRuntimeScope) => void,
+  ): ScopeCreation<TenantRuntimeScope> {
     validateTenantId(tenantId)
-    return this.tenants.get(tenantId)
+    const identity = Object.freeze({ tenantId })
+    const preparation = prepareScope(
+      this.selfCtx,
+      'tenant',
+      identity,
+      definition,
+      { [kTenantRuntime]: identity },
+    )
+
+    return bindPreparedScope(preparation, (prepared) => {
+      const principalRegistry = new CanonicalRuntimeRegistry<
+        string,
+        PrincipalRuntimeScope,
+        TenantPrincipal,
+        PrincipalScopeDefinition
+      >(
+        principalDefinition => normalizeDefinition(principalDefinition),
+        (userId, principalDefinition, retirePrincipal) => this.preparePrincipal(
+          prepared.ctx,
+          identity,
+          userId,
+          principalDefinition,
+          retirePrincipal,
+        ),
+      )
+
+      let scope!: TenantRuntimeScope
+      const lifecycle = createScopeLifecycle(
+        prepared.fiber,
+        () => principalRegistry.disposeAll(),
+        () => retire(scope),
+      )
+      scope = {
+        kind: 'tenant',
+        identity,
+        ctx: prepared.ctx,
+        principals: principalRegistry,
+        get state() { return lifecycle.state },
+        dispose: () => lifecycle.dispose(),
+      }
+      return scope
+    })
   }
 
-  /**
-   * Create the canonical live scope for one tenant.
-   *
-   * Duplicate live scopes are rejected: a tenant must have one capability
-   * graph per runtime, otherwise two requests could silently resolve different
-   * auth/MCP/credential providers for the same tenant identity.
-   */
-  createTenant(tenantId: string, options: TenantScopeOptions = {}): TenantRuntimeScope {
-    validateTenantId(tenantId)
-    if (this.tenants.has(tenantId)) {
-      throw new MultiTenantRuntimeError(`tenant "${tenantId}" already has a live runtime scope`)
-    }
+  private preparePrincipal(
+    tenantCtx: Context,
+    tenant: Readonly<TenantIdentity>,
+    userId: string,
+    definition: NormalizedDefinition<TenantPrincipal>,
+    retire: (scope: PrincipalRuntimeScope) => void,
+  ): ScopeCreation<PrincipalRuntimeScope> {
+    const principal = Object.freeze({ tenantId: tenant.tenantId, userId })
+    validateTenantPrincipal(principal)
+    const preparation = prepareScope(
+      tenantCtx,
+      'principal',
+      principal,
+      definition,
+      { [kPrincipalRuntime]: principal },
+    )
 
-    const services = normalizeServiceNames(options.isolateServices)
-    const base = isolatedContext(this.selfCtx, services, 'tenant')
-    const fiber = base.plugin(runtimeScopeOwner)
-    const metadata: TenantMetadata = Object.freeze({ tenantId })
-    const tenantCtx = fiber.ctx.extend({ [kTenantRuntime]: metadata })
-    let disposing: Promise<void> | undefined
-
-    const scope: TenantRuntimeScope = {
-      tenantId,
-      ctx: tenantCtx,
-      createPrincipal: (principal, principalOptions = {}) => {
-        validateTenantPrincipal(principal)
-        if (principal.tenantId !== tenantId) {
-          throw new ValidationError('principal tenantId does not match the tenant runtime scope')
-        }
-        const principalServices = normalizeServiceNames(principalOptions.isolateServices)
-        const principalBase = isolatedContext(tenantCtx, principalServices, 'principal')
-        const principalFiber = principalBase.plugin(runtimeScopeOwner)
-        const boundPrincipal = Object.freeze({ tenantId: principal.tenantId, userId: principal.userId })
-        const principalCtx = principalFiber.ctx.extend({ [kPrincipalRuntime]: boundPrincipal })
-        let principalDisposing: Promise<void> | undefined
-        return {
-          principal: boundPrincipal,
-          ctx: principalCtx,
-          dispose: () => (principalDisposing ??= disposeFiber(principalFiber)),
-        }
-      },
-      dispose: () => {
-        if (disposing !== undefined) return disposing
-        // Keep the canonical scope registered until teardown reaches quiescence,
-        // so callers cannot overlap a replacement graph with one still disposing.
-        disposing = disposeFiber(fiber).finally(() => {
-          if (this.tenants.get(tenantId) === scope) this.tenants.delete(tenantId)
-        })
-        return disposing
-      },
-    }
-
-    this.tenants.set(tenantId, scope)
-    return scope
+    return bindPreparedScope(preparation, (prepared) => {
+      let scope!: PrincipalRuntimeScope
+      const lifecycle = createScopeLifecycle(prepared.fiber, async () => {}, () => retire(scope))
+      scope = {
+        kind: 'principal',
+        identity: principal,
+        ctx: prepared.ctx,
+        get state() { return lifecycle.state },
+        dispose: () => lifecycle.dispose(),
+      }
+      return scope
+    })
   }
 }
 
@@ -221,11 +526,6 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     tenantRuntime: TenantRuntimeService
   }
-}
-
-/** Runtime lifecycle/configuration error distinct from an access denial. */
-export class MultiTenantRuntimeError extends Error {
-  override name = 'MultiTenantRuntimeError'
 }
 
 export default TenantRuntimeService

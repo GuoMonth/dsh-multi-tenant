@@ -1,78 +1,88 @@
 [English](./release.md) | 简体中文
 
-# Kernel prerelease 发布契约
+# Release Contract
 
-Kernel 已经拥有真实公开的 prerelease 版本线。本文档定义当前 release artifact，以及发布前必须通过的机械化证明。
+项目处于快速 prerelease 开发期，发布机制刻意保持简单、确定、可复现。
 
-## 当前 artifact
+## 当前 Artifact
 
 - **Package：** `dsh-multi-tenant`
-- **Candidate：** `0.1.0-rc.2`
-- **npm dist-tag：** `next`
-- **DSH compatibility target：** `0.1.0-rc.7`
-- **Node：** `^22.19.0 || >=24.0.0`
-- **Publishing：** npm Trusted Publishing / GitHub Actions OIDC
+- **当前 version：** 从 `packages/multi-tenant/package.json` 读取
+- **当前 candidate：** `0.2.0-rc.3`
+- **npm dist-tag：** `latest`
+- **DSH baseline：** `0.1.1-rc.2` @ `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`
+- **Publishing：** GitHub Actions OIDC + npm Trusted Publishing
 - **Provenance：** enabled
 
-`dsh-multi-tenant-web` 继续保持 private，不属于本次 release。
+`dsh-multi-tenant-web` 继续保持 private。
 
-## 为什么需要 rc.2
+## Single Source of Truth
 
-`0.1.0-rc.1` 已经成功建立第一个公开 artifact，并完成 registry smoke、provenance、Git tag 与 GitHub prerelease。进入 stable 0.1 以前，rc.2 做最后一次主动 API subtraction：删除 `TenantPrincipal.roles`。
+Package manifest 拥有 release identity：
 
-Ownership kernel 从未读取 roles。继续把它作为 required public field，会迫使每个调用方携带一个本 package 明确不拥有的 RBAC vocabulary。因此 principal 收敛到 kernel 真正强制的 identity：
-
-```ts
-interface TenantPrincipal {
-  tenantId: string
-  userId: string
-}
+```text
+packages/multi-tenant/package.json
+  ├─ version
+  └─ publishConfig.tag = latest
 ```
 
-未来如果真实需求需要 roles / permissions / admin policy，应进入独立 policy plane。
+Release workflow 不再让操作者重复输入 version。只需要从 `main` 手动 dispatch，workflow 自动读取 manifest、执行完整验证并发布该版本。
 
-## Release guarantee
+## 单一 npm Channel
 
-Artifact 只承诺 kernel 自己拥有的 contract：opaque tenant/user identity、claim-once 不可变 session ownership、无条件 cross-tenant denial、v0.1 same-user ownership、fail-closed unknown/foreign-session authorization、不可枚举公开 denial，以及可替换 async `TenantSessionStore` contract 与共享 provider test suite。
+当前快速迭代阶段只维护一个 npm channel：
 
-内置 `InMemoryTenantSessionStore` 是 reference/bootstrap provider，不提供 production durability。
+> `latest` = 项目明确选择发布的最新版本。
 
-## 明确边界
+Prerelease / stable 语义由 SemVer 本身表达（例如 `0.2.0-rc.3`，以后可能是 `0.2.0`），不再额外维护 `next`。
 
-本 prerelease 不声称提供 authentication、production DSH Web 多用户隔离、durable storage、MCP credential/context isolation、audit persistence、team ACL、general RBAC，也不提供 shell/filesystem/process/container/network isolation。
+安装当前版本：
 
-## 发布前验证
+```sh
+dsh plugin --profile <profile> add dsh-multi-tenant
+```
+
+## Pre-publication Proof
+
+干净 checkout 上执行：
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm release:check
 ```
 
-真正 publish 前，release workflow 会从 `main` 再完整执行一次。
+完整 proof 包括 package / architecture invariant、release preflight、TypeScript typecheck、unit / contract tests、build、packed external-consumer smoke 与精确版本 DSH compatibility probes。
 
-## OIDC-only 发布
+CI 还会独立 checkout 精确 upstream DSH release commit 并验证源码 version。
 
-发布由 `.github/workflows/release.yml` 完成，并刻意保持手工 `workflow_dispatch`。操作者必须输入精确 package version，并从 `main` 触发。Job 运行在 `npm-release` GitHub Environment 中，具备 `id-token: write`，**不再存在 npm publish token fallback**。
+## Publication Flow
 
-Workflow 会：
+`.github/workflows/release.yml` 从 `main` 手动 dispatch，并依次：
 
-1. 核对 branch/version 与 npm trusted-publishing capability；
-2. 跑完整 `release:check`；
-3. 核对 npm package ownership 与精确 version 状态；
-4. version 不存在时，仅通过 npm Trusted Publishing/OIDC publish；
-5. 验证 `next`、repository metadata、integrity，并在干净 external consumer 中安装调用；
-6. registry smoke 成功以后才创建匹配的 Git tag 与 GitHub prerelease。
+1. 从 `packages/multi-tenant/package.json.version` 得到唯一 release identity；
+2. 验证 npm Trusted Publishing capability；
+3. frozen install + `pnpm release:check`；
+4. 检查 npm repository ownership 与 exact version 是否已存在；
+5. 需要时通过 OIDC / provenance 发布；
+6. 验证 exact registry artifact，并确认 `latest` 指向该版本；
+7. 创建 matching Git tag 与 GitHub release。
 
-Workflow 可安全重跑：如果匹配版本已经存在，会跳过重复 publish，继续完成 verification/tag/release recovery。
+如果 exact version 已发布，workflow 会跳过重复 publish，但仍可继续 verification / tag / release recovery。
 
-rc.1 首次发布使用过的 bootstrap token 已经不再属于 workflow。维护者应删除/revoke 任何仍然存在的 bootstrap credential。
+## Registry Proof
 
-## 发布后验证
+`scripts/registry-smoke.mjs` 会把精确发布 artifact 安装到干净 consumer，并验证当前 Runtime Contract：
 
-Workflow 会对精确版本运行 `scripts/registry-smoke.mjs`。还可以人工使用 DSH 验证：
+- store + ownership kernel；
+- `ctx.tenantRuntime`；
+- canonical Tenant / Principal creation；
+- tenant capability inheritance；
+- 从 Principal Context 执行 durable session ownership；
+- provider store contract；
+- npm `latest` 指向当前 release。
 
-```sh
-dsh plugin --profile <profile> add dsh-multi-tenant@next
-```
+## Release Philosophy
 
-rc.2 以后，项目应该优先观察真实使用反馈，不再给 kernel 增加推测性 API。除非出现真实 bug 或 upstream compatibility change，否则下一次 release decision 应该是判断是否进入 `0.1.0` stable。
+Release automation 的目标是保护 correctness，而不是制造流程负担。当前阶段优先 frequent explicit release，不维护多个 channel，也不为了兼容承诺阻碍结构优化。
+
+如果更好的 ownership model、数据结构、lifecycle state machine 或 semantic type 需要 prerelease breaking change，就直接改模型并发布新版本。

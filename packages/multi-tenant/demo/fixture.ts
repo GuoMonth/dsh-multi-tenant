@@ -18,11 +18,20 @@ export function apply(ctx: Context): void {
     const sameAllowed = await ctx.multiTenant.canAccessSession(alice, 's1')
     const crossTenantAllowed = await ctx.multiTenant.canAccessSession(eve, 's1')
 
-    const acme = ctx.tenantRuntime.createTenant('acme', { isolateServices: ['tenantAuth'] })
-    const evilcorp = ctx.tenantRuntime.createTenant('evilcorp', { isolateServices: ['tenantAuth'] })
-    await acme.ctx.plugin(marker, { name: 'tenantAuth', value: 'auth-acme' })
-    await evilcorp.ctx.plugin(marker, { name: 'tenantAuth', value: 'auth-evilcorp' })
-    const acmeAuth = acme.ctx.get('tenantAuth')
+    const acme = await ctx.tenantRuntime.tenants.ensure('acme', {
+      isolateServices: ['tenantAuth'],
+      setup: async ({ ctx: tenantCtx }) => {
+        await tenantCtx.plugin(marker, { name: 'tenantAuth', value: 'auth-acme' })
+      },
+    })
+    const evilcorp = await ctx.tenantRuntime.tenants.ensure('evilcorp', {
+      isolateServices: ['tenantAuth'],
+      setup: async ({ ctx: tenantCtx }) => {
+        await tenantCtx.plugin(marker, { name: 'tenantAuth', value: 'auth-evilcorp' })
+      },
+    })
+    const acmePrincipal = await acme.principals.ensure('alice')
+    const acmeAuth = acmePrincipal.ctx.get('tenantAuth')
     const evilcorpAuth = evilcorp.ctx.get('tenantAuth')
     const rootAuth = ctx.get('tenantAuth')
 

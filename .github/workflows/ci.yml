@@ -13,6 +13,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dsh-source:
+    name: DSH source baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Resolve pinned DSH identity
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { DSH_TARGET } from './scripts/dsh-target.mjs'
+          console.log(`repository=${DSH_TARGET.repository}`)
+          console.log(`version=${DSH_TARGET.version}`)
+          console.log(`commit=${DSH_TARGET.commit}`)
+          NODE
+
+      - name: Checkout exact upstream DSH release
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.target.outputs.repository }}
+          ref: ${{ steps.target.outputs.commit }}
+          path: .upstream/deepseek-harness
+          persist-credentials: false
+
+      - name: Verify upstream source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_COMMIT=$(git -C .upstream/deepseek-harness rev-parse HEAD)
+          ACTUAL_VERSION=$(node -p "require('./.upstream/deepseek-harness/package.json').version")
+          test "$ACTUAL_COMMIT" = "${{ steps.target.outputs.commit }}"
+          test "$ACTUAL_VERSION" = "${{ steps.target.outputs.version }}"
+          echo "DSH source baseline verified: $ACTUAL_VERSION @ $ACTUAL_COMMIT"
+
   quality:
     name: quality (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
@@ -55,7 +93,7 @@ jobs:
         run: pnpm smoke
 
   dsh-compat:
-    name: DSH RC compatibility (Node ${{ matrix.node }})
+    name: DSH compatibility (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -73,5 +111,5 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
-      - name: Run real DSH runtime proofs
+      - name: Run published DSH runtime proofs
         run: pnpm probe:dsh

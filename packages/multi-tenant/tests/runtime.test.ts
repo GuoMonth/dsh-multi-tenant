@@ -2,128 +2,211 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { InMemoryTenantSessionStore, MultiTenantService } from '../src/index.ts'
 import {
-  MultiTenantRuntimeError,
+  RuntimeDefinitionConflictError,
+  RuntimeRegistryClosedError,
   TenantRuntimeService,
   principalOf,
+  runtimeIdentityOf,
   tenantIdOf,
 } from '../src/runtime.ts'
 import { ValidationError } from '../src/errors.ts'
-
-function provideMarker(ctx: Context, config: { name: string; value: string }): void {
-  ctx.provide(config.name, config.value)
-}
 
 async function createRuntime(): Promise<{ ctx: Context; runtime: TenantRuntimeService }> {
   const ctx = new Context()
   await ctx.plugin(InMemoryTenantSessionStore)
   await ctx.plugin(MultiTenantService)
   await ctx.plugin(TenantRuntimeService)
-  return { ctx, runtime: ctx.get('tenantRuntime') as TenantRuntimeService }
+  return { ctx, runtime: ctx.tenantRuntime }
 }
 
-describe('TenantRuntimeService', () => {
-  it('creates real tenant-local Cordis service graphs without an ad-hoc service registry', async () => {
-    const { ctx, runtime } = await createRuntime()
-    await ctx.plugin(provideMarker, { name: 'sharedAdapter', value: 'shared' })
+describe('TenantRuntimeService runtime contract', () => {
+  it('publishes a tenant atomically and single-flights concurrent ensure calls', async () => {
+    const { runtime } = await createRuntime()
+    const gate = Promise.withResolvers<void>()
+    let setupRuns = 0
+    let commitRuns = 0
 
-    const tenantA = runtime.createTenant('acme', { isolateServices: ['tenantAuth', 'tenantMcp'] })
-    const tenantB = runtime.createTenant('globex', { isolateServices: ['tenantAuth', 'tenantMcp'] })
+    const first = runtime.tenants.ensure('acme', {
+      isolateServices: ['tenantAuth'],
+      setup: async ({ ctx, identity }) => {
+        setupRuns += 1
+        expect(identity).toEqual({ tenantId: 'acme' })
+        ctx.provide('tenantAuth', 'auth-A')
+        await gate.promise
+        return { commit: () => { commitRuns += 1 } }
+      },
+    })
+    const second = runtime.tenants.ensure('acme', {
+      isolateServices: ['tenantAuth'],
+      setup: () => { throw new Error('second initializer must never run') },
+    })
 
-    await tenantA.ctx.plugin(provideMarker, { name: 'tenantAuth', value: 'auth-A' })
-    await tenantA.ctx.plugin(provideMarker, { name: 'tenantMcp', value: 'mcp-A' })
-    await tenantB.ctx.plugin(provideMarker, { name: 'tenantAuth', value: 'auth-B' })
-    await tenantB.ctx.plugin(provideMarker, { name: 'tenantMcp', value: 'mcp-B' })
+    expect(runtime.tenants.get('acme')).toBeUndefined()
+    expect(setupRuns).toBe(1)
 
+    gate.resolve()
+    const [tenantA, tenantB] = await Promise.all([first, second])
+
+    expect(tenantA).toBe(tenantB)
+    expect(await runtime.tenants.ensure('acme')).toBe(tenantA)
+    expect(runtime.tenants.get('acme')).toBe(tenantA)
+    expect(tenantA.state).toBe('active')
     expect(tenantA.ctx.get('tenantAuth')).toBe('auth-A')
-    expect(tenantA.ctx.get('tenantMcp')).toBe('mcp-A')
-    expect(tenantB.ctx.get('tenantAuth')).toBe('auth-B')
-    expect(tenantB.ctx.get('tenantMcp')).toBe('mcp-B')
-    expect(ctx.get('tenantAuth')).toBeUndefined()
-    expect(ctx.get('tenantMcp')).toBeUndefined()
-
-    // Non-isolated deployment services are intentionally shared.
-    expect(tenantA.ctx.get('sharedAdapter')).toBe('shared')
-    expect(tenantB.ctx.get('sharedAdapter')).toBe('shared')
-
-    // Prove the v0.1 kernel is one shared persistent invariant by behavior,
-    // rather than comparing Cordis trace proxies (whose identity is caller-bound).
-    const alice = { tenantId: 'acme', userId: 'alice' }
-    await tenantA.ctx.multiTenant.claimSession('shared-kernel', alice)
-    await expect(ctx.multiTenant.getSessionOwner('shared-kernel')).resolves.toEqual(alice)
-    await expect(tenantB.ctx.multiTenant.canAccessSession(
-      { tenantId: 'globex', userId: 'bob' },
-      'shared-kernel',
-    )).resolves.toBe(false)
+    expect(commitRuns).toBe(1)
   })
 
-  it('adds a principal-local capability layer below the tenant layer', async () => {
+  it('rolls back failed unpublished setup and permits a clean retry', async () => {
+    const { ctx, runtime } = await createRuntime()
+
+    await expect(runtime.tenants.ensure('acme', {
+      isolateServices: ['tenantAuth'],
+      setup: ({ ctx: tenantCtx }) => {
+        tenantCtx.provide('tenantAuth', 'should-never-publish')
+        throw new Error('boom')
+      },
+    })).rejects.toThrow('boom')
+
+    expect(runtime.tenants.get('acme')).toBeUndefined()
+    expect(ctx.get('tenantAuth')).toBeUndefined()
+
+    const tenant = await runtime.tenants.ensure('acme', {
+      isolateServices: ['tenantAuth'],
+      setup: ({ ctx: tenantCtx }) => { tenantCtx.provide('tenantAuth', 'auth-A') },
+    })
+    expect(tenant.ctx.get('tenantAuth')).toBe('auth-A')
+  })
+
+  it('uses the same canonical registry semantics for principals', async () => {
     const { runtime } = await createRuntime()
-    const tenant = runtime.createTenant('acme', { isolateServices: ['tenantAuth'] })
-    await tenant.ctx.plugin(provideMarker, { name: 'tenantAuth', value: 'acme-auth' })
+    const tenant = await runtime.tenants.ensure('acme', {
+      isolateServices: ['tenantAuth'],
+      setup: ({ ctx }) => { ctx.provide('tenantAuth', 'acme-auth') },
+    })
 
-    const alice = tenant.createPrincipal(
-      { tenantId: 'acme', userId: 'alice' },
-      { isolateServices: ['userCredentials'] },
-    )
-    const bob = tenant.createPrincipal(
-      { tenantId: 'acme', userId: 'bob' },
-      { isolateServices: ['userCredentials'] },
-    )
-    await alice.ctx.plugin(provideMarker, { name: 'userCredentials', value: 'alice-token' })
-    await bob.ctx.plugin(provideMarker, { name: 'userCredentials', value: 'bob-token' })
+    let aliceSetups = 0
+    const alice1 = tenant.principals.ensure('alice', {
+      isolateServices: ['userCredentials'],
+      setup: ({ ctx, identity }) => {
+        aliceSetups += 1
+        expect(identity).toEqual({ tenantId: 'acme', userId: 'alice' })
+        ctx.provide('userCredentials', 'alice-token')
+      },
+    })
+    const alice2 = tenant.principals.ensure('alice', {
+      isolateServices: ['userCredentials'],
+    })
+    const bob = tenant.principals.ensure('bob', {
+      isolateServices: ['userCredentials'],
+      setup: ({ ctx }) => { ctx.provide('userCredentials', 'bob-token') },
+    })
 
-    expect(alice.ctx.get('tenantAuth')).toBe('acme-auth')
-    expect(bob.ctx.get('tenantAuth')).toBe('acme-auth')
-    expect(alice.ctx.get('userCredentials')).toBe('alice-token')
-    expect(bob.ctx.get('userCredentials')).toBe('bob-token')
+    const [a1, a2, b] = await Promise.all([alice1, alice2, bob])
+    expect(a1).toBe(a2)
+    expect(await tenant.principals.ensure('alice')).toBe(a1)
+    expect(aliceSetups).toBe(1)
+    expect(a1.identity).toEqual({ tenantId: 'acme', userId: 'alice' })
+    expect(b.identity).toEqual({ tenantId: 'acme', userId: 'bob' })
+    expect(a1.ctx.get('tenantAuth')).toBe('acme-auth')
+    expect(b.ctx.get('tenantAuth')).toBe('acme-auth')
+    expect(a1.ctx.get('userCredentials')).toBe('alice-token')
+    expect(b.ctx.get('userCredentials')).toBe('bob-token')
     expect(tenant.ctx.get('userCredentials')).toBeUndefined()
 
-    expect(tenantIdOf(alice.ctx)).toBe('acme')
-    expect(tenantIdOf(bob.ctx)).toBe('acme')
-    expect(principalOf(alice.ctx)).toEqual({ tenantId: 'acme', userId: 'alice' })
-    expect(principalOf(bob.ctx)).toEqual({ tenantId: 'acme', userId: 'bob' })
-    expect(principalOf(tenant.ctx)).toBeUndefined()
+    expect(runtimeIdentityOf(a1.ctx)).toEqual({
+      tenant: { tenantId: 'acme' },
+      principal: { tenantId: 'acme', userId: 'alice' },
+    })
+    expect(tenantIdOf(a1.ctx)).toBe('acme')
+    expect(principalOf(a1.ctx)).toEqual({ tenantId: 'acme', userId: 'alice' })
   })
 
-  it('rejects a principal from another tenant before any capability scope exists', async () => {
+  it('rejects definition drift for an already active canonical node', async () => {
     const { runtime } = await createRuntime()
-    const tenant = runtime.createTenant('acme')
+    await runtime.tenants.ensure('acme', { isolateServices: ['tenantAuth'] })
 
-    expect(() => tenant.createPrincipal({ tenantId: 'globex', userId: 'eve' }))
-      .toThrow(ValidationError)
+    await expect(runtime.tenants.ensure('acme', { isolateServices: ['tenantMcp'] }))
+      .rejects.toThrow(RuntimeDefinitionConflictError)
   })
 
-  it('refuses duplicate live tenant graphs and allows recreation after disposal', async () => {
+  it('cascades lifecycle ownership and allows recreation only after quiescent disposal', async () => {
     const { runtime } = await createRuntime()
-    const first = runtime.createTenant('acme')
+    const disposed: string[] = []
+    const lifecyclePlugin = (ctx: Context, name: string): (() => void) => {
+      ctx.provide('lifecycleMarker', name)
+      return () => { disposed.push(name) }
+    }
 
-    expect(() => runtime.createTenant('acme')).toThrow(MultiTenantRuntimeError)
-    await first.dispose()
+    const tenant = await runtime.tenants.ensure('acme', { isolateServices: ['lifecycleMarker'] })
+    await tenant.ctx.plugin(lifecyclePlugin, 'tenant-A')
+    const alice = await tenant.principals.ensure('alice', { isolateServices: ['userCredentials'] })
+    await alice.ctx.plugin((ctx: Context) => {
+      ctx.provide('userCredentials', 'alice-token')
+      return () => { disposed.push('alice') }
+    })
 
-    const second = runtime.createTenant('acme')
-    expect(second).not.toBe(first)
-    await second.dispose()
+    expect(runtime.tenants.get('acme')).toBe(tenant)
+    expect(tenant.principals.get('alice')).toBe(alice)
+
+    await tenant.dispose()
+
+    expect(tenant.state).toBe('disposed')
+    expect(alice.state).toBe('disposed')
+    expect(runtime.tenants.get('acme')).toBeUndefined()
+    expect(disposed).toContain('alice')
+    expect(disposed).toContain('tenant-A')
+
+    const replacement = await runtime.tenants.ensure('acme', { isolateServices: ['lifecycleMarker'] })
+    expect(replacement).not.toBe(tenant)
+    expect(replacement.state).toBe('active')
   })
 
-  it('forbids isolating the ownership kernel or Cordis core services', async () => {
+  it('closes child admission and cancels unpublished principal setup during tenant teardown', async () => {
     const { runtime } = await createRuntime()
+    const tenant = await runtime.tenants.ensure('acme')
+    const started = Promise.withResolvers<void>()
 
-    expect(() => runtime.createTenant('acme', { isolateServices: ['multiTenant'] }))
-      .toThrow(ValidationError)
-    expect(() => runtime.createTenant('globex', { isolateServices: ['registry'] }))
-      .toThrow(ValidationError)
+    const pendingAlice = tenant.principals.ensure('alice', {
+      setup: async ({ signal }) => {
+        started.resolve()
+        await new Promise<never>((_, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+        })
+      },
+    })
+
+    await started.promise
+    expect(tenant.principals.get('alice')).toBeUndefined()
+
+    const disposing = tenant.dispose()
+    await expect(pendingAlice).rejects.toThrow(RuntimeRegistryClosedError)
+    await disposing
+
+    expect(tenant.state).toBe('disposed')
+    await expect(tenant.principals.ensure('bob')).rejects.toThrow(RuntimeRegistryClosedError)
   })
 
-  it('keeps ownership authorization effective inside a principal context', async () => {
+  it('keeps ownership authorization shared across the runtime tree', async () => {
     const { ctx, runtime } = await createRuntime()
-    const acme = runtime.createTenant('acme')
-    const globex = runtime.createTenant('globex')
-    const alice = acme.createPrincipal({ tenantId: 'acme', userId: 'alice' })
-    const eve = globex.createPrincipal({ tenantId: 'globex', userId: 'eve' })
+    const acme = await runtime.tenants.ensure('acme')
+    const globex = await runtime.tenants.ensure('globex')
+    const alice = await acme.principals.ensure('alice')
+    const eve = await globex.principals.ensure('eve')
 
-    await alice.ctx.multiTenant.claimSession('session-a', alice.principal)
-    await expect(alice.ctx.multiTenant.canAccessSession(alice.principal, 'session-a')).resolves.toBe(true)
-    await expect(eve.ctx.multiTenant.canAccessSession(eve.principal, 'session-a')).resolves.toBe(false)
-    await expect(ctx.multiTenant.getSessionOwner('session-a')).resolves.toEqual(alice.principal)
+    await alice.ctx.multiTenant.claimSession('session-a', alice.identity)
+    await expect(alice.ctx.multiTenant.canAccessSession(alice.identity, 'session-a')).resolves.toBe(true)
+    await expect(eve.ctx.multiTenant.canAccessSession(eve.identity, 'session-a')).resolves.toBe(false)
+    await expect(ctx.multiTenant.getSessionOwner('session-a')).resolves.toEqual(alice.identity)
+  })
+
+  it('keeps security/kernel services shared and validates principal keys', async () => {
+    const { runtime } = await createRuntime()
+
+    await expect(runtime.tenants.ensure('acme', { isolateServices: ['multiTenant'] }))
+      .rejects.toThrow(ValidationError)
+    await expect(runtime.tenants.ensure('globex', { isolateServices: ['registry'] }))
+      .rejects.toThrow(ValidationError)
+
+    const tenant = await runtime.tenants.ensure('initech')
+    await expect(tenant.principals.ensure(' ')).rejects.toThrow(ValidationError)
   })
 })

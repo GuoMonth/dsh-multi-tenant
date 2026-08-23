@@ -1,37 +1,25 @@
 #!/usr/bin/env node
 /**
- * Admission-decorator runtime proof: confirm that a plugin can wrap
- * `ctx.agents` (the real AgentRegistry) so that a tenant-admission callback runs
- * inside the Agent `setup` hook — BEFORE `sessions.enter` — for all four genesis
- * paths, against the current pinned DSH prerelease.
+ * Admission-decorator runtime proof against the repository's exact DSH baseline.
  *
- *   P1  create    — admission sees `options.sessionId`; store not yet entered.
- *   P2  fork      — admission sees `options.meta.parentSession`; store not yet entered.
- *   P3  subagent  — admission sees `options.meta.origin === 'subagent'` + `parentSession`.
- *   P4  resume    — admission sees `options.resumeSessionId`; store not yet entered.
- *
- * The `llm` / `tools` / `systemPrompt` services are structurally injected by the
- * AgentLoop but are NOT exercised by the create → setup → enter path, so they are
- * provided as no-op stubs; `sessionPersistence` is a minimal stub that yields a
- * fresh prepared session for the resume path.
- *
- * Run from the repo root: `node scripts/admission-decorator-probe.mjs`.
- * Installs the current target into a throwaway temp dir (not the workspace).
+ * A decorator around `ctx.agents` must be able to run tenant admission in the
+ * Agent `setup` hook before `sessions.enter` for create, fork, subagent and
+ * resume genesis paths.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DSH_TARGET_VERSION } from './dsh-target.mjs'
+import { DSH_TARGET } from './dsh-target.mjs'
 
 const tmp = mkdtempSync(join(tmpdir(), 'dsh-mt-admission-'))
 try {
   writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'admission-probe', private: true, type: 'module' }))
   execFileSync('pnpm', [
     'add',
-    `@deepseek-ai/dsh-agent-loop@${DSH_TARGET_VERSION}`,
-    `@deepseek-ai/dsh-agent@${DSH_TARGET_VERSION}`,
-    `@deepseek-ai/dsh-session@${DSH_TARGET_VERSION}`,
+    `@deepseek-ai/dsh-agent-loop@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-agent@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-session@${DSH_TARGET.version}`,
     '@deepseek-ai/cordis@4.0.1',
   ], { cwd: tmp, stdio: 'ignore' })
 
@@ -105,7 +93,7 @@ try {
   const out = execFileSync('node', ['probe.mjs'], { cwd: tmp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   const result = JSON.parse(out.trim())
   const rows = result.seen.map((s) => `${s.via.padEnd(6)} ${s.sessionId ?? s.resumeSessionId}  inStore@setup=${s.inStore}`).join('\n')
-  console.log(`Admission decorator proof passed on DSH ${DSH_TARGET_VERSION}:\n${rows}`)
+  console.log(`Admission decorator proof passed on DSH ${DSH_TARGET.version}:\n${rows}`)
 } finally {
   rmSync(tmp, { recursive: true, force: true })
 }
