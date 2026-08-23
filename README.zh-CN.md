@@ -4,71 +4,98 @@
 
 目标：让 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）真正成为 **Multi-Tenant Runtime**，同时保留一个小而可审计的安全 Kernel。
 
-> **当前版本线：`0.2.0-rc.1`。** 已发布的 v0.1 tag 冻结为历史契约。v0.1 负责不可变 session ownership 与 fail-closed authorization；v0.2 在其上增加 Context-native Tenant / Principal capability scope。本 PR 的可执行 DSH compatibility closure 保持已经验证的 **`0.1.0-rc.7`**；设计阶段另外审阅了当前上游 `0.1.1-rc.2` 的 scope 行为。
+> **当前版本线：`0.2.0-rc.2`。** 已发布的 v0.1 tag 冻结为历史契约。v0.1 负责不可变 session ownership 与 fail-closed authorization；v0.2 在其上建立 canonical Tenant / Principal runtime tree，为后续 SaaS Framework 提供稳定地基。
 
 ## 架构
 
 ```text
-Deployment / Root Context
+Deployment / Root
 │
 ├── shared TenantSessionStore
-├── shared MultiTenantService        <- 持久授权 invariant
+├── shared MultiTenantService          持久授权 invariant
 ├── shared TenantRuntimeService
 │
-├── Tenant A Cordis Context          <- capability graph
-│   ├── tenant-local auth / MCP / providers
-│   └── Principal A Context
-│       └── user-local credentials
+├── Tenant(acme)                       canonical runtime node
+│   ├── tenant capability graph
+│   ├── Principal(alice)               canonical runtime node
+│   │   └── principal capability graph
+│   └── Principal(bob)
 │
-└── Tenant B Cordis Context
-    ├── tenant-local auth / MCP / providers
-    └── Principal B Context
-        └── user-local credentials
+└── Tenant(globex)
 ```
 
-项目刻意区分三层隔离：
+项目刻意区分四个 plane：
 
-1. **Ownership Kernel** —— 持久 `(tenantId, userId) -> session` 授权，fail closed；
-2. **Cordis Context Isolation** —— Tenant / Principal service resolution 与 plugin lifecycle；
-3. **Deployment Isolation** —— process/filesystem/network/shell；需要强隔离时使用 one tenant per container / Pod。
+1. **Persistent Authorization** —— 持久 `(tenantId, userId) -> session` ownership，始终 fail closed；
+2. **Tenant / Principal Capability Graph** —— Cordis Context service isolation 与 lifecycle；
+3. **Agent / Preset Registration Graph** —— DSH `@deepseek-ai/dsh-scope`，负责 tools、prompt、listeners 与 Agent-local visibility；
+4. **Strong Deployment Isolation** —— process/filesystem/network/shell，要求强隔离时使用独立 container / Pod。
 
-DSH 自己的 `@deepseek-ai/dsh-scope` 继续负责 Agent / Preset registration visibility。Tenant capability isolation 使用 Cordis service isolation，不去争抢 Agent scope 的 parent chain。
+Capability authority 与 Agent registration visibility 是两个不同的数据结构。Principal Context 是 `ctx.agents.create()` 的 owner / composition boundary；Agent 所需能力通过 setup 显式 projection / composition，而不是假装 `Agent.ctx` 直接继承 Tenant service graph。
 
 ## v0.1 冻结
 
-已经发布的 v0.1 tag 保持不变，继续表示原来的 Kernel contract：
+已发布的 v0.1 继续表示 security kernel：
 
 - 最小 authenticated `TenantPrincipal`；
 - claim-once immutable session ownership；
 - fail-closed access decision；
 - 可替换 `TenantSessionStore` provider seam。
 
-v0.1 不再增加新功能；这些保证作为 defense in depth 被完整保留进 v0.2。
+这些保证作为 defense in depth 完整保留在 v0.2，并保持 deployment-global。
 
-## v0.2 Runtime
+## v0.2 Runtime Contract
 
-`ctx.tenantRuntime` 创建真实 Cordis Tenant / Principal child lifecycle。显式选择的 service name 获得独立 isolation label，因此 Tenant A / Tenant B 下挂载的 provider 由 Cordis 原生解析，不需要再造一套应用级 `tenantId -> service` 容器。
+Tenant 和 Principal 使用统一结构：
 
-Runtime 保持 provider-neutral：auth、MCP、credential、storage、model 等 provider 通过挂载到正确 Context 下进入租户体系，同时 provider 自身不能绕开 Cordis resolution 使用 deployment-global state。
+```ts
+const tenant = await ctx.tenantRuntime.tenants.ensure('acme', tenantDefinition)
+const alice = await tenant.principals.ensure('alice', principalDefinition)
+```
 
-上游/provider 的 gap 会明确记录，不会被第二套 registry 掩盖。例如在已审阅的当前上游里，DSH MCP client 的 `serverName` reservation 仍按 `ctx.root` 全局管理，所以不同 Tenant 复用同一个 serverName 目前还不能自动视为安全。
+两级节点都有 immutable identity、scoped Context、`state`、幂等 `dispose()`，以及统一的 `ensure / get` canonical registry。
 
-## 原则
+创建过程是 transaction：
+
+```text
+reserve canonical key
+        ↓
+unpublished Cordis subtree
+        ↓
+await setup
+        ↓
+optional synchronous commit()
+        ↓
+publish active node
+```
+
+因此半初始化 Tenant / Principal 不会暴露。并发 `ensure()` single-flight；setup 失败完整 rollback；active definition drift 明确失败；Tenant teardown 先 drain Principals 再回收自己。
+
+Principal registry 直接嵌套在 Tenant 下，所以 key 只需要 `userId`，`tenantId` 从父结构中自然获得——错误 tenantId 这种非法状态从数据结构层面就不存在。
+
+## Provider Ecosystem
+
+`dsh-multi-tenant/testing` 提供可执行 Tenant-Safe Provider Contract。第三方 provider 可以自动证明：同名 A/B service 隔离、root/parent 不泄漏、descendant inheritance、sibling 不干扰、dispose isolation，以及 recreate 不残留旧状态。
+
+这就是未来 Plugin Family 的基础：SaaS Distribution 可以提供 opinionated defaults，但每个 capability slot 都允许被满足同一 contract 的实现替换。
+
+## 工程原则
 
 - **控制得住 → 严格强制**：仓库拥有的边界做 fail-closed invariant；
-- **需要生态协作 → 制定标准**：优先使用 Cordis / DSH 原生 scope，缺 seam 时只推动最小上游 contract；
-- **控制不住 → 明确边界**：Context 不是 process sandbox；
-- **不再造 DI 容器**：Tenant capability resolution 属于 Cordis Context；
-- **Defense in depth**：Context routing 永远不能替代持久 session ownership 校验。
+- **需要生态协作 → 制定标准**：优先定义可执行 provider / transport contract，而不是把所有实现都塞进 core；
+- **控制不住 → 明确边界**：Cordis Context 不是 hostile-code / process sandbox；
+- **结构优先于补丁**：通过 ownership/data structure 让非法状态无法表达；
+- **Prerelease 不背兼容债务**：更好的长期抽象出现时可以直接破坏性重构；
+- **不再造 DI 容器**：capability resolution 属于 Cordis Context。
 
 ## Packages
 
 | Package | Distribution | Role |
 | --- | --- | --- |
-| [`packages/multi-tenant`](./packages/multi-tenant) | npm `dsh-multi-tenant@next` | v0.2 runtime + 冻结的 v0.1 ownership kernel：`ctx.tenantRuntime`、`ctx.multiTenant`、`ctx.tenantSessionStore`。 |
-| [`packages/multi-tenant-web`](./packages/multi-tenant-web) | private workspace | Web/API enforcement 实验；production transport 仍需要真实 authenticated principal/context binding。 |
+| [`packages/multi-tenant`](./packages/multi-tenant) | npm `dsh-multi-tenant@next` | v0.2 Runtime Contract + 冻结的 v0.1 ownership kernel：`ctx.tenantRuntime`、`ctx.multiTenant`、`ctx.tenantSessionStore`。 |
+| [`packages/multi-tenant-web`](./packages/multi-tenant-web) | private workspace | Web/API enforcement 实验；产品级 transport composition 进入 SaaS Framework 阶段。 |
 
-参见 [ROADMAP.zh-CN.md](./ROADMAP.zh-CN.md)、[`docs/releases/v0.2.0-rc.1.md`](./docs/releases/v0.2.0-rc.1.md) 与 [CONTRIBUTING.zh-CN.md](./CONTRIBUTING.zh-CN.md)。
+参见 [ROADMAP.zh-CN.md](./ROADMAP.zh-CN.md)、[`docs/releases/v0.2.0-rc.2.md`](./docs/releases/v0.2.0-rc.2.md) 与 [CONTRIBUTING.zh-CN.md](./CONTRIBUTING.zh-CN.md)。
 
 ## 开发
 
@@ -77,11 +104,6 @@ pnpm install
 pnpm typecheck
 pnpm test
 pnpm build
-```
-
-完整 release gate：
-
-```sh
 pnpm release:check
 ```
 
