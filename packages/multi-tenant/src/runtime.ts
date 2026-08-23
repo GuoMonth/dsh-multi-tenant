@@ -1,29 +1,19 @@
 /**
  * Context-native multi-tenant runtime primitives for DeepSeek Harness.
  *
- * v0.2 models runtime tenancy as a canonical ownership tree. Tenant and
- * Principal nodes share one lifecycle vocabulary and one publication model:
- * reserve identity -> prepare unpublished scope -> setup -> optional commit ->
- * publish. Preparing transactions are cancellable structural resources, so
- * parent teardown can close admission and abort/drain unpublished children.
+ * Tenant, Principal and v0.3 Operation ownership share one structural model:
+ * canonical long-lived scopes publish transactionally, while ephemeral
+ * Operations are owned and drained by their canonical Principal.
  *
  * @module dsh-multi-tenant/runtime
  */
 
 import { Service, type Context, type Fiber } from '@deepseek-ai/cordis'
-import { ValidationError } from './errors.ts'
+import type { PrincipalOperationRegistry } from './operation.ts'
+import { createPrincipalOperationRegistry } from './operation.ts'
+import { disposeFiber, isolatedContext, normalizeServiceNames, raceAbort } from './scope.ts'
 import type { TenantPrincipal } from './types.ts'
 import { validateTenantId, validateTenantPrincipal } from './validation.ts'
-
-const RESERVED_SHARED_SERVICES = new Set([
-  'events',
-  'logger',
-  'reflect',
-  'registry',
-  'tenantRuntime',
-  'tenantSessionStore',
-  'multiTenant',
-])
 
 const kTenantRuntime = Symbol('dsh-multi-tenant.tenant-runtime')
 const kPrincipalRuntime = Symbol('dsh-multi-tenant.principal-runtime')
@@ -81,7 +71,10 @@ export interface RuntimeScopeRegistry<Key, Scope, Definition> {
   ensure(key: Key, definition?: Definition): Promise<Scope>
 }
 
-export interface PrincipalRuntimeScope extends RuntimeScope<'principal', TenantPrincipal> {}
+export interface PrincipalRuntimeScope extends RuntimeScope<'principal', TenantPrincipal> {
+  /** Ephemeral one-shot work structurally owned and drained by this Principal. */
+  readonly operations: PrincipalOperationRegistry
+}
 
 export interface TenantRuntimeScope extends RuntimeScope<'tenant', TenantIdentity> {
   readonly principals: RuntimeScopeRegistry<string, PrincipalRuntimeScope, PrincipalScopeDefinition>
@@ -101,21 +94,6 @@ export class RuntimeRegistryClosedError extends MultiTenantRuntimeError {
 
 function runtimeScopeOwner(): void {}
 
-function normalizeServiceNames(names: readonly string[] | undefined): string[] {
-  if (names === undefined) return []
-  const unique = new Set<string>()
-  for (const name of names) {
-    if (typeof name !== 'string' || name.length === 0 || name !== name.trim()) {
-      throw new ValidationError('isolated service names must be non-empty trimmed strings')
-    }
-    if (RESERVED_SHARED_SERVICES.has(name)) {
-      throw new ValidationError(`service "${name}" is shared/reserved and cannot be runtime-isolated`)
-    }
-    unique.add(name)
-  }
-  return [...unique].sort()
-}
-
 interface NormalizedDefinition<I> {
   readonly services: readonly string[]
   readonly signature: string
@@ -131,35 +109,6 @@ function normalizeDefinition<I>(definition: RuntimeScopeDefinition<I> = {}): Nor
   }
 }
 
-function isolatedContext(base: Context, names: readonly string[], scopeKind: 'tenant' | 'principal'): Context {
-  let current = base
-  for (const name of names) {
-    current = current.isolate(name, Symbol(`${scopeKind}:${name}`))
-  }
-  return current
-}
-
-async function disposeFiber(fiber: Fiber): Promise<void> {
-  await Promise.resolve(fiber.dispose())
-  while (fiber.inertia !== undefined) await fiber.inertia
-}
-
-async function raceAbort<T>(operation: PromiseLike<T> | T, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) {
-    throw signal.reason instanceof Error ? signal.reason : new Error('runtime scope setup aborted')
-  }
-  const aborted = Promise.withResolvers<never>()
-  const listener = (): void => {
-    aborted.reject(signal.reason instanceof Error ? signal.reason : new Error('runtime scope setup aborted'))
-  }
-  signal.addEventListener('abort', listener, { once: true })
-  try {
-    return await Promise.race([Promise.resolve(operation), aborted.promise])
-  } finally {
-    signal.removeEventListener('abort', listener)
-  }
-}
-
 interface PreparedScope<I> {
   readonly ctx: Context
   readonly fiber: Fiber
@@ -172,11 +121,11 @@ interface ScopeCreation<Scope> {
 }
 
 /**
- * Start an unpublished, cancellable scope transaction.
+ * Start an unpublished, cancellable canonical-scope transaction.
  *
- * `ready` resolves only after setup and its optional synchronous commit have
- * completed. `cancel()` can run while setup is pending; it aborts the setup
- * signal and structurally disposes the unpublished Cordis subtree.
+ * Setup and its optional synchronous commit complete before the scope can be
+ * published through the canonical registry. Cancellation disposes the whole
+ * unpublished Cordis subtree.
  */
 function prepareScope<I>(
   parent: Context,
@@ -235,13 +184,17 @@ interface CanonicalEntry<Scope> {
 type PublishedScope = RuntimeScope<'tenant' | 'principal', unknown>
 
 /**
- * Generic canonical registry shared by Tenant and Principal nodes.
+ * Canonical registry shared by Tenant and Principal nodes.
  *
- * The registry owns both unpublished creation transactions and published
- * scopes. Closing it first stops admission, then cancels/drains every entry.
+ * Registry shutdown first closes admission, then cancels unpublished creation
+ * and drains every published scope before forgetting canonical identities.
  */
-class CanonicalRuntimeRegistry<Key, Scope extends PublishedScope, Identity, Definition extends RuntimeScopeDefinition<Identity>>
-implements RuntimeScopeRegistry<Key, Scope, Definition> {
+class CanonicalRuntimeRegistry<
+  Key,
+  Scope extends PublishedScope,
+  Identity,
+  Definition extends RuntimeScopeDefinition<Identity>,
+> implements RuntimeScopeRegistry<Key, Scope, Definition> {
   private readonly entries = new Map<Key, CanonicalEntry<Scope>>()
   private accepting = true
   private closing: Promise<void> | undefined
@@ -322,7 +275,7 @@ implements RuntimeScopeRegistry<Key, Scope, Definition> {
         try {
           await entry.creation.cancel(reason)
         } catch {
-          // Continue draining siblings even if one provider cleanup fails.
+          // Continue draining siblings even if one cleanup fails.
         }
         try {
           const scope = await entry.creation.ready
@@ -355,6 +308,8 @@ function createScopeLifecycle(
       state = 'disposing'
       disposing = (async () => {
         try {
+          // Structural child registries become quiescent before Cordis starts
+          // recursively unloading the owning canonical scope.
           await beforeDispose()
           await disposeFiber(fiber)
         } finally {
@@ -508,12 +463,18 @@ export class TenantRuntimeService extends Service {
     )
 
     return bindPreparedScope(preparation, (prepared) => {
+      const operations = createPrincipalOperationRegistry(prepared.ctx, principal)
       let scope!: PrincipalRuntimeScope
-      const lifecycle = createScopeLifecycle(prepared.fiber, async () => {}, () => retire(scope))
+      const lifecycle = createScopeLifecycle(
+        prepared.fiber,
+        () => operations.disposeAll(),
+        () => retire(scope),
+      )
       scope = {
         kind: 'principal',
         identity: principal,
         ctx: prepared.ctx,
+        operations,
         get state() { return lifecycle.state },
         dispose: () => lifecycle.dispose(),
       }
