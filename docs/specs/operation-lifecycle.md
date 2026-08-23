@@ -2,135 +2,158 @@
 
 # Spec — Principal Operation Lifecycle
 
-> Status: P0 design contract. The final public Operation API is intentionally blocked by assumption `A6`.
+> Status: **implemented and proven for v0.3 M2/M3**. Assumption `A6` is proven by contract tests and the pinned-DSH SaaS Core vertical probe.
 
-## Problem
+## Purpose
 
-A SaaS request must not call DSH from an arbitrary root Context. Work originates from one canonical Principal and needs an ephemeral lifecycle boundary for dependency acquisition, cancellation, tracing and Agent orchestration.
-
-The target path is:
+A user-visible SaaS action is not a Cordis plugin activation. It is one semantic attempt owned by one canonical Principal.
 
 ```text
-Authenticated identity
-      ↓
-canonical Tenant
-      ↓
+Tenant
+  └─ Principal
+       └─ Operation
+            ├─ operation-local providers
+            ├─ one-shot capability snapshot
+            ├─ execute exactly once
+            └─ deterministic teardown
+```
+
+The structural path into DSH is:
+
+```text
 canonical Principal
       ↓
-begin one Operation
+Principal-owned Operation Fiber
+      ↓ setup operation-local capabilities
+one-shot required-capability snapshot
       ↓
-derived Cordis lifecycle boundary
+execute exactly once
       ↓
-acquire required capabilities
-      ↓
-DSH Agent create / resume / drive
+ctx.agents.create / resume
+      ↓ caller-bound ownerCtx
+DSH Agent setup / publication
       ↓
 Operation teardown
 ```
 
-## Ownership rule
+## Ownership
 
-An Operation belongs to exactly one Principal. It cannot migrate between Principals or Tenants.
-
-The parent/child lifetime rule is:
+An Operation belongs to exactly one Principal and cannot migrate between identities.
 
 ```text
 Tenant owns Principal
-Principal owns Operation
-Operation owns operation-local resources
+Principal owns Operation registry
+Operation Fiber owns ephemeral resources
 ```
 
-Disposing a Principal must make all of its Operations quiescent before Principal teardown finishes. This is an externally proven Cordis behavior for child fibers (assumption `A3`).
+Principal disposal closes Operation admission, cancels/drains live Operations, then disposes the Principal Fiber. Tenant disposal therefore recursively quiesces Principal and Operation work.
 
-## Semantic states
+## State model
 
-The final names are not frozen, but P0 reasoning uses this state machine:
+The implementation exposes these semantic states:
 
 ```text
-CREATED
-  ↓ start
 PREPARING
-  ├─ dependency / setup failure -> FAILED -> DISPOSED
-  ├─ cancel                     -> CANCELLING -> DISPOSED
-  └─ ready                      -> ACTIVE
-                                   ├─ complete -> DISPOSING -> DISPOSED
-                                   ├─ failure  -> FAILED -> DISPOSED
-                                   └─ cancel   -> CANCELLING -> DISPOSED
+  ├─ missing dependency / setup failure -> FAILED -> DISPOSING -> DISPOSED
+  ├─ cancel                             -> CANCELLING -> DISPOSING -> DISPOSED
+  └─ snapshot ready                     -> ACTIVE
+                                           ├─ complete -> DISPOSING -> DISPOSED
+                                           ├─ failure  -> FAILED -> DISPOSING -> DISPOSED
+                                           └─ cancel   -> CANCELLING -> DISPOSING -> DISPOSED
 ```
 
-A consumer must never observe an Operation as ACTIVE before required capability acquisition and operation setup have succeeded.
+`execute()` never runs before setup and required-capability acquisition succeed. Every terminal path attempts quiescent cleanup and retires the Operation from its Principal registry.
 
-## One-shot work vs reactive injection
+## The A6 decision: snapshot, do not reactively execute
 
-Cordis `ctx.inject()` is a reactive plugin primitive. The repository probe proves that when a required service disappears, the injected callback unloads; if the service later returns, the callback can run again (assumption `A4`).
+Cordis `ctx.inject()` is intentionally reactive: losing a required service unloads the callback and restoring the service may execute the callback again (`A4`). That is correct plugin lifecycle behavior but incorrect user-transaction behavior.
 
-Therefore this is **not** an acceptable semantic definition of one user Operation:
+Therefore semantic Operation work **must not** be defined as:
 
 ```ts
 principal.ctx.inject(['agents'], async (ctx) => {
-  await performExternallyVisibleUserWork(ctx)
+  await performUserWork(ctx)
 })
 ```
 
-unless the Operation abstraction proves exactly-once/idempotent behavior across dependency churn.
+v0.3 chooses a different primitive:
 
-P0 must explicitly choose and prove a safer model before freezing the public API. Candidate approaches may include a one-shot acquisition phase followed by explicit lifetime ownership, or an idempotent transaction token that rejects callback re-entry. The spec does not choose an implementation prematurely.
+1. create a normal Principal-owned child Fiber without reactive `inject`;
+2. materialize operation-local providers;
+3. synchronously resolve every required capability from that Operation Context;
+4. freeze those resolved values into an `OperationCapabilitySnapshot`;
+5. call `execute()` exactly once with that snapshot;
+6. dispose the Operation regardless of success, failure or cancellation.
 
-This unresolved design point is assumption/gate `A6`.
+A captured Cordis capability may itself later become unusable if its provider is disposed. The framework does **not** promise provider immortality. The guarantee is narrower and load-bearing: provider churn never re-enters or silently repeats the user's semantic Operation.
 
-## Agent boundary
+This model is proven by tests that remove a provider, install a replacement, and verify the already-running Operation executes once against its original captured capability.
 
-Once an Operation owns a stable Principal-derived context for the duration of one attempt, Agent creation follows the already-proven seam:
+## Capability snapshot
 
-```text
-Operation Context
-   ↓ caller-bound ownerCtx
-ctx.agents.create / resume
-   ↓
-DSH Agent setup transaction
-   ↓
-DSH publication
+The snapshot is immutable and intentionally small:
+
+```ts
+interface OperationCapabilitySnapshot {
+  readonly keys: readonly string[]
+  has(name: string): boolean
+  get<T>(name: string): T | undefined
+  require<T>(name: string): T
+}
 ```
 
-The Operation must not copy private Cordis isolation maps into `Agent.ctx` and must not create a parallel Agent tenant registry.
+It is not a second DI container. Resolution still belongs to Cordis; the snapshot merely records the exact capabilities already resolved for this one semantic attempt.
 
-## Cancellation
+## DSH Agent boundary
 
-P0 requires one cancellation direction to be structural:
+The real public `@deepseek-ai/dsh-agent` `AgentRegistry` is used in CI. Calling a captured `agents` capability from the Operation preserves the Operation Context as DSH's caller-bound `ownerCtx`.
+
+The vertical proof covers concurrent:
+
+- Acme/Alice create;
+- Acme/Bob create;
+- Globex/Alice create;
+- Acme/Alice resume;
+- DSH create failure.
+
+For every create/resume, the factory observes the correct Tenant identity, Principal identity, Tenant capability, Principal capability and Operation-local capability. A factory failure is preserved as the Operation error and the failed Operation retires completely.
+
+Operation does not copy private Cordis isolation maps into `Agent.ctx`, does not invent an Agent tenant registry, and does not redefine DSH Agent/Preset scope semantics.
+
+## Cancellation and teardown
+
+Cancellation is structural:
 
 ```text
 Principal disposal
-    ↓
-Operation cancellation / teardown
+      ↓ close Operation admission
+cancel/drain Operations
+      ↓
+dispose Principal
 ```
 
-Operation-local cancellation must also dispose resources owned by the Operation. The concrete AbortSignal/public API shape is not frozen in this foundation PR.
+An Operation also owns an `AbortSignal` for explicit cancellation. Repeated `cancel()` / `dispose()` calls are idempotent and join the same quiescent teardown.
 
-Cancellation does not automatically mean rollback of durable authorization state. Session ownership reservation/finalization remains a separate product-level concern because the v0.1 ownership kernel is immutable and persistent.
+Durable Session ownership is separate. Cancelling an Operation does not automatically roll back the v0.1 persistent authorization invariant.
 
-## Failure semantics
+## Error boundary
 
-Operation failure must distinguish at least these classes conceptually:
+The first public taxonomy is intentionally semantic rather than vendor-specific:
 
-- composition/dependency cannot be acquired;
-- caller cancellation;
-- Agent setup/publication failure;
-- Agent execution failure;
-- teardown failure.
+- `OperationRegistryClosedError` — no new work after Principal teardown starts;
+- `OperationDependencyUnavailableError` — required capability absent before execution;
+- `OperationCancelledError` — caller/owner cancellation;
+- downstream DSH/provider errors — preserve their causal error instead of wrapping away meaning.
 
-The framework should preserve causal error information and still attempt quiescent cleanup. Final public error classes belong to the implementation PR, after behavior tests exist.
+Cleanup still runs after downstream failure.
 
-## Required P0 tests before public API
+## Executable evidence
 
-The first Operation implementation must prove:
+The current contract is protected by:
 
-1. Operation is structurally bound to one Principal;
-2. Tenant A/B and Principal sibling capability state cannot cross;
-3. Principal disposal drains active/preparing Operations;
-4. Operation-local resources clean up exactly once;
-5. dependency churn cannot duplicate externally visible work;
-6. create/resume uses the correct Principal-derived DSH owner context;
-7. Agent publication failure leaves no live partial Operation/Agent graph;
-8. repeated disposal/cancel is idempotent and quiescent.
+- `packages/multi-tenant/tests/operation.test.ts` — one-shot snapshot, missing dependency, Principal drain, idempotent teardown;
+- `scripts/cordis-operation-lifecycle-probe.mjs` — Cordis child ownership and reactive `inject` behavior;
+- `scripts/saas-core-vertical-slice-probe.mjs` — real DSH AgentRegistry create/resume/failure from multi-tenant Operations;
+- Node 22.19 and Node 24 GitHub Actions lanes.
 
-Until item 5 is proven, the Operation public API remains gated.
+`A6` is therefore `proven`, not an open design gate.

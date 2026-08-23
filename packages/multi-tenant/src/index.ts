@@ -1,8 +1,6 @@
 /**
- * dsh-multi-tenant — context-native multi-tenant runtime for DeepSeek Harness.
- *
- * v0.2 keeps the v0.1 immutable session-ownership kernel and adds a canonical,
- * transactionally published Tenant -> Principal runtime tree.
+ * dsh-multi-tenant — context-native multi-tenant runtime and v0.3 SaaS
+ * Framework Core primitives for DeepSeek Harness.
  *
  * @module dsh-multi-tenant
  */
@@ -42,6 +40,59 @@ export type {
   TenantScopeDefinition,
   PrincipalScopeDefinition,
 } from './runtime.ts'
+
+export {
+  PrincipalOperationError,
+  OperationRegistryClosedError,
+  OperationDependencyUnavailableError,
+  OperationCancelledError,
+} from './operation.ts'
+export type {
+  PrincipalOperationState,
+  PrincipalOperationIdentity,
+  OperationScopeSetupCommit,
+  OperationScopePreparation,
+  OperationScopeSetup,
+  OperationScopeDefinition,
+  OperationCapabilitySnapshot,
+  PrincipalOperationExecution,
+  PrincipalOperationDefinition,
+  PrincipalOperation,
+  PrincipalOperationRegistry,
+} from './operation.ts'
+
+export {
+  compileSaaSDefinition,
+  bootstrapDeploymentComposition,
+  tenantDefinitionFromPlan,
+  principalDefinitionFromPlan,
+  operationDefinitionFromPlan,
+  CompositionError,
+  DuplicateCapabilityError,
+  DuplicateProviderDefinitionError,
+  UnknownCapabilityError,
+  MissingCapabilityProviderError,
+  AmbiguousCapabilityProviderError,
+  InvalidProviderSelectionError,
+  CapabilityScopeMismatchError,
+  CapabilityDependencyError,
+  CapabilityDependencyVisibilityError,
+  CapabilityDependencyCycleError,
+  CapabilityProviderUnavailableError,
+} from './composition.ts'
+export type {
+  CapabilityScope,
+  CapabilityDefinition,
+  CapabilityProviderSetupCommit,
+  CapabilityProviderPreparation,
+  CapabilityProviderSetup,
+  CapabilityProviderDefinition,
+  SaaSDefinition,
+  PlannedCapability,
+  PlannedProvider,
+  CompositionPlan,
+  DeploymentComposition,
+} from './composition.ts'
 
 export { TenantSessionStore, InMemoryTenantSessionStore } from './store.ts'
 export type { TenantPrincipal, SessionOwner, ClaimResult } from './types.ts'

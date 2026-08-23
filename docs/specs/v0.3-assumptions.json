@@ -69,11 +69,14 @@
     {
       "id": "A6",
       "owner": "v0.3-design",
-      "claim": "The final one-shot Operation abstraction can safely acquire reactive Cordis dependencies without duplicate externally visible work during provider churn.",
-      "status": "open",
+      "claim": "A Principal-owned non-reactive Operation captures required Cordis capabilities exactly once before execute; provider churn cannot re-enter semantic work, and DSH create/resume/failure preserve the Operation/Principal caller boundary.",
+      "status": "proven",
       "blocking": true,
-      "gate": "operation-public-api",
-      "proof": null
+      "proof": {
+        "kind": "probe",
+        "path": "scripts/saas-core-vertical-slice-probe.mjs",
+        "command": "pnpm probe:saas-core"
+      }
     }
   ]
 }

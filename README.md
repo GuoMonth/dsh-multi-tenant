@@ -6,9 +6,9 @@ Make [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) a
 
 > **Published foundation:** `dsh-multi-tenant@0.2.0-rc.3` — canonical Tenant/Principal Runtime Contract + frozen ownership kernel.
 >
-> **Active development line:** **v0.3 SaaS Framework Core** — typed composition, fail-fast validation, Principal-owned one-shot Operations, replaceable capabilities and executable DSH/Cordis assumptions.
+> **Active development line:** **v0.3 SaaS Framework Core**. The M1–M3 Core Vertical Slice is now implemented: deterministic CompositionPlan, Principal-owned one-shot Operations, and real DSH Agent create/resume/failure evidence.
 >
-> **Current DSH compatibility baseline:** `0.1.1-rc.2` at upstream release commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`. Baselines are explicit and manually advanced; CI never follows floating `latest` or `master`.
+> **Current DSH compatibility baseline:** `0.1.1-rc.2` at upstream release commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`. CI never follows floating `latest` or `master`.
 
 ## Version direction
 
@@ -22,135 +22,173 @@ v0.3  SaaS Framework Core                active development
 v0.4  Production Provider Ecosystem      preview
 ```
 
-v0.1 answered **who owns a Session**. v0.2 answered **what Tenant and Principal are in the Runtime**. v0.3 now answers **how a SaaS product declares, validates and executes replaceable capabilities through that Runtime**.
+v0.1 answered **who owns a Session**. v0.2 answered **what Tenant and Principal are in the Runtime**. v0.3 answers **how a SaaS product declares, validates and executes replaceable capabilities through that Runtime**.
 
-## What v0.3 is building
-
-v0.3 is not a feature-count release and is not a plan to build one monolithic SaaS plugin. Its goal is an executable Framework Core with one stable path:
+## v0.3 north star
 
 ```text
 SaaSDefinition
-      ↓ normalize + validate
-CompositionPlan
-      ↓ bootstrap
+      ↓ compile / validate
+immutable CompositionPlan
+      ↓ materialize
 canonical Tenant / Principal
       ↓
-one semantic Operation
-      ↓
-capability acquisition
-      ↓
+Principal-owned one-shot Operation
+      ↓ capability snapshot
 DSH Agent create / resume / drive
       ↓
 deterministic teardown
 ```
 
-The release is complete only when this path is strongly typed, fail-fast, lifecycle-safe and executable in CI across multiple tenants/principals.
+The core guarantees already established by M1–M3 are:
 
-The key guarantees we are working toward are:
+- invalid composition fails before Runtime traffic;
+- equivalent definitions normalize deterministically;
+- structurally different Plans cannot silently share an active canonical Tenant/Principal;
+- declared Tenant/Principal/Operation scope corresponds to a real Cordis ownership boundary;
+- Tenant and Principal capability state stays isolated;
+- one user-visible action maps to one non-reactive semantic Operation;
+- provider churn cannot re-enter or duplicate Operation work;
+- Principal teardown closes admission and drains its Operations;
+- DSH create/resume receives the correct Operation/Principal-derived `ownerCtx`;
+- DSH/provider failure is preserved causally while Operation cleanup still completes;
+- the packed npm artifact executes the same Composition/Operation contract as source CI.
 
-- invalid capability composition fails before user traffic;
-- Tenant and Principal capability state remains isolated under concurrency, failure and teardown;
-- one user-visible action maps to one semantic Operation and dependency churn cannot silently duplicate externally visible work;
-- Principal teardown drains its Operations;
-- DSH Agent create/resume receives the correct Principal-derived `ownerCtx`;
-- provider implementations are replaceable without rewriting the Framework Core;
-- assumptions about DSH/Cordis are machine-readable and executable in GitHub Actions.
+## Current runtime shape
 
-The detailed milestone roadmap and v0.3 Definition of Done live in [ROADMAP.md](./ROADMAP.md).
+```text
+Deployment / Root
+│
+├── shared TenantSessionStore          persistent ownership storage
+├── shared MultiTenantService         fail-closed authorization kernel
+├── shared TenantRuntimeService
+│
+├── Tenant(acme)                      canonical capability node
+│   ├── tenant capabilities
+│   ├── Principal(alice)              canonical capability node
+│   │   ├── principal capabilities
+│   │   └── Operation                 ephemeral, one-shot
+│   │       ├── operation capabilities
+│   │       └── immutable snapshot -> DSH Agent
+│   └── Principal(bob)
+│
+└── Tenant(globex)
+```
+
+The project keeps four planes separate:
+
+1. **Persistent authorization** — durable `(tenantId, userId) -> session` ownership, always fail closed.
+2. **Tenant/Principal/Operation capability ownership** — native Cordis Context/Fiber lifecycle and service isolation.
+3. **Agent/Preset registration graph** — native DSH `@deepseek-ai/dsh-scope` for Agent-local tools/prompts/listeners.
+4. **Strong deployment isolation** — process/container/Pod boundaries when same-process trust is insufficient.
+
+The SaaS layer composes these planes; it does not copy Cordis internals into Agent scope and does not create a second DI container.
+
+## Composition compiler
+
+`dsh-multi-tenant/composition` separates mutable intent from executable structure:
+
+```ts
+const plan = compileSaaSDefinition({
+  capabilities: [
+    { key: 'agents', scope: 'deployment', required: true },
+    { key: 'tenantMcp', scope: 'tenant', required: true },
+    { key: 'credentials', scope: 'principal', required: true },
+  ],
+  providers: [
+    { id: 'dsh-agents', capability: 'agents', scope: 'deployment' },
+    {
+      id: 'tenant-mcp',
+      capability: 'tenantMcp',
+      scope: 'tenant',
+      setup({ ctx }) {
+        ctx.provide('tenantMcp', createTenantMcp())
+      },
+    },
+    {
+      id: 'credentials',
+      capability: 'credentials',
+      scope: 'principal',
+      requires: ['tenantMcp'],
+      setup({ ctx }) {
+        ctx.provide('credentials', loadPrincipalCredentials())
+      },
+    },
+  ],
+})
+```
+
+The compiler resolves selection, dependency visibility, cycles, scope placement and bootstrap order. A deterministic Plan fingerprint becomes part of canonical Runtime definition identity, so structurally different compositions fail instead of silently joining the same active node.
+
+Ambient providers are deployment-only. Tenant/Principal/Operation providers must actually materialize in their declared scope.
+
+## One-shot Operations
+
+Cordis `ctx.inject()` is reactive and intentionally reruns when dependencies disappear and return. That is useful plugin lifecycle semantics, but it cannot define one user transaction.
+
+v0.3 therefore uses a Principal-owned non-reactive Operation:
+
+```ts
+const tenant = await ctx.tenantRuntime.tenants.ensure('acme', tenantDefinitionFromPlan(plan))
+const alice = await tenant.principals.ensure('alice', principalDefinitionFromPlan(plan))
+
+const operation = alice.operations.start({
+  ...operationDefinitionFromPlan(plan),
+  requires: ['agents', 'tenantMcp', 'credentials'],
+  async execute({ capabilities, signal }) {
+    const agents = capabilities.require<any>('agents')
+    const credentials = capabilities.require('credentials')
+
+    return agents.create({
+      sessionId,
+      signal,
+      setup(agentCtx) {
+        // Compose DSH-native Agent/Preset scope here.
+      },
+    })
+  },
+})
+
+const handle = await operation.result
+```
+
+Operation setup resolves required Cordis capabilities exactly once into an immutable snapshot, then calls `execute()` once. Provider churn may make a captured provider unusable, but it never causes semantic work to rerun. This is assumption `A6`, now proven on Node 22.19 and Node 24 against the pinned public DSH AgentRegistry.
+
+## Provider ecosystem direction
+
+`dsh-multi-tenant/testing` exposes executable provider conformance for Tenant/Principal capability isolation. M4/M5 will now add the smallest real SaaS contracts needed to prove the ecosystem model, prioritizing:
+
+- Authenticated Identity Boundary;
+- Credentials capability;
+- MCP capability;
+- minimal replaceable reference providers.
+
+These are capability responsibilities, not pre-approved package names.
+
+### Package-boundary decision after M3
+
+**No new `dsh-saas` package yet.** Composition + Operation currently extend the same Runtime ownership contract and do not justify a separate versioning/distribution boundary.
+
+A new package will appear only if M4/M5 produces an independently useful consumer API, replacement/lifecycle boundary, release boundary or Distribution boundary. Until then, keeping one package preserves architectural freedom and reduces noise.
 
 ## v0.3 roadmap at a glance
 
 ```text
 M0  P0 Spec / Assumption Foundation          ✅
-M1  Composition Compiler
-M2  Operation Kernel + resolve A6
-M3  Fake-provider end-to-end vertical slice
-    └─ package-boundary decision gate
-M4  Minimal Auth / Credentials / MCP contracts
+M1  Composition Compiler                     ✅
+M2  Operation Kernel + A6                    ✅
+M3  Multi-tenant DSH vertical slice          ✅
+    └─ package boundary: keep one package
+M4  Minimal Auth / Credentials / MCP contracts   ← next
 M5  Minimal reference providers
 M6  Diagnostics / explainability
 M7  Conformance + compatibility hardening
 M8  v0.3 release convergence
 ```
 
-A critical current gate is **A6**: the final Operation design must prove that Cordis dependency reactivity cannot cause duplicate externally visible user work. The Operation public API stays unfrozen until that proof exists.
-
-## Architecture foundation
-
-```text
-Deployment / Root
-│
-├── shared TenantSessionStore
-├── shared MultiTenantService          persistent authorization invariant
-├── shared TenantRuntimeService
-│
-├── Tenant(acme)                       canonical runtime node
-│   ├── tenant capability graph
-│   ├── Principal(alice)               canonical runtime node
-│   │   └── principal capability graph
-│   └── Principal(bob)
-│
-└── Tenant(globex)
-```
-
-The project separates four planes instead of overloading one tenant mechanism:
-
-1. **Persistent authorization** — durable `(tenantId, userId) -> session` ownership; always fail closed.
-2. **Tenant/Principal capability graph** — Cordis Context service isolation and lifecycle.
-3. **Agent/Preset registration graph** — DSH `@deepseek-ai/dsh-scope`; tools, prompts, listeners and Agent-local visibility.
-4. **Strong deployment isolation** — process/filesystem/network/shell boundaries such as one tenant per container/Pod when required.
-
-The v0.3 Framework grows **above** this structure. It does not copy Cordis internals into Agent scope and does not create a second DI/service registry.
-
-## v0.1 frozen kernel
-
-The v0.1 security guarantees remain intentionally small:
-
-- minimal authenticated `TenantPrincipal`;
-- claim-once immutable session ownership;
-- fail-closed access decisions;
-- replaceable `TenantSessionStore` provider seam.
-
-These guarantees remain deployment-global defense in depth.
-
-## v0.2 Runtime Contract
-
-Tenant and Principal share one structural vocabulary:
-
-```ts
-const tenant = await ctx.tenantRuntime.tenants.ensure('acme', tenantDefinition)
-const alice = await tenant.principals.ensure('alice', principalDefinition)
-```
-
-Both are canonical runtime nodes with immutable identity, scoped Context, explicit lifecycle state, idempotent quiescent disposal and canonical `ensure/get` registries.
-
-Creation is transactional:
-
-```text
-reserve canonical identity
-        ↓
-prepare unpublished Cordis subtree
-        ↓
-await setup(signal)
-        ↓
-optional synchronous commit()
-        ↓
-publish active node
-```
-
-Preparing transactions are first-class lifecycle resources. Partial graphs are never visible; concurrent `ensure()` calls single-flight; setup failure rolls back; definition drift fails explicitly.
-
-## Provider ecosystem direction
-
-`dsh-multi-tenant/testing` exposes an executable Runtime Capability Provider Contract covering A/B isolation, root/parent non-leakage, descendant inheritance, sibling non-interference, disposal isolation, recreation and unpublished setup ownership.
-
-v0.3 builds on that principle: **provider compatibility is a contract, not an assumption**.
-
-Capability names such as Auth, Credentials, MCP, Transport, Audit and Usage are responsibilities, not pre-created package names. A package is introduced only when a real independent contract, replacement boundary, lifecycle boundary, release boundary or Distribution boundary has been demonstrated.
+See [ROADMAP.md](./ROADMAP.md) for the complete release definition and [docs/specs](./docs/specs) for live contracts.
 
 ## Engineering method
-
-v0.3 work follows one development sequence:
 
 ```text
 Spec
@@ -162,42 +200,43 @@ Spec
   → vertical-slice CI proof
 ```
 
-Core principles:
+Rules that matter:
 
-- **Structure before patches** — ownership, data structures and state transitions first.
-- **Strong semantic types** — make invalid states difficult or impossible to represent.
-- **Assumption-first verification** — external DSH/Cordis behavior must be executable evidence before public API depends on it.
-- **Relevance over correctness theater** — technically valid historical experiments do not stay live when they no longer serve the architecture.
+- **Structure before patches.** Refactor ownership/data/state so features grow naturally.
+- **Strong semantic types.** Invalid topology should be hard or impossible to express.
+- **Assumption-first verification.** DSH/Cordis behavior is evidence, not folklore.
+- **Relevance over correctness theater.** Delete technically valid surfaces when they no longer serve the architecture.
 - **Control -> enforce; ecosystem -> standardize; outside control -> explicit boundary.**
-- **No second DI container** — Cordis remains the service/lifecycle substrate.
-- **No speculative package topology** — package boundaries follow proven architecture.
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) and the P0 specs under [`docs/specs`](./docs/specs).
+- **No second DI container.** Cordis remains the service/lifecycle substrate.
+- **No speculative package topology.** Package boundaries must be earned.
+- **Prerelease freedom.** We do not preserve early shapes when they obstruct the better long-term model.
 
 ## Compatibility evidence
 
-CI currently verifies the platform seams the active architecture depends on:
+GitHub Actions currently verifies on Node 22.19 and Node 24:
 
 - exact upstream DSH release identity;
-- DSH session setup/publication/rollback behavior;
-- Principal-derived DSH Agent owner/context composition;
-- Cordis parent/child lifecycle behavior;
-- Cordis reactive dependency injection behavior;
-- Runtime capability provider isolation contract.
+- DSH Session setup/publication/rollback;
+- caller-bound DSH Agent owner context;
+- Cordis parent/child teardown;
+- Cordis reactive injection behavior;
+- Runtime capability provider isolation;
+- SaaSDefinition -> CompositionPlan -> Tenant/Principal -> one-shot Operation -> real DSH Agent create/resume/failure;
+- packed external-consumer installation and execution.
 
-Open blocking assumptions are tracked in [`docs/specs/v0.3-assumptions.json`](./docs/specs/v0.3-assumptions.json) instead of being hidden in implementation code.
+The machine-readable ledger lives at [`docs/specs/v0.3-assumptions.json`](./docs/specs/v0.3-assumptions.json). `A1`–`A6` are currently proven.
 
-## Current package
+## Explicit security boundary
 
-[`packages/multi-tenant`](./packages/multi-tenant) is currently the only live workspace package and is published as npm `dsh-multi-tenant` (`latest`). It contains the v0.2 Runtime Contract and frozen v0.1 ownership kernel.
+Cordis Context is a trusted same-process composition/lifecycle boundary, not a hostile-code sandbox. It does not isolate process memory, filesystem, shell, network, environment variables or malicious same-process plugins.
 
-v0.3 does not pre-create `saas`, Auth, MCP or provider packages. The implementation will decide package boundaries only after their independent value is demonstrated.
+Strong isolation belongs to process/container/Pod deployment profiles.
 
 ## v0.4 preview
 
-v0.4 is expected to turn the v0.3 Framework Core into a broader **production provider ecosystem and productized SaaS experience**: production identity integrations, durable credentials/secrets, richer MCP integrations, audit/usage/observability, durable stores and migrations, stronger deployment profiles, and a more polished out-of-box Distribution/install experience.
+v0.4 is expected to turn the v0.3 Framework Core into a broader **Production Provider Ecosystem & Productization** stage: production identity providers, durable secrets/credentials, richer MCP integrations, operational providers, durable stores/migrations, stronger deployment profiles and a more polished Distribution/install experience.
 
-This is intentionally only a preview. The detailed v0.4 roadmap will be based on the architecture and real usage evidence produced by v0.3.
+This is intentionally only a preview; the detailed v0.4 roadmap will be based on v0.3 architecture and real usage evidence.
 
 ## Install
 
@@ -205,7 +244,7 @@ This is intentionally only a preview. The detailed v0.4 roadmap will be based on
 dsh plugin --profile <profile> add dsh-multi-tenant
 ```
 
-The current stage does not require Marketplace or custom installer work. npm + the DSH-native plugin/bundle path is the supported installation baseline.
+Marketplace/custom installer work is not on the current critical path. npm + the DSH-native bundle path is the supported baseline.
 
 ## Development
 
