@@ -76,6 +76,13 @@ export interface RuntimeScope<K extends 'tenant' | 'principal', I> {
 
 export interface RuntimeScopeRegistry<Key, Scope, Definition> {
   get(key: Key): Scope | undefined
+  /**
+   * Join the canonical active node, or create it when absent.
+   *
+   * Omitting `definition` means the caller only cares about identity and does
+   * not need to know the creation recipe of an already-live node. Supplying a
+   * definition opts into structural-drift validation.
+   */
   ensure(key: Key, definition?: Definition): Promise<Scope>
 }
 
@@ -225,6 +232,7 @@ implements RuntimeScopeRegistry<Key, Scope, Definition> {
   }
 
   async ensure(key: Key, definition?: Definition): Promise<Scope> {
+    const definitionSupplied = definition !== undefined
     const normalized = this.normalize(definition)
     const existing = this.entries.get(key)
     if (existing !== undefined) {
@@ -233,7 +241,7 @@ implements RuntimeScopeRegistry<Key, Scope, Definition> {
         await scope.dispose()
         return this.ensure(key, definition)
       }
-      if (existing.signature !== normalized.signature) {
+      if (definitionSupplied && existing.signature !== normalized.signature) {
         throw new RuntimeDefinitionConflictError(
           'canonical runtime scope already exists with a different isolated-service definition',
         )
