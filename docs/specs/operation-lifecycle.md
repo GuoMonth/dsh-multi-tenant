@@ -2,7 +2,7 @@
 
 # Spec — Principal Operation Lifecycle
 
-> Status: **implemented and proven for v0.3 M2/M3**. Assumption `A6` is proven by contract tests and the pinned-DSH SaaS Core vertical probe.
+> Status: **implemented and proven for v0.3 M2/M3, typed in M3.5**. Assumption `A6` is proven by contract tests and the pinned-DSH SaaS Core vertical probe.
 
 ## Purpose
 
@@ -13,7 +13,7 @@ Tenant
   └─ Principal
        └─ Operation
             ├─ operation-local providers
-            ├─ one-shot capability snapshot
+            ├─ one-shot typed capability snapshot
             ├─ execute exactly once
             └─ deterministic teardown
 ```
@@ -64,6 +64,8 @@ PREPARING
 
 `execute()` never runs before setup and required-capability acquisition succeed. Every terminal path attempts quiescent cleanup and retires the Operation from its Principal registry.
 
+Normal successful completion is not represented as cancellation: disposing an Operation's owner Fiber during normal teardown does not spuriously abort its signal.
+
 ## The A6 decision: snapshot, do not reactively execute
 
 Cordis `ctx.inject()` is intentionally reactive: losing a required service unloads the callback and restoring the service may execute the callback again (`A4`). That is correct plugin lifecycle behavior but incorrect user-transaction behavior.
@@ -76,37 +78,52 @@ principal.ctx.inject(['agents'], async (ctx) => {
 })
 ```
 
-v0.3 chooses a different primitive:
+v0.3 uses a different primitive:
 
 1. create a normal Principal-owned child Fiber without reactive `inject`;
-2. materialize operation-local providers;
-3. synchronously resolve every required capability from that Operation Context;
+2. materialize Operation-local providers;
+3. resolve every required typed capability token from that Operation Context exactly once;
 4. freeze those resolved values into an `OperationCapabilitySnapshot`;
 5. call `execute()` exactly once with that snapshot;
 6. dispose the Operation regardless of success, failure or cancellation.
 
 A captured Cordis capability may itself later become unusable if its provider is disposed. The framework does **not** promise provider immortality. The guarantee is narrower and load-bearing: provider churn never re-enters or silently repeats the user's semantic Operation.
 
-This model is proven by tests that remove a provider, install a replacement, and verify the already-running Operation executes once against its original captured capability.
-
-## Capability snapshot
+## Typed capability snapshot
 
 The snapshot is immutable and intentionally small:
 
 ```ts
 interface OperationCapabilitySnapshot {
+  readonly capabilities: readonly CapabilityToken[]
   readonly keys: readonly string[]
-  has(name: string): boolean
-  get<T>(name: string): T | undefined
-  require<T>(name: string): T
+
+  has<C extends CapabilityToken>(capability: C): boolean
+  get<C extends CapabilityToken>(capability: C): CapabilityValue<C> | undefined
+  require<C extends CapabilityToken>(capability: C): CapabilityValue<C>
 }
 ```
 
-It is not a second DI container. Resolution still belongs to Cordis; the snapshot merely records the exact capabilities already resolved for this one semantic attempt.
+A caller cannot claim an arbitrary return type with `require<MyType>('credentials')`. The `CapabilityToken<T, Scope>` carries the semantic value type and authority scope.
+
+Example:
+
+```ts
+const credentials = defineCapability<Credentials, 'principal'>('credentials', 'principal')
+
+const operation = principal.operations.start({
+  requires: [credentials],
+  execute({ capabilities }) {
+    const value = capabilities.require(credentials) // Credentials
+  },
+})
+```
+
+The snapshot is still not a second DI container. Resolution belongs to Cordis; the snapshot only records the exact values already resolved for this one attempt.
 
 ## DSH Agent boundary
 
-The real public `@deepseek-ai/dsh-agent` `AgentRegistry` is used in CI. Calling a captured `agents` capability from the Operation preserves the Operation Context as DSH's caller-bound `ownerCtx`.
+The real public `@deepseek-ai/dsh-agent` `AgentRegistry` is used in CI. Calling the captured typed `agents` capability from the Operation preserves the Operation Context as DSH's caller-bound `ownerCtx`.
 
 The vertical proof covers concurrent:
 
@@ -118,7 +135,7 @@ The vertical proof covers concurrent:
 
 For every create/resume, the factory observes the correct Tenant identity, Principal identity, Tenant capability, Principal capability and Operation-local capability. A factory failure is preserved as the Operation error and the failed Operation retires completely.
 
-Operation does not copy private Cordis isolation maps into `Agent.ctx`, does not invent an Agent tenant registry, and does not redefine DSH Agent/Preset scope semantics.
+Operation does not copy private Cordis isolation maps into `Agent.ctx`, does not invent an Agent tenant registry and does not redefine DSH Agent/Preset scope semantics.
 
 ## Cancellation and teardown
 
@@ -138,7 +155,7 @@ Durable Session ownership is separate. Cancelling an Operation does not automati
 
 ## Error boundary
 
-The first public taxonomy is intentionally semantic rather than vendor-specific:
+The public taxonomy is semantic rather than vendor-specific:
 
 - `OperationRegistryClosedError` — no new work after Principal teardown starts;
 - `OperationDependencyUnavailableError` — required capability absent before execution;
@@ -149,11 +166,13 @@ Cleanup still runs after downstream failure.
 
 ## Executable evidence
 
-The current contract is protected by:
+The contract is protected by:
 
-- `packages/multi-tenant/tests/operation.test.ts` — one-shot snapshot, missing dependency, Principal drain, idempotent teardown;
+- `packages/multi-tenant/tests/operation.test.ts` — typed one-shot snapshot, missing dependency, Principal drain, idempotent teardown;
+- `packages/multi-tenant/tests/composition.test.ts` — token scope semantics and scope-local composition identity;
 - `scripts/cordis-operation-lifecycle-probe.mjs` — Cordis child ownership and reactive `inject` behavior;
-- `scripts/saas-core-vertical-slice-probe.mjs` — real DSH AgentRegistry create/resume/failure from multi-tenant Operations;
+- `scripts/saas-core-vertical-slice-probe.mjs` — typed real DSH AgentRegistry create/resume/failure from multi-tenant Operations;
+- `scripts/package-smoke.mjs` — packed external consumer executes the same typed Operation contract;
 - Node 22.19 and Node 24 GitHub Actions lanes.
 
 `A6` is therefore `proven`, not an open design gate.
