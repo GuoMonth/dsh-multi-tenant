@@ -45,61 +45,72 @@ v0.2 已经稳定下来的 contract 包括 canonical identity/lifecycle、unpubl
 
 # v0.3 —— SaaS Framework Core
 
-## Definition of Value
+## 更新后的 Definition of Value
 
-v0.3 让项目从 **安全的 Multi-Tenant Runtime** 跨到 **可执行 SaaS Framework Core**。
+MR-A 改变了我们对 Framework boundary 的理解。v0.3 不只是：
 
 ```text
-SaaSDefinition
-      ↓ compile / validate
-immutable CompositionPlan
-      ↓ materialize
-canonical Tenant / Principal
-      ↓
-Principal-owned one-shot Operation
-      ↓ capability snapshot
-DSH Agent create / resume / drive
-      ↓
-deterministic teardown
+SaaSDefinition -> Providers -> Agent
 ```
 
-v0.3 不按 feature 数量验收。只有这条主链做到 strongly typed、fail-fast、lifecycle-safe、replaceable，并能在真实 multi-tenant DSH vertical slice 中执行证明，v0.3 才算完成。
+更准确的 north star 是：
 
-最终 Framework 必须保证：
+```text
+Product / Transport
+      ↓ 产品自己完成 authentication
+Trusted Subject
+      ↓ identity resolution
+Product Ingress Boundary
+      ↓
+TenantPrincipal
+      ↓
+canonical Tenant / Principal
+      ↓
+Typed Runtime Capabilities
+      ↓
+Principal-owned one-shot Operation
+      ↓ immutable capability snapshot
+Agent Integration
+      ↓ DSH-native Agent setup / plugin composition
+DeepSeek Harness
+```
 
-- 非法 composition 在用户流量进入前失败；
-- Tenant / Principal capability state 保持隔离；
-- canonical Runtime node 不会悄悄采用 structurally different composition；
-- 一次用户可见动作对应一次 semantic Operation；
-- provider churn 不会悄悄重复 Operation work；
-- Principal teardown 会 drain 自己的 Operation；
-- DSH create/resume 获得正确 caller-bound Tenant/Principal/Operation Context；
-- Provider 可以替换，而不要求改 Framework Core；
-- 关键 DSH/Cordis assumption 永远有 executable CI evidence。
+这把以前描述得过于扁平的 concern 拆开：
+
+- **Product Ingress** 选择可信 Runtime identity；
+- **Runtime Capability** 存在于显式 Deployment/Tenant/Principal/Operation ownership 中；
+- **Operation** 是一次 semantic execution boundary；
+- **Agent Integration** 把可信 Runtime state 转换成 DSH-native Agent/Preset/plugin composition。
+
+参见 [`docs/specs/saas-boundaries.zh-CN.md`](./docs/specs/saas-boundaries.zh-CN.md)。
+
+只有整条路径做到 strongly typed、fail-fast、lifecycle-safe、replaceable，并能在真实 multi-tenant DSH vertical slice 中执行证明，v0.3 才算完成。
 
 ## 目标架构
 
 ```text
-                         SaaS Framework Core
-                                │
-                       Composition Compiler
-                                │
-                        CompositionPlan
-                                │
-             ┌──────────────────┼──────────────────┐
-             │                  │                  │
-           Tenant            Principal          Operation
-             │                  │                  │
-             └──────── Capability Contracts ──────┘
-                                │
-                     Replaceable Providers
-                                │
-                       dsh-multi-tenant
-                                │
-                         Cordis + DSH
+Product / Transport
+        │
+        ▼
+Trusted Identity Resolution
+        │
+        ▼
+Tenant / Principal Runtime
+        │
+        ▼
+Typed Capability Composition
+        │
+        ▼
+One-shot Operation
+        │
+        ▼
+Agent Integration
+        │
+        ▼
+Cordis / DeepSeek Harness
 ```
 
-Auth、Credentials、MCP、Transport、Audit、Usage 是 capability responsibility，**不是提前批准好的 package name**。
+Auth、Credentials、MCP、Transport、Audit、Usage 继续只是 responsibility name，**不是提前批准的 package name**。
 
 ## 工程铁律
 
@@ -115,13 +126,15 @@ Spec
 
 额外规则：
 
-- `SaaSDefinition` 是 intent，Runtime 不反复解释它；
+- `SaaSDefinition` 是 mutable intent，Runtime 不反复解释它；
 - `CompositionPlan` 必须 normalized、deterministic、immutable；
-- scope 名字必须对应真实 lifecycle / authority boundary；
+- scope 名字对应真实 lifecycle / authority boundary；
+- capability key、value type、scope 属于同一个 semantic token；
 - Cordis 继续负责 DI/service/lifecycle；
 - Operation 必须 Principal-owned，并在 semantic effect 上 one-shot；
-- blocking assumption 仍 open 时不能支撑 public API；
-- Provider compatibility 必须是 executable contract；
+- Product Ingress 与 Agent Integration 都是显式 boundary，不是隐藏在 Provider convention 中；
+- blocking assumption open 时不能支撑 public API；
+- Provider / Integration compatibility 必须有 executable evidence；
 - package topology 跟着真实 architecture 长；
 - prerelease compatibility 阻碍长期模型时可以直接丢掉。
 
@@ -129,228 +142,203 @@ Spec
 
 # Milestone Status
 
-## M0 —— P0 Spec / Assumption Foundation —— ✅ 完成
+## M0 —— Spec / Assumption Foundation —— ✅ 完成
 
-已交付：
-
-- SaaS Composition / Operation lifecycle 双语 live spec；
-- machine-readable Assumption Ledger；
-- DSH/Cordis executable probe；
-- Node 22.19 / Node 24 platform-assumption lane；
-- blocking open assumption 不能进入 public API 的 promotion rule。
+已交付双语 live spec、machine-readable assumption、DSH/Cordis probe、Node 22.19/24 platform lane 与 promotion gate。
 
 ## M1 —— Composition Compiler —— ✅ 完成
 
-已建立：
+MR-A 已交付：
 
-```text
-SaaSDefinition
-      ↓
-compileSaaSDefinition()
-      ↓
-immutable CompositionPlan
-```
-
-Compiler 当前提供：
-
-- stable capability key；
-- `deployment | tenant | principal | operation` ownership vocabulary；
 - required / optional capability；
-- deterministic provider selection；
-- provider dependency graph；
+- provider selection；
+- dependency graph / visibility；
 - deterministic topological bootstrap order；
 - immutable normalized Plan；
-- deterministic structural fingerprint。
-
-它会在 bootstrap 前拒绝 duplicate / unknown / missing / ambiguous provider、scope mismatch、假 scoped ambient provider、dependency visibility violation 与 cycle。
-
-### Scope 是 Authority，不是 Metadata
-
-Ambient external provider 只允许 deployment scope。Tenant / Principal / Operation provider 必须真的在对应 Cordis scope materialize。
-
-### Canonical Plan Drift
-
-Plan fingerprint 会进入 Runtime definition identity：
-
-```text
-saas:tenant:<plan fingerprint>
-saas:principal:<plan fingerprint>
-```
-
-Equivalent Plan 可以 join 同一个 canonical node；structurally different Plan 会抛 `RuntimeDefinitionConflictError`，而不是悄悄共用 active Tenant / Principal。
-
-v0.3 不定义 Plan hot mutation。
+- semantic error taxonomy；
+- 真实 scope authority，而不是 metadata；
+- whole-plan structural fingerprint。
 
 ## M2 —— Principal Operation Kernel + A6 —— ✅ 完成
 
-最终 A6 设计不是 reactive `ctx.inject()` business work，而是：
+MR-A 证明最终 Operation primitive 不是 reactive `ctx.inject()` business work：
 
 ```text
 Principal
   └─ non-reactive Operation Fiber
-       ├─ operation-local provider setup
+       ├─ Operation-local setup
        ├─ one-shot capability snapshot
        ├─ execute exactly once
        └─ quiescent teardown
 ```
 
-已交付：
+`A6` 已在 Node 22.19 / Node 24 上 proven。
 
-- Principal-owned Operation registry；
-- 显式 semantic lifecycle state；
-- one-shot required capability snapshot；
-- provider churn 不会造成 re-entry；
-- 显式 cancellation signal；
-- Principal teardown 先 close admission 再 drain Operation；
-- 幂等 / quiescent cancel 与 dispose；
-- causal downstream error；
-- semantic Operation error taxonomy。
+## M3 —— Multi-tenant real-DSH Core Vertical Slice —— ✅ 完成
 
-`A6` 已经 **proven**。Cordis reactive injection 继续用于 plugin lifecycle，但不再被误当成 user transaction primitive。
+Pinned public `@deepseek-ai/dsh-agent` AgentRegistry 从 Operation boundary 驱动多 Tenant / Principal create、resume、failure 路径；packed npm consumer 也执行同一 contract。
 
-## M3 —— Multi-tenant DSH Core Vertical Slice —— ✅ 完成
+### M3 Package Boundary Gate —— 继续一个 Package
 
-CI 直接运行 pinned public `@deepseek-ai/dsh-agent` AgentRegistry，从新 Operation boundary 驱动真实 create/resume seam。
-
-Executable proof 并发覆盖：
-
-```text
-Acme / Alice   -> create
-Acme / Bob     -> create
-Globex / Alice -> create
-Acme / Alice   -> resume
-Acme / Alice   -> create failure
-```
-
-它证明：
-
-- DSH factory `ownerCtx` 中 Tenant / Principal identity 正确；
-- Tenant、Principal、Operation-local capability 可见性正确；
-- 每个 Operation 只执行一次；
-- Agent setup 在 handle 返回前完成；
-- create/resume caller binding 正确；
-- downstream create failure 保留 causal error；
-- failed Operation 不留下 live registry entry；
-- dispose 一个 Tenant 不影响另一个 Tenant；
-- successful handle 被完整 drain。
-
-同一套 contract 还会通过 **packed npm tarball** 安装到 clean consumer 后再次执行，而不是只测 workspace source。
-
-### M3 Package Boundary Gate —— 结论：继续一个 Package
-
-M3 以后仍然**不创建** `dsh-saas`。
-
-Composition + Operation 目前是在扩展同一套 Runtime ownership / lifecycle contract，还没有证明足够独立的 versioning / distribution value。
-
-当前 public subpath：
-
-```text
-dsh-multi-tenant/runtime
-dsh-multi-tenant/operation
-dsh-multi-tenant/composition
-dsh-multi-tenant/testing
-```
-
-这个决定不是永久的。M4/M5 出现真实 SaaS capability contract 后再重新判断；在证据不足时保持一个 package，更轻、更自由、噪音更少。
+现在仍然不创建 `dsh-saas`。Runtime、typed composition、Operation 仍然是一套连贯 lifecycle contract。
 
 ---
 
-# 当前主线：M4 + M5
+## M3.5 —— Post-MR-A Architecture Hardening —— 当前
 
-MR-B 的目标是证明 **capability ecosystem**，不是堆 Provider 数量。
+MR-A 刻意优先完整 vertical slice。实践暴露了两个结构债，必须在 product-facing capability 到来以前清掉。
 
-## M4 —— 最小 SaaS Capability Contracts
+### 1. Typed Capability Token
 
-优先只做三条：
+旧 API 允许：
 
-### 1. Authenticated Identity Boundary
+```ts
+capabilities.require<MyType>('credentials')
+```
+
+调用方可以自行声称任意 type，同时 Definition 中还会重复声明 scope。
+
+Hardening 后使用：
+
+```ts
+CapabilityToken<T, Scope>
+```
+
+把 stable service key + semantic value type + authority scope 绑定起来。
+
+可以提供 typed Cordis `get/provide` 薄 helper，但 Cordis 仍然是唯一 resolver / registry。
+
+### 2. Scope-local Composition Identity
+
+MR-A 初版把 whole-plan fingerprint 直接作为 canonical Tenant / Principal definition identity。安全但过度耦合：只改 Operation provider，也可能错误 invalidate Tenant。
+
+Hardening 后：
 
 ```text
-trusted external authenticated subject
+fingerprint                  exact whole-plan identity
+scopeFingerprints[scope]     scope provider dependency closure
+```
+
+Canonical Tenant / Principal 使用自己的 scope-local closure identity。
+
+**M3.5 Exit Gate：**
+
+- Operation-only drift 不 invalid unrelated Principal / Tenant；
+- Principal-only drift 不 invalid unrelated Tenant；
+- 一个 scope 真正依赖到的 ancestor 改变时，该 scope identity 必须变化；
+- typed capability consumption 在 source / packed artifact 都通过；
+- docs/roadmap 明确拆开 Product Ingress、Runtime Capability、Agent Integration 三个 plane。
+
+---
+
+# 下一阶段：Product-facing Boundary Proof
+
+旧 Roadmap 把 Authenticated Identity、Credentials、MCP 当成三个并列 capability contract。MR-A 已证明这种描述不够准确，所以重新定义 M4/M5。
+
+## M4 —— Product Ingress + Principal Capability Contracts
+
+M4 同时证明两个不同 boundary，因为它们在 canonical Principal selection 处汇合。
+
+### A. Trusted Product Ingress
+
+```text
+authenticated product subject
+        ↓
+identity resolver
         ↓
 TenantPrincipal
         ↓
 canonical Tenant / Principal
 ```
 
-Framework 不负责 JWT/OAuth/SAML parsing；它只拥有“外部认证已经建立可信 identity”之后的 semantic boundary。
+Framework **不**负责 JWT/OAuth/OIDC/SAML parsing。它只拥有产品已经建立 trusted identity 之后的 semantic boundary。
 
-### 2. Credentials Capability
+第一版 reference adapter 应该保持 simple/callback，仅用于证明 contract。
 
-Principal-owned credential contract 必须保持：
+### B. Principal Credentials Capability
+
+Credentials 成为第一个真实 product-facing typed Runtime capability。
+
+必须证明：
 
 - Tenant isolation；
 - Principal sibling isolation；
 - lifecycle ownership；
-- 显式 consumer boundary；
-- Provider replacement 不改 Framework Core。
+- typed consumption；
+- replacement 不改 Framework Core；
+- secret state 不会误泄漏到 deployment/root authority。
 
-### 3. MCP Capability
+**M4 Exit Gate：** Product Ingress 能选择正确 canonical Principal，并且该 Principal 能消费 replaceable typed Credentials capability，同时 vendor auth logic 不进入 Core。
 
-MCP 是最有价值的 reference capability，因为它天然同时测试：
+## M5 —— Agent Integration Reference Path + Minimal Defaults
+
+MCP 从“并列 Runtime capability”调整为最重要的 reference **Agent Integration** 路径。
+
+目标：
 
 ```text
-Tenant configuration
-      +
-Principal credential
-      +
-Operation consumption
-      +
-DSH Agent composition
+Tenant MCP configuration
+        +
+Principal credentials
+        +
+Operation snapshot
+        ↓
+Agent integration
+        ↓
+DSH Agent setup
+        ↓
+@deepseek-ai/dsh-mcp-client
+        ↓
+native DSH MCP tools
 ```
 
-只在 DSH / MCP 有稳定 native seam 的地方组合，不再造平行 protocol stack。
+当前 pinned DSH baseline 里 Harness 正式 bridge 的是 MCP Tools。Resources / Prompts 还没有 Harness consumer，所以 v0.3 不自己造平行 compatibility protocol 模拟它们。
 
-**M4 Exit Gate：** contract 足够小、可替换、可解释，且 vendor-specific 假设没有泄漏进 Framework Core。
+M5 只提供让这条链真实成立所需的最小 default：
 
-## M5 —— 最小 Reference Providers
+- M4 的 simple identity adapter；
+- 一个 in-memory/reference Credentials implementation；
+- 一条真实 MCP Tools integration path；
+- 至少一个 implementation replacement proof。
 
-只提供足够证明 contract 真能用的 default/reference implementation。
+**M5 Exit Gate：** 一条真实 Product Ingress -> Tenant/Principal -> Credentials -> Operation -> DSH-native MCP Tool 链端到端成立；替换 conforming implementation 不需要改 Core。
 
-可能包括：
-
-- simple/callback authenticated identity adapter；
-- in-memory/reference credential provider；
-- 一条真实 MCP integration path；
-- 必要时复用现有 reference ownership store。
-
-不要把 M5 变成 Auth0/Okta/Vault/Redis/Postgres/vendor breadth。
-
-**M5 Exit Gate：** 替换 reference provider 不需要修改 Framework Core，并且一条真实 Auth -> Principal -> Credentials -> MCP -> Operation -> DSH Agent 链端到端成立。
-
-M5 结束后再次评估是否真正出现独立 SaaS/package boundary。
+M5 结束后重新评估 package boundary。
 
 ---
 
 ## M6 —— Diagnostics & Explainability
 
-Composition Framework 必须能解释自己：
+Framework 应该能够解释：
 
-- 最终为什么选这个 provider；
-- 哪个 scope 拥有它；
-- 它依赖什么；
-- definition/provider 为什么被拒绝；
+- 最终为什么选中某 provider；
+- 哪个 typed capability / scope 拥有它；
+- dependency closure 是什么；
+- definition/provider/integration 为什么被拒绝；
+- 哪个 scope fingerprint 控制 canonical identity；
 - bootstrap 在哪里失败；
-- normalized Plan / fingerprint 是什么；
-- 当前 canonical Runtime definition 是什么。
+- normalized Plan 是什么。
 
-Diagnostic 不清楚通常意味着模型本身不清楚，因此它属于 v0.3 contract，而不是 UI polish。
+Diagnostics 可能在 M3.5/M4/M5 过程中自然出现，但 M6 会把它收敛成正式 framework contract。
 
 ## M7 —— Conformance & Compatibility Hardening
 
 Executable evidence 扩展到：
 
+- typed capability identity；
 - Composition validation / determinism；
-- Plan / canonical drift；
-- Tenant / Principal isolation；
+- scope-local canonical drift；
+- Tenant / Principal isolation / recreation；
 - Operation prepare/active/cancel/failure/teardown/provider churn；
-- DSH create/resume/setup/publication/failure；
-- Provider replacement / failure；
+- Product Ingress identity mapping；
+- Credentials replacement / failure；
+- Agent Integration create/resume/setup/failure；
+- DSH-native MCP Tools behavior；
 - Node 22.19 / Node 24；
 - pinned DSH/Cordis assumption；
 - packed consumer behavior。
 
-GitHub Actions 继续承担 upstream truth detector、architecture gate、regression firewall。
+GitHub Actions 继续作为 upstream truth detector、architecture gate、regression firewall。
 
 ## M8 —— v0.3 Release Convergence
 
@@ -359,49 +347,49 @@ GitHub Actions 继续承担 upstream truth detector、architecture gate、regres
 - 删除没有成为 architecture 的 research / intermediate surface；
 - 只冻结已经挣出来的 public/package boundary；
 - README/spec/reference 与真实代码对齐；
-- 发布清晰 compatibility/security boundary；
-- packed/registry consumer smoke；
-- install/distribution 保持最小化，除非 released contract 真正需要更多。
+- 发布显式 compatibility/security boundary；
+- packed / registry consumer smoke；
+- install/distribution 保持最小化，除非 released contract 真的需要更多。
 
 ---
 
 # v0.3 Golden Test
 
-最终验收模拟真实 SaaS composition：
+最终验收应该像真实 SaaS product flow：
 
 ```text
-Tenant Acme
-├─ Alice
-│  ├─ Credentials A
-│  └─ MCP A
-└─ Bob
-   ├─ Credentials B
-   └─ MCP A
-
-Tenant Globex
-└─ Alice
-   ├─ Credentials C
-   └─ MCP B
+Trusted Product Request
+        ↓
+Tenant Acme / Alice
+│       ├─ Credentials A
+│       └─ Tenant MCP config A
+│
+├─ Tenant Acme / Bob
+│       ├─ Credentials B
+│       └─ Tenant MCP config A
+│
+└─ Tenant Globex / Alice
+        ├─ Credentials C
+        └─ Tenant MCP config B
 ```
 
-并发 Operation 必须证明每个 DSH Agent 只看到正确 Tenant capability、Principal credential、MCP composition；dispose/failure/recreation 仍保持 sibling 与 cross-Tenant isolation。
+并发 Operation 必须证明每个 DSH Agent / integration 只看到正确 identity、Tenant config、Principal credential；dispose/failure/recreation 一个 scope 不影响 sibling 与其他 Tenant。
 
-同一 suite 还要输入非法 Definition，并证明在用户流量进入前失败。
+同一 suite 还必须输入非法 Definition，并证明在用户流量进入前失败。
 
 # v0.3 Definition of Done
 
-1. `SaaSDefinition -> CompositionPlan` deterministic、strongly typed、fail-fast。✅
-2. 一次用户动作拥有一个 semantic Operation boundary，A6 proven。✅
-3. Principal -> Operation -> 真实 DSH create/resume/failure 有 CI evidence。✅
-4. Tenant / Principal capability isolation 在并发、失败、teardown、recreation 下成立。
-5. 最小 Authenticated Identity / Credentials / MCP contract 证明 replacement model，vendor product 不进入 Core。
-6. 至少一套 reference composition 真实端到端可用。
-7. semantic diagnostics 可以解释 Plan selection / failure。
-8. platform assumption / provider contract 在支持 baseline 上可执行。
-9. package boundary 来自真实独立价值，而不是 speculative name。✅ M3 当前结论：继续一个 package。
-10. 文档与安装说明准确描述用户真正获得的 artifact。
-
-M4–M8 会逐步完成其余条目。
+1. typed `SaaSDefinition -> CompositionPlan` deterministic、fail-fast。✅ M3.5 后
+2. canonical identity scope-local，不被无关 descendant 错误耦合。✅ M3.5 后
+3. 一次用户动作拥有一个 semantic Operation boundary，A6 proven。✅
+4. Principal -> Operation -> 真实 DSH create/resume/failure 有 CI evidence。✅
+5. Product Ingress 把 trusted identity 映射到 canonical Runtime，vendor auth 不进入 Core。
+6. Principal-owned typed Credentials contract 证明 replacement / isolation。
+7. 至少一条 DSH-native Agent Integration 真正端到端可用。
+8. semantic diagnostics 能解释 Plan selection/locality/failure。
+9. platform assumption / provider / integration contract 在支持 baseline 上可执行。
+10. package boundary 来自真实独立价值，而不是 speculative name。
+11. 文档与安装说明准确描述用户真正获得的 artifact。
 
 # v0.3 明确 Non-goals
 
@@ -409,53 +397,43 @@ M4–M8 会逐步完成其余条目。
 
 - 大量 OAuth/OIDC/SAML vendor integration；
 - production Vault/Redis/Postgres credential ecosystem；
-- 完整 MCP Apps/Resources 产品 UX；
+- 平行 MCP protocol stack；
+- 为 DSH 当前没有 consumer 的 MCP Resources / Prompts 写 compatibility shim；
 - Billing/Audit/Usage 产品；
 - Web 管理后台；
 - Plugin Marketplace / discoverability；
 - 超出 released contract 所需的 Distribution/Profile polish；
 - one-tenant-per-Pod orchestration；
 - 任意 dynamic provider hot reconfiguration；
-- 大规模 migration/provider ecosystem。
-
-这些事情不能拖慢 Framework Core。
+- 大型 migration/provider ecosystem。
 
 ---
 
 # v0.4 预告 —— Production Provider Ecosystem & Productization
 
-v0.4 把稳定的 v0.3 contract 扩展成更完整的 production-ready SaaS ecosystem。
+v0.4 把稳定 v0.3 boundary contract 扩展成更完整的 production-ready SaaS ecosystem。
 
-方向上可能包括：
+方向可能包括 production identity integration、durable credentials/secrets、随着 DSH consumer 稳定而扩展更丰富 MCP capability、operational provider、durable store/migration、更强 deployment profile 与更完善 Distribution / 安装体验。
 
-- production authentication / identity integration；
-- durable credential / secret provider；
-- DSH 有稳定 seam 时增强 MCP / MCP Apps / Resources；
-- Audit、Usage、Observability、operational provider；
-- durable store / migration / compatibility tooling；
-- 更强 process/container/Pod deployment profile；
-- 更完善开箱即用 Distribution / 安装体验；
-- ecosystem provider 文档 / conformance certification。
-
-这里仍然只是 **preview，不是详细 v0.4 Roadmap**。精确 scope 等 v0.3 的真实 architecture 与使用证据形成后再规划。
+这仍然只是 **preview，不是详细 v0.4 roadmap**；准确范围根据 v0.3 architecture 与真实使用证据决定。
 
 ---
 
 # 跨版本工程规则
 
-- 先全局设计，再局部修改；
-- specification / test 先于 public abstraction；
-- external assumption 必须有 executable evidence；
-- 优先让非法状态无法表达；
-- 显式建模 lifecycle / publication；
-- 用 semantic TypeScript type 替代松散字段；
-- 相关性和技术正确性同样重要；
-- prerelease compatibility 损害长期模型时直接丢掉；
-- Git history 足够保存的旧实验不继续占据 live tree；
-- 使用 Cordis / DSH 原生抽象，不造平行 registry / fork；
-- package boundary 只有在独立价值被证明后才创建；
-- 控制得住 -> enforce；需要生态协作 -> standardize；控制不住 -> explicit boundary。
+- 全局设计优先于局部编辑；
+- Spec / test 先于 public abstraction；
+- 外部 assumption 必须 executable verification；
+- 优先让 invalid state 无法表达；
+- lifecycle / publication 显式建模；
+- 使用 semantic TypeScript type，而不是 loose field；
+- 技术正确性与战略相关性同时优化；
+- prerelease compatibility 阻碍长期模型时不保留；
+- Git history 足够时，从 live tree 删除 obsolete experiment；
+- 使用 Cordis / DSH native abstraction，而不是平行 registry / fork；
+- package boundary 只在独立价值被证明后创建；
+- 控制得住的边界 enforce；依赖生态协作的边界 standardize；双方都控制不了的边界明确 document。
 
 # Explicit Security Boundary
 
-Cordis Context 是 trusted same-process composition/lifecycle boundary，不是 hostile-code sandbox。它不隔离 process memory、filesystem、shell、network、environment variable 或恶意同进程插件。Strong isolation 属于 process/container/Pod deployment boundary。
+Cordis Context 是 trusted same-process composition/lifecycle boundary，不是 hostile-code sandbox。它不隔离 process memory、filesystem、shell、network、environment variable 或 malicious same-process plugin。Strong isolation 属于 process/container/Pod deployment boundary。
