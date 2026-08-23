@@ -32,17 +32,34 @@ export type CapabilityProviderSetup = (
   preparation: CapabilityProviderPreparation,
 ) => CapabilityProviderSetupCommit | PromiseLike<CapabilityProviderSetupCommit | void> | void
 
-export interface CapabilityProviderDefinition {
+interface CapabilityProviderBase {
   readonly id: string
   readonly capability: string
-  readonly scope: CapabilityScope
   readonly requires?: readonly string[]
   /**
-   * Mount the provider in the native Cordis scope. Omitting setup declares an
-   * ambient provider whose service must already be visible at materialization.
+   * Optional stable identity for provider configuration that is not otherwise
+   * visible in the structural definition (for example a named config profile).
+   * Semantically different creation recipes must not reuse the same key.
    */
-  readonly setup?: CapabilityProviderSetup
+  readonly definitionKey?: string
 }
+
+/**
+ * A provider is either deployment-ambient or explicitly materialized.
+ *
+ * Ambient means the capability already exists in the application Context, so
+ * it can only truthfully be deployment-owned. Tenant/Principal/Operation
+ * providers must have setup code that materializes them inside that scope.
+ */
+export type CapabilityProviderDefinition =
+  | (CapabilityProviderBase & {
+      readonly scope: 'deployment'
+      readonly setup?: CapabilityProviderSetup
+    })
+  | (CapabilityProviderBase & {
+      readonly scope: Exclude<CapabilityScope, 'deployment'>
+      readonly setup: CapabilityProviderSetup
+    })
 
 export interface SaaSDefinition {
   readonly capabilities: readonly CapabilityDefinition[]
@@ -62,10 +79,13 @@ export interface PlannedProvider {
   readonly capability: string
   readonly scope: CapabilityScope
   readonly requires: readonly string[]
+  readonly definitionKey?: string
   readonly setup?: CapabilityProviderSetup
 }
 
 export interface CompositionPlan {
+  /** Stable structural identity excluding executable callback object identity. */
+  readonly fingerprint: string
   readonly capabilities: readonly PlannedCapability[]
   readonly providers: readonly PlannedProvider[]
   readonly bootstrapOrder: readonly string[]
@@ -133,6 +153,10 @@ function semanticName(value: string, label: string): string {
   return value
 }
 
+function optionalSemanticName(value: string | undefined, label: string): string | undefined {
+  return value === undefined ? undefined : semanticName(value, label)
+}
+
 function normalizeDependencies(names: readonly string[] | undefined): readonly string[] {
   if (names === undefined) return Object.freeze([])
   const unique = new Set<string>()
@@ -141,13 +165,15 @@ function normalizeDependencies(names: readonly string[] | undefined): readonly s
 }
 
 function freezeProvider(provider: CapabilityProviderDefinition): PlannedProvider {
+  const definitionKey = optionalSemanticName(provider.definitionKey, `definitionKey for provider "${provider.id}"`)
   const base = {
     id: semanticName(provider.id, 'provider id'),
     capability: semanticName(provider.capability, 'provider capability'),
     scope: provider.scope,
     requires: normalizeDependencies(provider.requires),
   }
-  return Object.freeze(provider.setup === undefined ? base : { ...base, setup: provider.setup })
+  const identified = definitionKey === undefined ? base : { ...base, definitionKey }
+  return Object.freeze(provider.setup === undefined ? identified : { ...identified, setup: provider.setup })
 }
 
 function freezeCapability(
@@ -164,6 +190,30 @@ function freezeCapability(
 
 function validateScope(scope: string, label: string): asserts scope is CapabilityScope {
   if (!(scope in SCOPE_RANK)) throw new TypeError(`${label} has unsupported scope "${scope}"`)
+}
+
+function createPlanFingerprint(
+  capabilities: readonly PlannedCapability[],
+  providers: readonly PlannedProvider[],
+  bootstrapOrder: readonly string[],
+): string {
+  return JSON.stringify({
+    capabilities: capabilities.map(capability => ({
+      key: capability.key,
+      scope: capability.scope,
+      required: capability.required,
+      providerId: capability.providerId ?? null,
+    })),
+    providers: providers.map(provider => ({
+      id: provider.id,
+      capability: provider.capability,
+      scope: provider.scope,
+      requires: provider.requires,
+      definitionKey: provider.definitionKey ?? null,
+      materialization: provider.setup === undefined ? 'ambient' : 'managed',
+    })),
+    bootstrapOrder,
+  })
 }
 
 export function compileSaaSDefinition(definition: SaaSDefinition): CompositionPlan {
@@ -183,6 +233,11 @@ export function compileSaaSDefinition(definition: SaaSDefinition): CompositionPl
   const providersByCapability = new Map<string, PlannedProvider[]>()
   for (const raw of definition.providers ?? []) {
     validateScope(raw.scope, `provider "${raw.id}"`)
+    if (raw.setup === undefined && raw.scope !== 'deployment') {
+      throw new CapabilityScopeMismatchError(
+        `provider "${raw.id}" declares ${raw.scope} ownership but has no scoped materializer; ambient providers are deployment-only`,
+      )
+    }
     const provider = freezeProvider(raw)
     if (providerDefs.has(provider.id)) {
       throw new DuplicateProviderDefinitionError(`provider "${provider.id}" is declared more than once`)
@@ -308,10 +363,16 @@ export function compileSaaSDefinition(definition: SaaSDefinition): CompositionPl
     if (!providerById.has(providerId)) throw new Error(`internal composition error: unknown provider "${providerId}"`)
   }
 
+  const frozenCapabilities = Object.freeze(capabilities)
+  const frozenProviders = Object.freeze(providers)
+  const frozenOrder = Object.freeze(bootstrapOrder)
+  const fingerprint = createPlanFingerprint(frozenCapabilities, frozenProviders, frozenOrder)
+
   return Object.freeze({
-    capabilities: Object.freeze(capabilities),
-    providers: Object.freeze(providers),
-    bootstrapOrder: Object.freeze(bootstrapOrder),
+    fingerprint,
+    capabilities: frozenCapabilities,
+    providers: frozenProviders,
+    bootstrapOrder: frozenOrder,
   })
 }
 
@@ -322,12 +383,8 @@ function selectedProvidersAt(plan: CompositionPlan, scope: CapabilityScope): rea
     .filter(provider => provider.scope === scope)
 }
 
-function scopeIsolation(plan: CompositionPlan, scope: CapabilityScope): readonly string[] {
-  return normalizeServiceNames(
-    selectedProvidersAt(plan, scope)
-      .filter(provider => provider.setup !== undefined)
-      .map(provider => provider.capability),
-  )
+function scopeIsolation(plan: CompositionPlan, scope: Exclude<CapabilityScope, 'deployment'>): readonly string[] {
+  return normalizeServiceNames(selectedProvidersAt(plan, scope).map(provider => provider.capability))
 }
 
 async function prepareCapabilityScope(
@@ -372,10 +429,15 @@ async function prepareCapabilityScope(
   }
 }
 
+function runtimeDefinitionKey(plan: CompositionPlan, scope: 'tenant' | 'principal'): string {
+  return `saas:${scope}:${plan.fingerprint}`
+}
+
 export function tenantDefinitionFromPlan(plan: CompositionPlan): TenantScopeDefinition {
   const isolateServices = scopeIsolation(plan, 'tenant')
   return {
     isolateServices,
+    definitionKey: runtimeDefinitionKey(plan, 'tenant'),
     setup: ({ ctx, signal }: RuntimeScopePreparation<TenantIdentity>) => prepareCapabilityScope(
       plan,
       'tenant',
@@ -389,6 +451,7 @@ export function principalDefinitionFromPlan(plan: CompositionPlan): PrincipalSco
   const isolateServices = scopeIsolation(plan, 'principal')
   return {
     isolateServices,
+    definitionKey: runtimeDefinitionKey(plan, 'principal'),
     setup: ({ ctx, signal }: RuntimeScopePreparation<TenantPrincipal>) => prepareCapabilityScope(
       plan,
       'principal',
