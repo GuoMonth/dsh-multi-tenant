@@ -52,6 +52,7 @@ describe('Principal-owned one-shot Operations', () => {
     await expect(operation.result).resolves.toBe('v1')
     expect(executions).toBe(1)
     expect(operation.state).toBe('disposed')
+    expect(operation.signal.aborted).toBe(false)
     expect(alice.operations.size).toBe(0)
 
     await providerTwo.dispose()
@@ -75,6 +76,7 @@ describe('Principal-owned one-shot Operations', () => {
     await expect(operation.result).rejects.toThrow(OperationDependencyUnavailableError)
     expect(executions).toBe(0)
     expect(operation.state).toBe('disposed')
+    expect(operation.signal.aborted).toBe(false)
 
     await tenant.dispose()
     await ctx.fiber.dispose()
@@ -105,6 +107,7 @@ describe('Principal-owned one-shot Operations', () => {
     await disposing
 
     expect(operation.state).toBe('disposed')
+    expect(operation.signal.aborted).toBe(true)
     expect(cleanupRuns).toBe(1)
     expect(alice.state).toBe('disposed')
     expect(alice.operations.accepting).toBe(false)
@@ -138,6 +141,7 @@ describe('Principal-owned one-shot Operations', () => {
     await expect(operation.result).rejects.toThrow()
     expect(cleanupRuns).toBe(1)
     expect(operation.state).toBe('disposed')
+    expect(operation.signal.aborted).toBe(true)
 
     await tenant.dispose()
     await ctx.fiber.dispose()
