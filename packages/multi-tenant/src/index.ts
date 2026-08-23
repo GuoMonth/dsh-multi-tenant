@@ -22,6 +22,7 @@ export {
   TenantRuntimeService,
   MultiTenantRuntimeError,
   RuntimeDefinitionConflictError,
+  RuntimeRegistryClosedError,
   runtimeIdentityOf,
   tenantIdOf,
   principalOf,
