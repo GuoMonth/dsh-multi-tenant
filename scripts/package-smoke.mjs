@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Package smoke: prove the packed tarball is a valid distributable for an
- * external consumer. Build -> pack -> verify contents/exports -> install into a
- * clean temp consumer -> exercise both the v0.1 kernel and v0.2 runtime.
+ * Package smoke: prove the packed tarball is the same contract we test in the
+ * repository. Build -> pack -> verify contents/exports -> install into a clean
+ * consumer -> exercise the frozen kernel, canonical Runtime, and v0.3
+ * Composition -> Principal Operation path through public package subpaths.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -44,6 +45,8 @@ try {
     'package.json',
     'dist/index.mjs',
     'dist/runtime.mjs',
+    'dist/operation.mjs',
+    'dist/composition.mjs',
     'dist/store.mjs',
     'dist/testing.mjs',
     'cordis.patch.yml',
@@ -64,6 +67,14 @@ try {
     'import Store from "dsh-multi-tenant/store";',
     'import Service from "dsh-multi-tenant";',
     'import Runtime from "dsh-multi-tenant/runtime";',
+    'import { OperationDependencyUnavailableError } from "dsh-multi-tenant/operation";',
+    'import {',
+    '  bootstrapDeploymentComposition,',
+    '  compileSaaSDefinition,',
+    '  operationDefinitionFromPlan,',
+    '  principalDefinitionFromPlan,',
+    '  tenantDefinitionFromPlan,',
+    '} from "dsh-multi-tenant/composition";',
     'import { assertTenantSessionStoreContract, assertRuntimeCapabilityProviderContract } from "dsh-multi-tenant/testing";',
     'const ctx = new Context();',
     'await ctx.plugin(Store);',
@@ -89,7 +100,44 @@ try {
     '  mount: (scopeCtx, marker) => { scopeCtx.provide("smokeCapability", marker); },',
     '  fingerprint: scopeCtx => scopeCtx.get("smokeCapability"),',
     '});',
+    'const ambient = ctx.plugin(function smokeDeploymentProvider(providerCtx) {',
+    '  providerCtx.provide("smokeDeployment", "deployment-ready");',
+    '});',
+    'await ambient;',
+    'const plan = compileSaaSDefinition({',
+    '  capabilities: [',
+    '    { key: "smokeDeployment", scope: "deployment", required: true },',
+    '    { key: "smokeTenant", scope: "tenant", required: true },',
+    '    { key: "smokePrincipal", scope: "principal", required: true },',
+    '    { key: "smokeOperation", scope: "operation", required: true },',
+    '  ],',
+    '  providers: [',
+    '    { id: "ambient", capability: "smokeDeployment", scope: "deployment" },',
+    '    { id: "tenant", capability: "smokeTenant", scope: "tenant", setup: ({ ctx: c }) => { c.provide("smokeTenant", "tenant-ready"); } },',
+    '    { id: "principal", capability: "smokePrincipal", scope: "principal", requires: ["smokeTenant"], setup: ({ ctx: c }) => { c.provide("smokePrincipal", "principal-ready"); } },',
+    '    { id: "operation", capability: "smokeOperation", scope: "operation", requires: ["smokePrincipal"], setup: ({ ctx: c }) => { c.provide("smokeOperation", "operation-ready"); } },',
+    '  ],',
+    '});',
+    'const deployment = await bootstrapDeploymentComposition(ctx, plan);',
+    'const saasTenant = await ctx.tenantRuntime.tenants.ensure("saas-acme", tenantDefinitionFromPlan(plan));',
+    'const saasAlice = await saasTenant.principals.ensure("alice", principalDefinitionFromPlan(plan));',
+    'const operation = saasAlice.operations.start({',
+    '  ...operationDefinitionFromPlan(plan),',
+    '  requires: ["smokeDeployment", "smokeTenant", "smokePrincipal", "smokeOperation"],',
+    '  execute: ({ capabilities }) => capabilities.keys.map(key => capabilities.require(key)).join("|"),',
+    '});',
+    'const operationValue = await operation.result;',
+    'if (operationValue !== "deployment-ready|operation-ready|principal-ready|tenant-ready") throw new Error(`smoke: unexpected Operation snapshot ${operationValue}`);',
+    'if (operation.state !== "disposed" || saasAlice.operations.size !== 0) throw new Error("smoke: Operation did not become quiescent");',
+    'const missing = saasAlice.operations.start({ requires: ["missing"], execute() { throw new Error("must not execute"); } });',
+    'let missingFailed = false;',
+    'try { await missing.result; } catch (error) { missingFailed = error instanceof OperationDependencyUnavailableError; }',
+    'if (!missingFailed) throw new Error("smoke: packaged Operation dependency error contract failed");',
+    'await saasTenant.dispose();',
+    'await deployment.dispose();',
+    'await ambient.dispose();',
     'await tenant.dispose();',
+    'await ctx.fiber.dispose();',
     'console.log("consumer smoke passed");',
   ].join('\n'))
   execFileSync('node', ['smoke.mjs'], { cwd: consumer, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
