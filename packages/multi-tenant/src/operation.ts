@@ -1,4 +1,9 @@
 import type { Context, Fiber } from '@deepseek-ai/cordis'
+import {
+  assertCapabilityToken,
+  type CapabilityToken,
+  type CapabilityValue,
+} from './capability.ts'
 import type { TenantPrincipal } from './types.ts'
 import { disposeFiber, isolatedContext, normalizeServiceNames, raceAbort } from './scope.ts'
 
@@ -35,10 +40,11 @@ export interface OperationScopeDefinition {
 }
 
 export interface OperationCapabilitySnapshot {
+  readonly capabilities: readonly CapabilityToken[]
   readonly keys: readonly string[]
-  has(name: string): boolean
-  get<T = unknown>(name: string): T | undefined
-  require<T = unknown>(name: string): T
+  has<C extends CapabilityToken>(capability: C): boolean
+  get<C extends CapabilityToken>(capability: C): CapabilityValue<C> | undefined
+  require<C extends CapabilityToken>(capability: C): CapabilityValue<C>
 }
 
 export interface PrincipalOperationExecution {
@@ -49,7 +55,7 @@ export interface PrincipalOperationExecution {
 }
 
 export interface PrincipalOperationDefinition<T> extends OperationScopeDefinition {
-  readonly requires?: readonly string[]
+  readonly requires?: readonly CapabilityToken[]
   execute(execution: PrincipalOperationExecution): T | PromiseLike<T>
 }
 
@@ -94,48 +100,62 @@ export class OperationCancelledError extends PrincipalOperationError {
 
 function operationOwner(): void {}
 
-function normalizeRequiredCapabilities(names: readonly string[] | undefined): string[] {
-  if (names === undefined) return []
-  const unique = new Set<string>()
-  for (const name of names) {
-    if (typeof name !== 'string' || name.length === 0 || name !== name.trim()) {
-      throw new TypeError('operation capability names must be non-empty trimmed strings')
+function normalizeRequiredCapabilities(
+  capabilities: readonly CapabilityToken[] | undefined,
+): readonly CapabilityToken[] {
+  if (capabilities === undefined) return Object.freeze([])
+  const byKey = new Map<string, CapabilityToken>()
+  for (const capability of capabilities) {
+    assertCapabilityToken(capability, 'operation capability')
+    const existing = byKey.get(capability.key)
+    if (existing !== undefined && existing.scope !== capability.scope) {
+      throw new TypeError(
+        `operation capability "${capability.key}" is declared with conflicting scopes ${existing.scope}/${capability.scope}`,
+      )
     }
-    unique.add(name)
+    byKey.set(capability.key, capability)
   }
-  return [...unique].sort()
+  return Object.freeze([...byKey.values()].sort((a, b) => a.key.localeCompare(b.key)))
 }
 
 class ImmutableCapabilitySnapshot implements OperationCapabilitySnapshot {
+  readonly capabilities: readonly CapabilityToken[]
   readonly keys: readonly string[]
 
-  constructor(private readonly values: ReadonlyMap<string, unknown>) {
-    this.keys = Object.freeze([...values.keys()])
+  constructor(
+    capabilities: readonly CapabilityToken[],
+    private readonly values: ReadonlyMap<string, unknown>,
+  ) {
+    this.capabilities = Object.freeze([...capabilities])
+    this.keys = Object.freeze(capabilities.map(capability => capability.key))
     Object.freeze(this)
   }
 
-  has(name: string): boolean {
-    return this.values.has(name)
+  has<C extends CapabilityToken>(capability: C): boolean {
+    return this.values.has(capability.key)
   }
 
-  get<T = unknown>(name: string): T | undefined {
-    return this.values.get(name) as T | undefined
+  get<C extends CapabilityToken>(capability: C): CapabilityValue<C> | undefined {
+    return this.values.get(capability.key) as CapabilityValue<C> | undefined
   }
 
-  require<T = unknown>(name: string): T {
-    if (!this.values.has(name)) throw new OperationDependencyUnavailableError(name)
-    return this.values.get(name) as T
+  require<C extends CapabilityToken>(capability: C): CapabilityValue<C> {
+    if (!this.values.has(capability.key)) throw new OperationDependencyUnavailableError(capability.key)
+    return this.values.get(capability.key) as CapabilityValue<C>
   }
 }
 
-function captureCapabilities(ctx: Context, names: readonly string[]): OperationCapabilitySnapshot {
+function captureCapabilities(
+  ctx: Context,
+  capabilities: readonly CapabilityToken[],
+): OperationCapabilitySnapshot {
   const values = new Map<string, unknown>()
-  for (const name of names) {
-    const value = ctx.get(name)
-    if (value === undefined) throw new OperationDependencyUnavailableError(name)
-    values.set(name, value)
+  for (const capability of capabilities) {
+    const value = ctx.get(capability.key)
+    if (value === undefined) throw new OperationDependencyUnavailableError(capability.key)
+    values.set(capability.key, value)
   }
-  return new ImmutableCapabilitySnapshot(values)
+  return new ImmutableCapabilitySnapshot(capabilities, values)
 }
 
 function cancellationReason(reason: unknown): Error {
@@ -201,9 +221,6 @@ class PrincipalOperationRegistryImpl implements PrincipalOperationRegistry {
         const operationCtx = ownerFiber.ctx
 
         operationCtx.effect(() => () => {
-          // A structural owner disappearing while semantic work is still live
-          // is cancellation. Normal/failed/cancelling teardown has already
-          // entered a terminal state and must not rewrite completion as abort.
           if ((state === 'preparing' || state === 'active') && !abort.signal.aborted) {
             abort.abort(new OperationCancelledError('operation owner disposed'))
           }
@@ -248,7 +265,6 @@ class PrincipalOperationRegistryImpl implements PrincipalOperationRegistry {
       }
     })()
 
-    // Observe rejection even when a caller creates a handle before attaching to result.
     void result.catch(() => {})
 
     const settle = async (): Promise<void> => {
