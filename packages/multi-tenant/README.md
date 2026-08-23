@@ -21,7 +21,7 @@ Deployment / Root
 │   │   ├── principal capabilities
 │   │   └── Operation
 │   │       ├── operation capabilities
-│   │       └── one-shot snapshot -> DSH Agent
+│   │       └── typed one-shot snapshot -> Agent integration -> DSH
 │   └── Principal(bob)
 │
 └── Tenant(globex)
@@ -35,7 +35,7 @@ The package combines three layers:
 
 1. **Persistent ownership authorization** — v0.1 claim-once `(tenantId, userId) -> session` invariant, fail closed.
 2. **Canonical Multi-Tenant Runtime** — v0.2 Tenant/Principal identity, unpublished setup, isolation and quiescent teardown.
-3. **SaaS Core composition/operation semantics** — v0.3 deterministic capability planning and Principal-owned one-shot work.
+3. **SaaS Core composition/operation semantics** — v0.3 typed capability planning and Principal-owned one-shot work.
 
 Current guarantees include:
 
@@ -49,14 +49,41 @@ Current guarantees include:
 - capability scope maps to a real Cordis ownership boundary;
 - invalid SaaS graphs fail before Runtime bootstrap;
 - equivalent Plans normalize deterministically;
-- structurally different Plans cannot silently share an active canonical node;
+- true local creation drift fails explicitly;
+- unrelated descendant Plan changes do not create false parent Runtime conflicts;
 - one user-visible action executes once even if a captured provider later churns;
 - DSH Agent create/resume receives the correct caller-bound Operation/Principal `ownerCtx`;
 - repeated Operation cancel/dispose is idempotent and quiescent.
 
-## Canonical publication
+## Typed CapabilityToken
 
-The v0.2 low-level Runtime contract remains available directly:
+Capability identity is represented by one semantic token:
+
+```ts
+import {
+  defineCapability,
+  provideCapability,
+} from 'dsh-multi-tenant'
+
+const credentials = defineCapability<Credentials, 'principal'>(
+  'credentials',
+  'principal',
+)
+```
+
+The token binds:
+
+```text
+stable Cordis service key
++ semantic value type
++ lifecycle/authority scope
+```
+
+`provideCapability()` / `getCapability()` are only typed facades over Cordis. They do not create storage, resolution or a second DI container.
+
+## Low-level canonical Runtime
+
+The v0.2 contract remains directly available:
 
 ```ts
 const acme = await ctx.tenantRuntime.tenants.ensure('acme', {
@@ -76,45 +103,57 @@ const alice = await acme.principals.ensure('alice', {
 })
 ```
 
-Consumers may call `ensure(key)` without a definition to join an existing canonical node. Callers that know the creation recipe can supply `definitionKey`; a different key/isolation definition fails with `RuntimeDefinitionConflictError`.
-
-The v0.3 Composition layer generates these canonical definition identities from a deterministic Plan fingerprint.
+Consumers may call `ensure(key)` without a definition to join an existing canonical node. Callers supplying a different semantic creation definition fail with `RuntimeDefinitionConflictError`.
 
 ## SaaS Composition
 
-`dsh-multi-tenant/composition` separates mutable product intent from executable Runtime structure:
+`dsh-multi-tenant/composition` separates mutable intent from executable Runtime structure:
 
 ```ts
+const tenantMcpConfig = defineCapability<TenantMcpConfig, 'tenant'>('tenantMcpConfig', 'tenant')
+
 const plan = compileSaaSDefinition({
   capabilities: [
-    { key: 'agents', scope: 'deployment', required: true },
-    { key: 'tenantMcp', scope: 'tenant', required: true },
-    { key: 'credentials', scope: 'principal', required: true },
+    { capability: agents, required: true },
+    { capability: tenantMcpConfig, required: true },
+    { capability: credentials, required: true },
   ],
   providers: [
-    { id: 'dsh-agents', capability: 'agents', scope: 'deployment' },
+    { id: 'dsh-agents', capability: agents },
     {
-      id: 'tenant-mcp',
-      capability: 'tenantMcp',
-      scope: 'tenant',
+      id: 'tenant-mcp-config',
+      capability: tenantMcpConfig,
       setup({ ctx }) {
-        ctx.provide('tenantMcp', makeTenantMcp())
+        provideCapability(ctx, tenantMcpConfig, loadTenantMcpConfig())
       },
     },
     {
       id: 'credentials',
-      capability: 'credentials',
-      scope: 'principal',
-      requires: ['tenantMcp'],
+      capability: credentials,
+      requires: [tenantMcpConfig],
       setup({ ctx }) {
-        ctx.provide('credentials', loadCredentials())
+        provideCapability(ctx, credentials, loadCredentials())
       },
     },
   ],
 })
 ```
 
-The compiler resolves provider selection, dependency visibility, cycles, scope placement and deterministic bootstrap order. Non-deployment providers must actually materialize in their declared scope; an ambient provider is deployment-only.
+The compiler resolves provider selection, dependency visibility, cycles and deterministic bootstrap order. Ambient providers are deployment-only; non-deployment providers must materially own their capability inside the declared Cordis scope.
+
+### Whole Plan vs local canonical identity
+
+```text
+plan.fingerprint
+  exact whole-plan structural identity
+
+plan.scopeFingerprints.tenant
+plan.scopeFingerprints.principal
+plan.scopeFingerprints.operation
+  provider dependency-closure identity for that scope
+```
+
+Canonical Tenant/Principal definitions use their local scope fingerprint. An Operation-only provider change therefore does not invalidate an unrelated existing Tenant/Principal, while a changed provider actually participating in Tenant creation still conflicts.
 
 Use the Plan to derive Runtime definitions:
 
@@ -133,16 +172,16 @@ Use the Principal-owned Operation registry:
 ```ts
 const operation = alice.operations.start({
   ...operationDefinitionFromPlan(plan),
-  requires: ['agents', 'tenantMcp', 'credentials'],
+  requires: [agents, credentials],
   async execute({ capabilities, signal }) {
-    const agents = capabilities.require<any>('agents')
-    const credentials = capabilities.require('credentials')
+    const dshAgents = capabilities.require(agents)
+    const credential = capabilities.require(credentials)
 
-    return agents.create({
+    return dshAgents.create({
       sessionId,
       signal,
       setup(agentCtx) {
-        // Compose DSH-native Agent/Preset scoped tools/prompts/listeners here.
+        // Compose DSH-native Agent/Preset scoped behavior here.
       },
     })
   },
@@ -151,15 +190,32 @@ const operation = alice.operations.start({
 const handle = await operation.result
 ```
 
-The Operation creates a normal Principal-owned child Fiber, prepares operation-local providers, resolves all required Cordis capabilities once into an immutable snapshot, then invokes `execute()` once. Provider churn never causes semantic re-entry.
+The token determines the snapshot return type. Operation creates a normal Principal-owned child Fiber, prepares Operation-local providers, captures required Cordis values exactly once and invokes `execute()` once. Provider churn never causes semantic re-entry.
 
-The captured capability is still the real Cordis value/traceable service; this is not a second service registry.
+## Framework boundary planes
+
+Product identity ingress and Agent integration are not flattened into the Runtime Provider graph.
+
+```text
+Product authentication
+  -> trusted identity resolution
+  -> TenantPrincipal
+  -> canonical Runtime
+  -> typed capabilities
+  -> Operation
+  -> Agent integration
+  -> DSH
+```
+
+The next v0.3 stage uses Credentials as the first real Principal capability and MCP Tools as a DSH-native Agent integration reference path rather than creating a parallel MCP stack.
+
+See the repository spec `docs/specs/saas-boundaries.md`.
 
 ## DSH Agent boundary
 
-CI executes the real public `@deepseek-ai/dsh-agent` AgentRegistry on the pinned baseline. The vertical proof covers concurrent multi-Tenant create, resume and downstream create failure, and verifies that the DSH factory sees the correct Tenant/Principal/Operation caller context.
+CI executes the real public `@deepseek-ai/dsh-agent` AgentRegistry on the pinned baseline. The vertical proof covers concurrent multi-Tenant create, resume and downstream create failure and verifies the DSH factory sees the correct Tenant/Principal/Operation caller context.
 
-Operation does not copy Cordis private isolation maps into `Agent.ctx`, does not create an Agent tenant registry, and does not replace DSH Agent/Preset scope semantics.
+Operation does not copy Cordis private isolation maps into `Agent.ctx`, does not create an Agent tenant registry and does not replace DSH Agent/Preset scope semantics.
 
 ## Tenant-safe provider contract
 
@@ -178,9 +234,9 @@ The harness checks same-name A/B isolation, parent/root non-leakage, descendant 
 
 ## Package boundary
 
-The M3 gate deliberately keeps one package. `runtime`, `operation`, `composition` and `testing` are public subpaths of `dsh-multi-tenant` because they currently form one ownership/lifecycle contract.
+The current gate deliberately keeps one package. `runtime`, `operation`, `composition` and `testing` are public subpaths because they still form one ownership/lifecycle contract.
 
-A separate SaaS package should appear only if later Auth/Credentials/MCP contracts prove an independent consumer, replacement, lifecycle, release or Distribution boundary.
+A separate SaaS/Auth/MCP package should appear only if later implementation proves an independent consumer, replacement, lifecycle, release or Distribution boundary.
 
 ## Context identity is not authorization
 
@@ -192,15 +248,13 @@ This package is not a hostile-code/process sandbox. Cordis Context does not isol
 
 Strong isolation belongs to process/container/Pod deployment boundaries.
 
-The package also does not claim every DSH/provider implementation is automatically tenant-safe. Provider compatibility must be proven. Production Auth, credentials/secrets, MCP ecosystem integrations, audit/usage and Distribution polish remain later v0.3/v0.4 work.
-
 ## Install
 
 ```sh
 dsh plugin --profile <profile> add dsh-multi-tenant
 ```
 
-The bundle installs the deployment-global ownership kernel and TenantRuntimeService. Composition/Operation are programmatic public APIs layered on the Runtime contract.
+The bundle installs the deployment-global ownership kernel and TenantRuntimeService. Typed Composition/Operation are programmatic public APIs layered on that Runtime contract.
 
 ## Public subpaths
 
@@ -220,7 +274,7 @@ pnpm install --frozen-lockfile
 pnpm release:check
 ```
 
-CI verifies exact upstream DSH identity, Cordis lifecycle assumptions, the SaaS Core vertical path on Node 22.19/24, and the packed tarball in a clean external consumer.
+CI verifies exact upstream DSH identity, Cordis lifecycle assumptions, typed/local Composition behavior, the SaaS Core vertical path on Node 22.19/24 and the packed tarball in a clean external consumer.
 
 ## License
 
