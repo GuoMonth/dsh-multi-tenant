@@ -1,142 +1,136 @@
 [English](./ROADMAP.md) | 简体中文
 
-# Roadmap —— v0.2 Multi-Tenant Runtime
+# Roadmap
 
-状态：✅ 已完成 · 🚧 当前 · 🤝 生态/上游协作 · 🧭 后续 · ⛔ 明确边界。
+项目当前处于快速推进阶段，不承诺 prerelease API 兼容。核心规则是：以长期系统的最佳工程结构、数据结构、状态流转与语义类型为目标，不为了保留早期形态制造兼容债。
 
-## 版本线策略
+## 版本线
 
-### v0.1 —— 冻结
+### v0.1 —— 冻结的 Security Kernel
 
-已经发布的 v0.1 tag 冻结，继续表示纯授权 Kernel：
+v0.1 负责 durable authorization invariant：
 
-- 最小 `TenantPrincipal`；
-- 不可变 session ownership；
+- 最小 `{ tenantId, userId }` principal identity；
+- claim-once immutable session ownership；
 - fail-closed authorization；
 - 可替换 `TenantSessionStore` contract。
 
-v0.1 不再做新功能；真正的 Runtime 扩展全部进入 v0.2。
+这一层应该保持小、稳定、无聊。
 
-### v0.2 —— 当前主线
+### v0.2 —— Multi-Tenant Runtime Contract
 
-目标：**让 DeepSeek Harness 真正成为 Multi-Tenant Runtime**。
+v0.2 把 tenancy 变成 first-class runtime structure，而不是到处传 `tenantId`。
 
-当前 candidate：`0.2.0-rc.1`。
-本 PR 的可执行 DSH compatibility target：`0.1.0-rc.7`（仓库已经验证的 lockfile 闭包）。当前上游 `0.1.1-rc.2` 的 scope 行为已审阅；依赖升级独立处理。
-
-## 架构契约
-
-Runtime 刻意拆成不同 plane，而不是让一个“tenant 机制”承担所有职责。
-
-| Plane | Owner | 作用 |
-| --- | --- | --- |
-| 持久授权 | `ctx.multiTenant` + `TenantSessionStore` | Session ownership invariant；永远 fail closed。 |
-| Tenant capability graph | Cordis Context service isolation | Tenant-local auth/MCP/credential/provider instance 与生命周期。 |
-| Principal capability graph | Cordis Context service isolation | Tenant 下的 user-local OAuth/credential/policy provider。 |
-| Agent/Preset registration view | DSH `@deepseek-ai/dsh-scope` | Tools、prompt、listener 与 model-facing registration visibility。 |
-| 强运行时隔离 | Deployment/container/K8S | Process、filesystem、shell、network、memory。 |
-
-Tenant Runtime **禁止**再造一套按 tenantId 索引的 DI/service registry。Cordis Context 就是 dependency scope。
-
-## ✅ R0 —— 保留 v0.1 Kernel
-
-v0.1 security kernel 完整保留进 v0.2。`multiTenant`、`tenantSessionStore`、`tenantRuntime` 以及 Cordis core service 都属于 reserved shared services，不能被 Tenant Context 隔离掉。
-
-## 🚧 R1 —— Context-native Runtime（`0.2.0-rc.1`）
-
-交付第一版可执行 runtime primitive：
-
-- `ctx.tenantRuntime`；
-- 每个 tenantId 一套 canonical live Tenant Context；
-- Tenant 下的 Principal Context；
-- 显式 `isolateServices` capability 选择；
-- `tenantIdOf(ctx)` / `principalOf(ctx)` contextual metadata；
-- Cordis Fiber structural disposal；
-- duplicate tenant graph 拒绝；
-- cross-tenant principal binding 拒绝；
-- two-tenant adversarial tests；
-- packed external-consumer runtime smoke；
-- 保留已经验证的 RC7 可执行兼容闭包，同时用当前上游 scope 行为校验架构方向。
-
-退出条件：仓库完整 release gate 通过，packed package 能证明两个 Tenant 对同名 service 得到独立 provider，同时 ownership kernel 仍然共享。
-
-## 🤝 R2 —— Provider Compatibility Contract
-
-Context 只能隔离真正尊重 Context/service scope 的 provider。对真实 DSH provider 做 inventory，并分类：
-
-1. **Context-safe** —— 可以直接实例化在 Tenant / Principal Context 下；
-2. **需要修 scoped global-state** —— provider 使用 `ctx.root`、module singleton、global Map/Set、env 或其他 deployment-global identity；
-3. **设计上就是 host-global** —— 不应该 tenant-local，应提供安全 tenant-facing facade。
-
-在已审阅的当前上游里，第一个明确 gap 是 DSH MCP client 的 `serverName` reservation 按 `ctx.root` 全局管理。应推动最小 upstream/provider 修复，让 namespace ownership scope-aware，而不是 fork MCP runtime。
-
-重点 capability family：
-
-- Auth/session identity provider；
-- MCP connection 与 credential；
-- credential/token store；
-- tenant config/secrets；
-- 合适场景下的 storage/workspace adapter；
-- 需要 tenant-local instance 的 model/provider policy。
-
-## 🧭 R2.5 —— DSH Dependency Refresh
-
-独立升级完整 DSH package graph 与 `pnpm-lock.yaml`，从当前已验证 RC7 闭包切到更新 release。不要把这类 dependency-resolution churn 混进 v0.2 架构 PR。
-
-## 🤝 R3 —— Authenticated Transport → Context Binding
-
-Production boundary 定义为：
+最终收口 MR 全绿并合并后，v0.2 即视为完成。其核心 contract 为：
 
 ```text
-HTTP request / WebSocket connection
-        ↓ authenticate
-TenantPrincipal
-        ↓ resolve/create
-Tenant Context / Principal Context
-        ↓
-从该 Context 驱动 DSH 工作
+Deployment / Root
+  ├─ shared ownership kernel
+  └─ TenantRuntimeService
+       └─ Tenant                  canonical capability node
+            └─ Principal         canonical capability node
+                 └─ derived integration fibers
+                      └─ DSH Agent / transport / provider operations
 ```
 
-能够由 Context 承载 dependency graph 的地方，不要再把 `tenantId` 参数扩散到每个 provider。Wire、durable、worker 与 authorization boundary 仍必须保留显式 identity。
+#### Canonical Runtime Structure
 
-需要证明：
+- Tenant / Principal 共用 `ensure / get / state / dispose` 语义；
+- Principal 结构上嵌套在 Tenant 下，错误 tenant/principal 组合不可表达；
+- 消费层可以只凭 identity 加入已有 canonical node，不需要知道 creation recipe；
+- 显式再次提供 definition 时才校验 capability-definition drift。
 
-- Tenant A/B 并发请求不 cross-talk；
-- WebSocket lifetime 始终绑定正确 Principal Context；
-- client field 不能选择可信 tenant/principal identity；
-- session publication/lookup 仍通过 ownership kernel。
+#### Publication 与 Lifecycle
 
-## 🧭 R4 —— Agent Integration
+- asynchronous work 之前先 reserve canonical identity；
+- setup 在 unpublished Cordis subtree 上运行；
+- 可选同步 `commit()` 拥有精确 publication boundary；
+- 并发 `ensure()` single-flight；
+- preparing transaction 是 first-class、可取消 lifecycle resource；
+- registry shutdown 先 close admission，再 cancel unpublished creation，最后 drain published scope；
+- setup 失败完整 rollback；
+- Tenant teardown 拥有 Principal teardown。
 
-将 Tenant / Principal Context 与 DSH Agent creation 集成，但不能破坏现有 Agent/Preset scope-parent chain。
+#### Capability 与 Agent 语义
 
-优先方向：
+- Cordis service isolation 负责 Tenant / Principal capability authority 与 provider lifetime；
+- DSH `@deepseek-ai/dsh-scope` 负责 Agent / Preset registration visibility；
+- Principal Context 是 capability root，不是 dependency-injection bypass；
+- 具体 operation 从 Principal 派生 integration fiber，并显式 inject 所需 service；
+- Agent creation 使用真实 DSH caller-bound `ownerCtx` seam，不复制 Context 私有状态。
 
-- 从 Tenant / Principal-derived Cordis Context 创建/驱动 Agent；
-- DSH `agent.ctx` 继续负责 Agent-local registration lifecycle；
-- Preset standing-scope ancestry 保持不变；
-- 明确定义 Agent creation 继承哪些 tenant-scoped services。
+#### Provider Ecosystem Contract
 
-## 🧭 R5 —— Production Providers
+`dsh-multi-tenant/testing` 提供可执行 Runtime Capability Provider Contract，覆盖 A/B isolation、leakage、inheritance、sibling、teardown、recreation 与 unpublished setup。
 
-按真实需求拆成可替换 Plugin Family：
+#### DSH Baseline 与 Evidence
 
-- durable ownership store（PostgreSQL/MySQL/Redis，按需求）；
-- reference auth/context binder；
-- tenant credential provider；
-- 上游 namespace/global-state gap 解决后的 MCP tenant adapter；
-- audit/usage provider。
+当前明确 baseline：
 
-不要让 core runtime 绑定某一套 SaaS 技术栈。
+- DSH version：`0.1.1-rc.2`
+- release commit：`b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`
 
-## ⛔ 明确边界
+Baseline 由我们手动推进；blocking CI 永远不跟随 floating upstream state。
 
-Cordis Context 不是 hostile-code sandbox，它不隔离：
+CI 同时证明两件事：
 
-- process memory/global；
-- filesystem/shell；
-- network；
-- environment variable；
-- 故意访问 `ctx.root` 或 process API 的 arbitrary plugin code。
+1. checkout 精确 upstream release commit，验证源码身份；
+2. 对精确 npm package 运行 session genesis、admission/publication、Agent owner/composition executable probes。
 
-要求 strong tenant isolation 的部署继续使用独立 process/container/Pod。Billing、组织 UI、general RBAC 与产品特定用户管理不属于本仓库 core contract。
+#### Release Model
+
+当前 release mechanics 刻意保持简单：
+
+- package version 只存在于 `packages/multi-tenant/package.json`；
+- 手动 GitHub release workflow 自动读取这个版本；
+- npm 只发布到 `latest`；
+- registry smoke 验证 `latest` 指向刚发布的版本；
+- prerelease / stable 语义由 SemVer 本身表达，不再维护第二个 npm channel。
+
+## v0.3 —— SaaS Framework
+
+v0.2 冻结后，主线直接进入 SaaS Framework。
+
+目标是：**由可替换 Plugin Family 构成、但提供 opinionated 开箱即用体验的 SaaS Framework / Distribution**，而不是一个 monolithic super-plugin。
+
+```text
+                         dsh-saas
+                 SaaS Distribution / Framework
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+      Auth              Credentials            MCP
+        │                   │                   │
+    Transport              Audit              Usage
+        │                   │                   │
+        └──────────── Provider Contracts ───────┘
+                            │
+                   dsh-multi-tenant
+                 Runtime Contract + Kernel
+```
+
+### v0.3 优先级
+
+1. **SaaS composition model** —— 定义 provider slot 与强类型 configuration/composition graph；
+2. **Authenticated transport binding** —— wire boundary 完成认证，resolve canonical Tenant / Principal，再从 derived integration fiber 驱动工作；
+3. **Agent orchestration** —— 从 Principal-owned integration boundary create/resume/drive DSH Agent，同时保持 DSH Agent/Preset scope 语义；
+4. **Reference Provider Family** —— Auth、credential/token storage、MCP tenancy、durable store、audit/usage 等按需求实现；
+5. **Distribution defaults** —— 提供一套官方推荐的开箱即用组合，同时所有 provider slot 可替换；
+6. **Diagnostics & compatibility** —— startup validation、health、provider conformance、migration、清晰 compatibility matrix。
+
+Strong isolation 仍然是 deployment profile，不是 Context promise。未来 K8S profile 可以把一个 Tenant 映射到一个 Pod，同时保持同一套上层 SaaS contract。
+
+## 工程规则
+
+- 先全局设计，再局部修改；
+- 优先使用让非法状态不可表达的数据结构；
+- 显式建模 lifecycle / state transition；
+- 用 TypeScript 强类型与泛型携带语义；
+- package version、DSH baseline 等 identity 只保留一个 source of truth；
+- prerelease 阶段如果兼容性损害长期模型，直接破坏兼容；
+- 使用 Cordis / DSH 原生抽象，不另造平行 registry 或本地 fork；
+- 控制得住的边界严格 enforce，需要生态协作的定义标准，控制不住的明确 boundary。
+
+## Explicit Security Boundary
+
+Cordis Context 是 trusted same-process composition / lifecycle boundary，不是 process sandbox。它不隔离 process memory、filesystem、shell、network、environment variable 或任意同进程插件。Strong isolation 属于 process / container / Pod boundary。

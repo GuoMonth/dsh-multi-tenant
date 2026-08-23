@@ -1,26 +1,21 @@
 #!/usr/bin/env node
 /**
- * Session genesis runtime proof: confirm the static Genesis Map findings against
- * the current pinned `@deepseek-ai/dsh-session` runtime.
+ * Session genesis runtime proof against the repository's exact DSH baseline.
  *
- *   F1  — `session/created` fires AFTER the session is already in the store
- *         (get-visible), so it is not a before-visibility admission point.
- *   F2  — a synchronous `session/created` throw vetoes publication (rolls the
- *         store entry back); an async listener's rejection is logged, not vetoed.
- *
- * Run from the repo root: `node scripts/session-genesis-probe.mjs`.
- * Installs the current target into a throwaway temp dir (not the workspace).
+ *   F1  — `session/created` fires AFTER the session is already in the store.
+ *   F2  — a synchronous `session/created` throw vetoes publication; an async
+ *         listener rejection is observed later and cannot veto publication.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DSH_TARGET_VERSION } from './dsh-target.mjs'
+import { DSH_TARGET } from './dsh-target.mjs'
 
 const tmp = mkdtempSync(join(tmpdir(), 'dsh-mt-genesis-'))
 try {
   writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'genesis-probe', private: true, type: 'module' }))
-  execFileSync('pnpm', ['add', `@deepseek-ai/dsh-session@${DSH_TARGET_VERSION}`, '@deepseek-ai/cordis@4.0.1'], {
+  execFileSync('pnpm', ['add', `@deepseek-ai/dsh-session@${DSH_TARGET.version}`, '@deepseek-ai/cordis@4.0.1'], {
     cwd: tmp,
     stdio: 'ignore',
   })
@@ -30,7 +25,6 @@ try {
     '',
     'const results = {};',
     '',
-    '// F1: is the session already get-visible when `session/created` fires?',
     '{',
     '  const ctx = new Context();',
     '  await ctx.plugin(SessionStore);',
@@ -40,7 +34,6 @@ try {
     '  results.F1 = { visibleAtCreated, idExistsAfter: ctx.sessions.get(session.id) !== undefined };',
     '}',
     '',
-    '// F2a: a synchronous throw vetoes publication.',
     '{',
     '  const ctx = new Context();',
     '  await ctx.plugin(SessionStore);',
@@ -50,7 +43,6 @@ try {
     '  results.F2_sync = { threw, sessionCount: ctx.sessions.list().length };',
     '}',
     '',
-    '// F2b: an async rejection is logged, not vetoed.',
     '{',
     '  const ctx = new Context();',
     '  await ctx.plugin(SessionStore);',
@@ -69,7 +61,7 @@ try {
     'console.log(JSON.stringify(results));',
   ].join('\n'))
   const out = execFileSync('node', ['probe.mjs'], { cwd: tmp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-  console.log(`Session genesis proof passed on DSH ${DSH_TARGET_VERSION}: ${out.trim()}`)
+  console.log(`Session genesis proof passed on DSH ${DSH_TARGET.version}: ${out.trim()}`)
 } finally {
   rmSync(tmp, { recursive: true, force: true })
 }

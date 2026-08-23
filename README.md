@@ -4,84 +4,134 @@
 
 Make [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) a real **Multi-Tenant Runtime** while preserving a small, auditable security kernel.
 
-> **Current line: `0.2.0-rc.1`.** Published v0.1 tags are frozen historical contracts. v0.1 owns immutable session ownership and fail-closed authorization; v0.2 adds context-native Tenant/Principal capability scopes above that kernel. The executable DSH compatibility closure stays on the proven **`0.1.0-rc.7`** pin in this PR; current upstream `0.1.1-rc.2` scope behavior was reviewed separately.
+> **Current line: `0.2.0-rc.3`.** v0.1 is the frozen ownership/authorization kernel. v0.2 is the canonical Tenant/Principal Runtime Contract that the upcoming SaaS Framework will compose rather than rewrite.
+>
+> **Current DSH compatibility baseline:** `0.1.1-rc.2` at upstream release commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`. The version is explicitly pinned and manually advanced; CI never follows floating `latest` or `master`.
 
 ## Architecture
 
 ```text
-Deployment / Root Context
+Deployment / Root
 │
 ├── shared TenantSessionStore
-├── shared MultiTenantService        <- persistent authorization invariant
+├── shared MultiTenantService          persistent authorization invariant
 ├── shared TenantRuntimeService
 │
-├── Tenant A Cordis Context          <- capability graph
-│   ├── tenant-local auth / MCP / providers
-│   └── Principal A Context
-│       └── user-local credentials
+├── Tenant(acme)                       canonical runtime node
+│   ├── tenant capability graph
+│   ├── Principal(alice)               canonical runtime node
+│   │   └── principal capability graph
+│   └── Principal(bob)
 │
-└── Tenant B Cordis Context
-    ├── tenant-local auth / MCP / providers
-    └── Principal B Context
-        └── user-local credentials
+└── Tenant(globex)
 ```
 
-The project intentionally separates three isolation levels:
+The project separates four planes instead of overloading one tenant mechanism:
 
-1. **Ownership kernel** — durable `(tenantId, userId) -> session` authorization, fail closed.
-2. **Cordis context isolation** — tenant/principal service resolution and plugin lifecycle.
-3. **Deployment isolation** — process/filesystem/network/shell boundaries such as one tenant per container/Pod when stronger isolation is required.
+1. **Persistent authorization** — durable `(tenantId, userId) -> session` ownership; always fail closed.
+2. **Tenant/Principal capability graph** — Cordis Context service isolation and lifecycle.
+3. **Agent/Preset registration graph** — DSH `@deepseek-ai/dsh-scope`; tools, prompts, listeners and Agent-local visibility.
+4. **Strong deployment isolation** — process/filesystem/network/shell boundaries such as one tenant per container/Pod when required.
 
-DSH's own `@deepseek-ai/dsh-scope` remains the Agent/Preset registration-visibility plane. Tenant capability isolation uses Cordis service isolation instead of competing for the Agent scope parent chain.
+A canonical Principal Context is a capability/composition root. Operations that need additional services run in a Principal-derived integration fiber with explicit Cordis injection. For Agent creation the structural path is:
+
+```text
+Principal Runtime
+      ↓
+Principal-derived integration fiber
+  inject: agents
+      ↓
+ownerCtx.agents.create(...)
+      ↓
+DSH Agent setup / Agent scope
+```
+
+This preserves both planes instead of pretending `Agent.ctx` directly inherits the tenant service-isolation graph.
 
 ## v0.1 is frozen
 
-The published v0.1 tags remain unchanged and document the original kernel contract:
+The published v0.1 line remains the security kernel:
 
 - minimal authenticated `TenantPrincipal`;
 - claim-once immutable session ownership;
 - fail-closed access decisions;
 - replaceable `TenantSessionStore` provider seam.
 
-No new feature work is planned on the v0.1 line. Those guarantees are retained inside v0.2 as defense in depth.
+Those guarantees remain deployment-global inside v0.2 as defense in depth.
 
-## v0.2 runtime
+## v0.2 Runtime Contract
 
-`ctx.tenantRuntime` creates real Cordis tenant/principal child lifecycles. Selected service names receive independent isolation labels, so providers mounted below Tenant A and Tenant B resolve independently without a second application-level `tenantId -> service` container.
+Tenant and Principal share one structural vocabulary:
 
-The runtime is provider-neutral: auth, MCP, credential, storage, model, or other capability providers opt into tenancy by being mounted under the appropriate context and by avoiding deployment-global state that bypasses Cordis resolution.
+```ts
+const tenant = await ctx.tenantRuntime.tenants.ensure('acme', tenantDefinition)
+const alice = await tenant.principals.ensure('alice', principalDefinition)
+```
 
-Known upstream/provider gaps are documented rather than hidden. For example, in the reviewed current upstream the DSH MCP client reserves `serverName` against `ctx.root`, so equal server names across tenant-local instances are not yet automatically safe.
+Both levels are canonical runtime nodes with immutable identity, scoped Context, explicit lifecycle state, idempotent quiescent disposal, and canonical `ensure/get` registries.
 
-## Guiding principles
+Creation is transactional:
 
-- **Control → enforce** — strict fail-closed invariants where this repository owns the boundary.
-- **Ecosystem → standardize** — use Cordis/DSH native scope mechanisms and propose the smallest upstream seam when a provider is still global.
-- **Outside control → bound** — Context is not a process sandbox; say so explicitly.
-- **No second DI container** — tenant capability resolution belongs to Cordis Context.
-- **Defense in depth** — Context routing never replaces persistent session ownership checks.
+```text
+reserve canonical identity
+        ↓
+prepare unpublished Cordis subtree
+        ↓
+await setup(signal)
+        ↓
+optional synchronous commit()
+        ↓
+publish active node
+```
+
+Preparing transactions are first-class lifecycle resources. Registry teardown closes admission, cancels unpublished creations, then drains published scopes. Partial graphs are never visible; concurrent `ensure()` calls single-flight; setup failure rolls back; definition drift fails explicitly.
+
+## Provider ecosystem
+
+`dsh-multi-tenant/testing` exposes an executable Runtime Capability Provider Contract. Provider authors can prove same-name A/B isolation, root/parent non-leakage, descendant inheritance, sibling non-interference, disposal isolation, clean recreation, and unpublished setup ownership.
+
+That contract is the base of the future Plugin Family: the SaaS Framework may ship opinionated defaults while every capability slot remains replaceable.
+
+## Engineering principles
+
+- **Structure before patches** — design ownership, data structures and state transitions so correct behavior grows naturally.
+- **Strong semantic types** — use TypeScript types/generics to encode lifecycle and identity meaning rather than passing loosely related fields.
+- **Control -> enforce** — fail closed where this repository owns the boundary.
+- **Ecosystem -> standardize** — define executable provider/integration contracts instead of absorbing every implementation.
+- **Outside control -> bound** — Cordis Context is not a hostile-code or process sandbox.
+- **No prerelease compatibility debt** — break early APIs when a better long-term abstraction exists.
+- **No second DI container** — capability resolution belongs to Cordis Context.
+
+## Compatibility evidence
+
+CI proves the selected DSH baseline in two independent ways:
+
+- checks out the exact upstream DSH release commit and verifies its root package version;
+- runs executable session genesis, admission/publication and Agent owner/composition probes against the exact published npm packages.
+
+The baseline is explicit and manually refreshed when we choose to move DSH forward.
 
 ## Packages
 
 | Package | Distribution | Role |
 | --- | --- | --- |
-| [`packages/multi-tenant`](./packages/multi-tenant) | npm `dsh-multi-tenant@next` | v0.2 runtime + frozen v0.1 ownership kernel: `ctx.tenantRuntime`, `ctx.multiTenant`, `ctx.tenantSessionStore`. |
-| [`packages/multi-tenant-web`](./packages/multi-tenant-web) | private workspace | Experimental Web/API enforcement research; transport integration remains gated by real authenticated principal/context binding. |
+| [`packages/multi-tenant`](./packages/multi-tenant) | npm `dsh-multi-tenant` (`latest`) | v0.2 Runtime Contract + frozen v0.1 ownership kernel. |
+| [`packages/multi-tenant-web`](./packages/multi-tenant-web) | private workspace | Experimental Web/API enforcement research; production transport composition belongs to the SaaS Framework stage. |
 
-See [ROADMAP.md](./ROADMAP.md), [`docs/releases/v0.2.0-rc.1.md`](./docs/releases/v0.2.0-rc.1.md), and [CONTRIBUTING.md](./CONTRIBUTING.md).
+See [ROADMAP.md](./ROADMAP.md), [`docs/releases/v0.2.0-rc.3.md`](./docs/releases/v0.2.0-rc.3.md), and [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## Install
+
+```sh
+dsh plugin --profile <profile> add dsh-multi-tenant
+```
+
+`latest` always represents the newest version this project has intentionally published. We do not maintain a separate prerelease dist-tag during the current rapid-iteration phase.
 
 ## Development
 
 ```sh
-pnpm install
-pnpm typecheck
-pnpm test
-pnpm build
-```
-
-Full release gate:
-
-```sh
+pnpm install --frozen-lockfile
 pnpm release:check
 ```
 

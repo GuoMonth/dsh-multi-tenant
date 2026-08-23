@@ -2,115 +2,112 @@
 
 # Contributing
 
-## Development model: spec-driven, then test-driven
+## Engineering model: global structure first
 
-This repository develops by **spec first, test second, implementation third**.
+This repository optimizes for long-term structural correctness and rapid iteration, not prerelease compatibility.
 
-1. **Spec** — a capability starts as a written spec: a *Seam Map* (surfaces +
-   gaps), a contract sketch, or an *ADR* that records the decision. No
-   implementation until the contract is written down.
-2. **Test** — write the contract test *before* the implementation. A provider's
-   contract test is a **shared suite** that any implementation of that seam must
-   pass.
-3. **Implement** — the smallest thing that satisfies the spec and the test.
+Before changing code, model the system globally:
 
-Current spec artifacts: `docs/specs/web-seam-map.md` (web surfaces) and
-`docs/adr/web-enforcement.md` (hard conclusions + upstream seam
-proposal).
+1. **Ownership/data structure** — what is the canonical tree/graph, and which invalid states should be impossible to represent?
+2. **State transitions** — what are the explicit lifecycle states, publication boundaries, cancellation paths and teardown order?
+3. **Semantic types** — which identity/capability/lifecycle meanings should TypeScript encode instead of leaving as loosely related fields?
+4. **Native framework structure** — can Cordis/DSH already express the dependency, lifecycle or registration plane instead of adding another registry/facade?
+5. **Executable contract** — what test or conformance harness proves the abstraction independently of one implementation?
+
+Only then implement the smallest coherent structure. Do not accumulate local patches around a weak model.
 
 ## Boundary-first decision rule
 
-Before adding implementation, classify the surface being discussed:
+Classify every guarantee:
 
-1. **Controlled by this repository → enforce it.** If we own the reliable
-   enforcement point, make the rule fail-closed and prove the invariant with
-   executable tests.
-2. **Owned by the ecosystem → standardize it.** If the guarantee depends on a
-   DSH or third-party seam, define the smallest reusable contract / seam,
-   publish conformance expectations, and collaborate upstream. A local spike is
-   evidence; it is not permission to permanently fork or reimplement the
-   upstream subsystem.
-3. **Not reliably enforceable → bound it.** State the threat-model / support
-   boundary and keep the promise narrow. Do not add broad architectural
-   machinery merely to claim coverage over a surface we still cannot prove.
+1. **Controlled by this repository -> enforce it.** Own the reliable boundary, make it fail closed where appropriate, and prove it.
+2. **Owned by the ecosystem -> standardize it.** Define or consume the smallest reusable DSH/provider seam and executable conformance contract.
+3. **Not reliably enforceable -> bound it.** State the support/security boundary rather than hiding it behind a parallel registry or local fork.
 
-Complexity is not evidence. A PR whose main effect is to absorb an upstream or
-uncontrolled responsibility into this repository should be rejected or
-deferred unless it demonstrates a stable, independently owned boundary.
+## Runtime structural rules
 
-## Prerelease-following discipline
+The v0.2 runtime is a canonical ownership tree:
 
-DeepSeek Harness is moving quickly, so this project optimizes for **small,
-explicit compatibility deltas** rather than long-lived local forks. The current
-target baseline is **DSH `0.1.0-rc.7`**.
+```text
+Root -> Tenant -> Principal -> derived integration fibers -> DSH operations
+```
 
-- Pin explicit prerelease versions; never make compatibility depend on an
-  unqualified `latest` tag.
-- Record the exact DSH version / commit used by a probe or architectural
-  conclusion.
-- Historical evidence is immutable evidence: an RC6 proof stays labelled RC6
-  until the affected seam is revalidated for RC7. Do not rewrite the label just
-  because source looks similar.
-- On a DSH bump, identify which seams changed and rerun only the affected
-  probes / conformance checks. Do not redesign unchanged layers.
-- Keep compatibility upgrades separate from unrelated feature expansion when
-  practical, so regressions and upstream changes remain easy to review and
-  revert.
+Contributions must preserve these semantics:
 
-See `docs/reference/compatibility.md` for the current target and evidence policy.
+- Tenant and Principal share canonical registry semantics;
+- Principal identity is structurally nested under Tenant;
+- asynchronous creation is unpublished until setup/commit succeeds;
+- preparing creation is cancellable lifecycle state, not only a Promise;
+- registry teardown closes admission, cancels preparing transactions, then drains published scopes;
+- Principal Context is a capability root; operations derive fibers and explicitly inject dependencies;
+- DSH Agent/Preset registration scope remains separate from Cordis Tenant/Principal service isolation;
+- the v0.1 ownership kernel remains shared and is not replaced by Context metadata.
+
+If a proposed feature requires repeated exceptions to these rules, revisit the abstraction before adding exceptions.
+
+## Strong types and semantics
+
+Prefer TypeScript types/generics that carry meaning:
+
+- use distinct identity/state/definition types instead of generic dictionaries;
+- normalize optional input into explicit internal data shapes;
+- make parent-child structure encode invariants where possible;
+- expose only lifecycle states consumers can actually observe;
+- avoid APIs that force upper layers to know lower-layer creation recipes;
+- keep one source of truth for package version, DSH baseline and other identities.
+
+Compiler failures such as `exactOptionalPropertyTypes` violations are design feedback; fix the data shape rather than weakening compiler settings.
+
+## DSH compatibility discipline
+
+Current exact baseline:
+
+- version: `0.1.1-rc.2`
+- release commit: `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`
+
+`scripts/dsh-target.mjs` is authoritative. The baseline is manually advanced and never floats.
+
+A DSH refresh must:
+
+1. select an explicit version + release commit;
+2. update every DSH-facing pin consistently;
+3. regenerate the lockfile from the real registry;
+4. verify the exact upstream source identity in GitHub Actions;
+5. rerun the exact-version published-package runtime probes;
+6. fix failures structurally rather than weakening evidence;
+7. update current docs while preserving historical release evidence.
+
+See `docs/reference/compatibility.md`.
 
 ## Package conventions
 
-- One package = one **independently composable / replaceable capability**, or
-  one **indivisible security boundary**. Never a code-size threshold, and never
-  a fragment of a single security invariant.
-- Prefer **native DSH/Cordis seams** (Service, event/waterfall, typed
-  protocol). Do not invent a Service merely to create a package boundary.
-- **Contract and default implementation may co-locate** (especially early). A
-  package may be a *pure provider* or a *pure integration*; extract a separate
-  package only when a provider gains independent install / replace / lifecycle
-  value.
-- **Do not scaffold speculative packages.** Create a package only when an
-  independent composition / replacement / dependency / versioning / lifecycle /
-  security boundary has been *demonstrated* — justified in an ADR, not by a
-  code-size or implementation-count threshold.
-- Directory names are short (`multi-tenant`); npm names are the published
-  identity (`dsh-multi-tenant`). They need not match.
+- One package = one independently composable/replaceable capability, one integration boundary, or one indivisible security invariant.
+- Prefer native DSH/Cordis Service, Context, Fiber, scope and typed protocol seams.
+- Contract and default implementation may co-locate early; split only when replacement/lifecycle/versioning value is real.
+- Do not scaffold speculative packages.
+- The future SaaS Framework should be an opinionated Distribution assembled from a Plugin Family, not a monolithic implementation package.
 
-## Dependency direction (non-negotiable)
+## Dependency direction
 
-```
-Kernel primitives ◀── capability contracts ◀── providers
+```text
+Runtime/kernel primitives <- capability contracts <- providers <- SaaS distribution
 ```
 
-The kernel owns only the minimal cross-suite tenant primitives (identity,
-ownership, authorization) and has zero transport/vendor dependencies — it never
-knows JWT / PostgreSQL / HTTP / MCP / Redis. Capability packages own their own
-contracts and may depend on the kernel's primitives. Providers depend on the
-package that owns their contract. Sibling capabilities do not reach through one
-another's implementations. A pull request that adds a transport/vendor
-dependency into the kernel is rejected.
+The runtime package keeps transport/vendor implementations out of core. Auth products, databases, HTTP/WebSocket transport, MCP product integration, audit/usage implementations and deployment profiles compose above the Runtime Contract.
 
 ## Tests: contract vs conformance
 
-Two test kinds prove different things:
-
-- **Contract Test Suite** — for a *provider seam* (e.g. `TenantSessionStore`).
-  Any implementation must pass the same suite as the default provider. This is
-  what makes "default ≠ only" hold: a replacement is proven by the contract,
-  not by fiat. The kernel ships this suite via the `dsh-multi-tenant/testing`
-  subpath (`assertTenantSessionStoreContract`).
-- **Conformance / Invariant Suite** — for a *security or integration
-  capability* (e.g. web enforcement). It asserts the tenant-isolation
-  invariants (A cannot list / history / mux / respond B; concurrent principals
-  never cross-talk), which no single provider's unit test can prove.
+- **Provider contract suites** prove a replaceable seam (for example `TenantSessionStore` or Runtime Capability Provider Contract).
+- **Conformance/invariant suites** prove cross-component properties such as tenant isolation, publication ordering and lifecycle ownership.
+- **Compatibility probes** prove assumptions about exact external DSH versions.
+- **Packed/registry smoke** proves the artifact users actually install, not only workspace source.
 
 ## Definition of done
 
-- Spec / ADR updated wherever behavior is decided.
-- The boundary classification is explicit when a change depends on an upstream
-  or otherwise uncontrolled surface.
-- Compatibility evidence names the DSH version it was actually validated on.
-- Contract and unit tests green (`pnpm test`).
-- `pnpm typecheck`, `pnpm build`, `pnpm verify`, and `pnpm smoke` green.
-- No transport/vendor dependency leaked into the kernel.
+- architecture/data/state/type implications reviewed globally;
+- current docs/ADR/spec updated where behavior is decided;
+- upstream/boundary ownership is explicit;
+- exact DSH compatibility evidence is green when relevant;
+- `pnpm release:check` is green;
+- no transport/vendor implementation leaks into the runtime kernel;
+- no compatibility shim is added solely to preserve an obsolete prerelease abstraction.

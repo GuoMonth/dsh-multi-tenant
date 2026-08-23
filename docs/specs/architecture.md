@@ -1,142 +1,272 @@
 [简体中文](./architecture.zh-CN.md) | English
 
-# Architecture — six layers, explicit ownership
+# Architecture — canonical runtime, explicit planes
 
-The project is **one composable plugin family**, organized into six conceptual
-layers. The layers describe where a multi-tenant guarantee must connect; they do
-**not** mean this repository must implement every layer. The boundary rule is
-part of the architecture:
+This document is the current architecture authority for `dsh-multi-tenant` v0.2 and the foundation that v0.3 SaaS Framework composes.
 
-- owned enforcement points are implemented and tested here;
-- ecosystem-owned seams are specified and upstreamed;
-- capabilities outside the supported threat model stay explicit boundaries.
+The design goal is not to spread tenant checks across APIs. It is to make tenancy a structural property of the runtime so identity, capability resolution and lifecycle ownership follow one coherent model.
 
-## The six layers
-
-| # | Layer | Artifact | Responsibility | Ownership / status |
-| --- | --- | --- | --- | --- |
-| ① | **Kernel** | `dsh-multi-tenant` | `TenantPrincipal` / `SessionOwner`, claim-once ownership, fail-closed authorization, the `TenantSessionStore` contract. | **Owned here.** ✅ test-pinned, prerelease contract. |
-| ② | **Ownership provider** | `TenantSessionStore` impls | Persist ownership. Providers prove conformance with the shared contract suite. | **Contract owned here; providers replaceable.** ✅ in-memory reference; durable providers demand-gated. |
-| ③ | **Genesis admission** | `ctx.agents` decorator | Join Agent `setup`; establish / inherit / restore ownership before `sessions.enter`. | **Owned here where DSH exposes the hook.** ✅ RC6 runtime proof; RC7 evidence refresh is release work. |
-| ④ | **Identity bridge** | DSH transport scope + auth resolver/provider | Carry authenticated request/connection identity to a scoped `TenantPrincipal`. | **Split ownership.** 🤝 transport scope is a DSH ecosystem seam; auth providers are optional integrations after that seam exists. |
-| ⑤ | **Enforcement plane** | `dsh-multi-tenant-web` | Principal-bound `ApiProxy`: guard/filter/admit/deny; later streams/respond under the same scope. | **Owned here after Layer ④ exists.** 🚧 unary spike exists; production Web contract is ecosystem-gated. |
-| ⑥ | **Distribution / integration** | optional bundles / recipes | Compose whichever kernel, provider, auth, Web, MCP, audit, or deployment components a product needs. | **Not a mandatory full-stack deliverable.** 🧭 recipes may be added when useful. |
-
-## Diagram
-
-```mermaid
-flowchart TD
-    subgraph L4["④ Identity Bridge"]
-        direction TB
-        HTTP["HTTP / WebSocket"] --> SCOPE["DSH request / connection scope<br/>(ecosystem seam)"]
-        SCOPE --> AUTH["replaceable auth resolver/provider"]
-        AUTH --> PRINCIPAL["scoped TenantPrincipal"]
-    end
-
-    PRINCIPAL -->|"create / fork / subagent / resume"| GENESIS
-    PRINCIPAL -->|"guard / filter / admit"| ENFORCE
-
-    subgraph L3["③ Genesis Admission"]
-        GENESIS["Agent setup decorator<br/>establish / inherit / restore"]
-    end
-
-    subgraph L5["⑤ Enforcement Plane"]
-        ENFORCE["tenant-bound ApiProxy<br/>guard / filter / admit / deny"]
-    end
-
-    GENESIS --> KERNEL
-    ENFORCE --> KERNEL
-
-    subgraph L1["① Kernel"]
-        KERNEL["dsh-multi-tenant<br/>TenantPrincipal · SessionOwner<br/>ownership + fail-closed authorization"]
-    end
-
-    KERNEL --> STORE
-
-    subgraph L2["② Ownership Provider"]
-        STORE["TenantSessionStore contract"]
-        STORE --> MEM["Memory reference"]
-        STORE --> DURABLE["optional durable providers"]
-        STORE --> THIRD["third-party providers"]
-    end
-
-    subgraph L6["⑥ Distribution / Integration"]
-        RECIPE["optional bundles / deployment recipes"]
-    end
-
-    RECIPE -.-> L1
-    RECIPE -.-> L2
-    RECIPE -.-> L3
-    RECIPE -.-> L4
-    RECIPE -.-> L5
-```
-
-## Request flow
-
-1. **④ Identity bridge** — a deployment authenticates an HTTP request or WS
-   upgrade and resolves a `TenantPrincipal`. For production Web isolation this
-   requires a DSH request/connection scope that can carry or install the scoped
-   API/security context. The kernel never sees JWT/OIDC/API-key mechanics.
-2. **③ Genesis** — on `create` / `fork` / `subagent` / `resume`, the admission
-   decorator joins Agent `setup` and establishes, inherits, or restores ownership
-   before `sessions.enter`.
-3. **⑤ Enforcement** — a tenant-bound `ApiProxy` guards session-keyed methods,
-   filters only collections whose semantics remain correct, and denies
-   unmodelled/global surfaces. Streams/respond remain denied in the spike until
-   Layer ④ provides a real principal scope.
-4. **① Kernel** — `MultiTenantService` authorizes against the
-   `TenantSessionStore` contract. Tenant and user ownership is immutable in the
-   0.1 line.
-5. **② Provider** — ownership is stored by the selected provider. Provider
-   choice does not change the kernel contract.
-
-## Dependency direction (one-way)
+## 1. Canonical runtime tree
 
 ```text
-Kernel primitives  ◀──  capability contracts  ◀──  providers / integrations
+Deployment / Root
+│
+├── TenantSessionStore                 shared durable ownership seam
+├── MultiTenantService                 shared fail-closed authorization kernel
+├── TenantRuntimeService               canonical runtime root
+│
+├── Tenant(acme)                       canonical capability node
+│   ├── tenant-local providers
+│   ├── Principal(alice)               canonical capability node
+│   │   ├── principal-local providers
+│   │   └── derived integration fibers
+│   │       └── Agent / transport / provider operations
+│   └── Principal(bob)
+│
+└── Tenant(globex)
 ```
 
-- The **kernel** has zero transport/vendor dependencies — it never knows JWT,
-  PostgreSQL, HTTP, MCP, Redis, or a particular deployment runtime.
-- Capability packages own only the contracts they can enforce.
-- Provider and integration packages depend on the contract they implement; a
-  sibling capability does not reach through another sibling's implementation.
-- A missing upstream seam is not solved by importing or copying the entire
-  upstream subsystem into the kernel.
+Tenant and Principal are not request DTOs. They are live runtime nodes with identity, Context, lifecycle and canonical registry semantics.
 
-## H3 under DSH RC7 — ecosystem seam, not kernel blocker
+Principal is structurally nested under Tenant. A Principal registry is keyed by `userId`; its `tenantId` is derived from its parent. Cross-tenant Principal binding is therefore not merely rejected by an `if` statement — the public data model does not represent it.
 
-RC7's public `ConnectionRpcHandler` receives decoded
-`(endpoint, payload, signal)`, while the DSH Web carrier owns the real HTTP/WS
-boundary and documents that it currently has no authentication layer. That is
-enough evidence to classify request/connection principal scope as an
-**ecosystem-owned seam**.
+## 2. One runtime-node vocabulary
 
-The project therefore does not need a production-like local Web transport fork
-to release the kernel. The deliverable is a minimal, tenant-agnostic upstream
-proposal that lets a deployment derive/install a request/connection-scoped API
-or security context from the real HTTP request / WS upgrade. When such a seam
-exists, Layer ⑤ can turn its current fail-closed spike into production Web
-enforcement.
+Tenant and Principal share the same semantic base shape:
 
-## Explicit architecture boundary: execution isolation
+```ts
+interface RuntimeScope<K, I> {
+  readonly kind: K
+  readonly identity: Readonly<I>
+  readonly ctx: Context
+  readonly state: 'active' | 'disposing' | 'disposed'
+  dispose(): Promise<void>
+}
 
-This architecture protects the application/session control surfaces it covers.
-It does **not** claim process, filesystem, shell, container, credential,
-network/egress, or host isolation for an Agent that the surrounding DSH
-deployment has already allowed to run. Strong execution isolation belongs to
-the deployment/runtime layer and is intentionally outside this plugin family's
-0.1 guarantee.
+interface RuntimeScopeRegistry<Key, Scope, Definition> {
+  get(key: Key): Scope | undefined
+  ensure(key: Key, definition?: Definition): Promise<Scope>
+}
+```
 
-## Layer → roadmap ownership
+The nesting adds only the capability that structurally belongs to the parent:
 
-| Layer | Roadmap treatment |
-| --- | --- |
-| ① Kernel | first-release blocker; owned and enforced here |
-| ② Provider | contract is release blocker; durable providers are independent follow-ups |
-| ③ Genesis admission | RC7 compatibility evidence is release blocker |
-| ④ Identity bridge | ecosystem track; does not block kernel release |
-| ⑤ Web enforcement | production work waits for Layer ④; not a kernel blocker |
-| ⑥ Distribution / integration | optional recipes, never a required "complete SaaS stack" milestone |
+```ts
+interface TenantRuntimeScope extends RuntimeScope<'tenant', TenantIdentity> {
+  readonly principals: RuntimeScopeRegistry<
+    string,
+    PrincipalRuntimeScope,
+    PrincipalScopeDefinition
+  >
+}
+```
 
-See `../../ROADMAP.md` for the release and ecosystem tracks.
+This is deliberate: avoid unrelated special-purpose verbs such as `createTenantForRequest`, `createPrincipalForAgent`, or provider-specific runtime managers. New features should compose from this tree rather than widen the core API surface.
+
+## 3. Creation recipe vs runtime identity
+
+A node has two different concerns:
+
+- **identity** — what canonical node the caller wants;
+- **definition** — how a missing node should be constructed.
+
+Consumers may join an existing node without knowing its creation recipe:
+
+```ts
+const tenant = await ctx.tenantRuntime.tenants.ensure('acme')
+```
+
+Configuration/bootstrap code may explicitly define creation:
+
+```ts
+const tenant = await ctx.tenantRuntime.tenants.ensure('acme', {
+  isolateServices: ['tenantAuth', 'tenantMcp'],
+  setup: async ({ ctx, signal }) => {
+    await ctx.plugin(authProvider)
+    await ctx.plugin(mcpProvider)
+  },
+})
+```
+
+When an explicit definition targets an already active canonical identity, incompatible capability shape is rejected. Upper layers are not forced to duplicate lower-layer configuration merely to resolve identity.
+
+## 4. Publication transaction
+
+Async configuration must not make a half-built Tenant/Principal visible.
+
+The creation state machine is:
+
+```text
+ABSENT
+  │ ensure(identity, definition)
+  ▼
+RESERVED / PREPARING              not visible through get()
+  │
+  ├─ prepare isolated Cordis subtree
+  ├─ await setup(signal)
+  ├─ optional synchronous commit()
+  │
+  ├──────── success ───────────────► ACTIVE / published
+  │
+  └──────── failure/cancel ────────► rollback -> ABSENT
+```
+
+The optional synchronous `commit()` owns the exact publication boundary for external mutable state that must be revalidated or flipped immediately before visibility. This intentionally mirrors DSH Agent unpublished-setup/publication semantics.
+
+Concurrent `ensure()` calls for one key single-flight into one creation transaction.
+
+## 5. Preparing transaction is a lifecycle resource
+
+A preparing scope is not modeled as only `Promise<Scope>`. That would lose the capability to cancel creation during parent teardown and can create a self-waiting lifecycle:
+
+```text
+Tenant.dispose()
+    waits pending Principal promise
+        waits forever
+            only Tenant teardown could cancel it
+```
+
+The registry therefore owns a cancellable creation transaction conceptually equivalent to:
+
+```ts
+interface RuntimeCreation<Scope> {
+  readonly ready: Promise<Scope>
+  cancel(reason: unknown): Promise<void>
+}
+```
+
+Registry teardown is ordered:
+
+```text
+OPEN
+  ↓ close admission
+CLOSING
+  ↓ cancel all preparing creations
+  ↓ dispose/drain all published scopes
+CLOSED
+```
+
+Tenant disposal first closes/drains its Principal registry and then unwinds the Tenant Cordis fiber. Replacement of the same canonical identity cannot overlap a still-draining old graph.
+
+## 6. Four independent planes
+
+Tenancy is not one overloaded mechanism.
+
+| Plane | Owner | Responsibility |
+| --- | --- | --- |
+| Persistent authorization | `MultiTenantService` + `TenantSessionStore` | Durable session ownership; fail closed. |
+| Tenant/Principal capability graph | Cordis Context service isolation | Auth/MCP/credential/provider resolution and lifecycle. |
+| Agent/Preset registration graph | DSH `@deepseek-ai/dsh-scope` | Agent-local tools, prompts, listeners and model-facing visibility. |
+| Strong isolation | Deployment/container/K8S | Process, filesystem, shell, network, memory boundary. |
+
+The first two are defense-in-depth, not alternatives. Context identity is trusted same-process composition metadata; it never replaces persistent ownership authorization.
+
+## 7. Principal Context and integration fibers
+
+A Principal Context is a canonical capability root. It is not a bypass around Cordis dependency injection.
+
+An operation that needs a service derives a child integration fiber and explicitly injects the dependency:
+
+```ts
+const alice = await tenant.principals.ensure('alice')
+
+const operation = alice.ctx.inject(['agents'], async (ownerCtx) => {
+  return ownerCtx.agents.create({
+    sessionId,
+    setup(agentCtx) {
+      const credentials = ownerCtx.get('userCredentials')
+      // Compose Agent-local DSH registrations into agentCtx.
+    },
+  })
+})
+
+await operation
+```
+
+This provides a natural place for future HTTP/WebSocket request scope, Agent orchestration, tracing and operation-local cancellation without polluting the canonical Principal node with ephemeral state.
+
+## 8. Agent boundary
+
+Current DSH Agent creation carries the `ctx.agents.create()` caller Context into the factory as `ownerCtx`. The runtime relies on that public seam.
+
+It deliberately does **not**:
+
+- copy Cordis private isolation maps into `Agent.ctx`;
+- make Tenant a second parent in DSH's Agent/Preset scope ancestry;
+- provide an Agent-specific tenant service registry.
+
+Instead:
+
+```text
+Principal capability root
+       ↓ derived fiber (inject agents)
+DSH ownerCtx boundary
+       ↓ setup composition
+DSH Agent/Preset scope
+```
+
+The two graphs preserve different semantics and remain composable.
+
+## 9. Provider contract
+
+A provider being mountable below a Context does not automatically make it tenant-safe. Providers can bypass scope through root state, module globals, process environment or other deployment-wide mutable state.
+
+`dsh-multi-tenant/testing` therefore exposes an executable Runtime Capability Provider Contract. It verifies:
+
+- same-name Tenant A/B isolation;
+- root/parent non-leakage;
+- expected descendant inheritance;
+- Principal sibling isolation;
+- disposing one scope does not affect another;
+- recreation has no stale state;
+- mounting works during unpublished setup.
+
+Provider compatibility is a contract, not an assumption.
+
+## 10. Dependency direction
+
+The architecture grows upward:
+
+```text
+v0.1 ownership kernel
+        ↑
+v0.2 Runtime Contract
+        ↑
+capability contracts
+        ↑
+replaceable providers / integrations
+        ↑
+v0.3 SaaS Distribution / Framework
+```
+
+The runtime package keeps transport/vendor implementations out of core. A future SaaS distribution may install opinionated Auth, credentials, MCP, storage, audit and transport defaults, but those providers remain independently replaceable.
+
+## 11. v0.3 composition target
+
+```text
+                         dsh-saas
+                 SaaS Distribution / Framework
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+      Auth              Credentials            MCP
+        │                   │                   │
+    Transport              Audit              Usage
+        │                   │                   │
+        └──────────── Provider Contracts ───────┘
+                            │
+                   dsh-multi-tenant
+                 Runtime Contract + Kernel
+```
+
+The Framework provides the product experience and opinionated defaults. The Plugin Family provides the replaceable architecture.
+
+## 12. Explicit boundary
+
+Cordis Context is a trusted same-process capability/lifecycle structure, not a hostile-code sandbox. It does not isolate arbitrary process memory, filesystem, shell, network, environment variables or code deliberately escaping to root/process APIs.
+
+Strong isolation belongs to deployment profiles such as one Tenant per process/container/Pod.
+
+## 13. Compatibility baseline
+
+Current exact DSH baseline and executable evidence policy are defined in [`../reference/compatibility.md`](../reference/compatibility.md). Architecture code must not depend on floating upstream state.

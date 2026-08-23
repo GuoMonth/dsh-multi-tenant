@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * Release-manifest preflight for the current v0.2 runtime prerelease.
- * Runtime/API behavior is covered by verify/test/smoke/probe:dsh; this script
- * prevents packaging/publication drift.
+ * Release-manifest preflight.
+ *
+ * package.json is the single source of truth for the release version and npm
+ * channel. Runtime/API behavior is covered by verify/test/smoke/probe:dsh;
+ * this script prevents packaging, workflow and documentation drift.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -11,8 +13,7 @@ import { join } from 'node:path'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packagesDir = join(root, 'packages')
 const expectedPackageName = 'dsh-multi-tenant'
-const expectedVersion = '0.2.0-rc.1'
-const expectedTag = 'next'
+const expectedTag = 'latest'
 const expectedRepository = 'git+https://github.com/GuoMonth/dsh-multi-tenant.git'
 const errors = []
 
@@ -28,11 +29,13 @@ if (publishable.length !== 1 || publishable[0]?.pkg.name !== expectedPackageName
 }
 
 const runtime = packages.find(({ pkg }) => pkg.name === expectedPackageName)
+let releaseVersion
 if (!runtime) {
   errors.push(`${expectedPackageName}: package not found`)
 } else {
   const { pkg, dir } = runtime
-  if (pkg.version !== expectedVersion) errors.push(`${expectedPackageName}: version must be ${expectedVersion}, got ${String(pkg.version)}`)
+  releaseVersion = pkg.version
+  if (typeof releaseVersion !== 'string' || releaseVersion.length === 0) errors.push(`${expectedPackageName}: version is required`)
   if (pkg.publishConfig?.access !== 'public') errors.push(`${expectedPackageName}: publishConfig.access must be public`)
   if (pkg.publishConfig?.tag !== expectedTag) errors.push(`${expectedPackageName}: publishConfig.tag must be ${expectedTag}`)
   if (pkg.publishConfig?.provenance !== true) errors.push(`${expectedPackageName}: publishConfig.provenance must be true`)
@@ -54,7 +57,7 @@ if (!runtime) {
   }
 
   const readme = readFileSync(join(dir, 'README.md'), 'utf8')
-  for (const heading of ['## Supported guarantee', '## Explicit boundaries', '## Context-native runtime']) {
+  for (const heading of ['## Runtime model', '## Supported guarantee', '## Canonical publication', '## Explicit boundaries']) {
     if (!readme.includes(heading)) errors.push(`${expectedPackageName}: README missing ${heading}`)
   }
 }
@@ -73,11 +76,16 @@ if (!existsSync(releaseWorkflowPath)) {
   if (!workflow.includes('actions/setup-node@v7')) errors.push('release workflow must use actions/setup-node@v7')
   if (workflow.includes('registry-url:')) errors.push('release workflow must not let setup-node generate token auth; npm Trusted Publishing owns registry authentication')
   if (workflow.includes('NPM_BOOTSTRAP_TOKEN')) errors.push('release workflow must be OIDC-only; bootstrap token fallback is not allowed')
+  if (workflow.includes('inputs.version')) errors.push('release workflow must derive the version from package.json instead of duplicating version input')
+  if (workflow.includes('--tag next')) errors.push('release workflow must publish the package default latest channel, not next')
 }
 
 for (const requiredPath of [
+  ...(releaseVersion ? [`docs/releases/v${releaseVersion}.md`] : []),
+  'docs/releases/v0.2.0-rc.2.md',
   'docs/releases/v0.2.0-rc.1.md',
   'docs/releases/v0.1.0-rc.2.md',
+  'scripts/agent-owner-context-probe.mjs',
   'scripts/registry-preflight.mjs',
   'scripts/registry-smoke.mjs',
 ]) {
@@ -89,4 +97,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedPackageName}@${expectedVersion} -> ${expectedTag}; v0.1 frozen; context-native runtime included; OIDC-only publishing`)
+console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; canonical v0.2 runtime; OIDC-only publishing`)

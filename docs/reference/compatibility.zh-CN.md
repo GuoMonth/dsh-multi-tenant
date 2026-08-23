@@ -1,79 +1,90 @@
 [English](./compatibility.md) | 简体中文
 
-# 兼容性与版本政策
+# Compatibility & Versioning Policy
 
-## 运行时
+## Runtime Baseline
 
-- **Node** `^22.19.0 || >=24.0.0` —— 与当前 DeepSeek Harness RC7 的 engine policy 对齐。
-- **Cordis** `@deepseek-ai/cordis` `>= 4.0.1 < 5`（peer）。
+- **Node：** `^22.19.0 || >=24.0.0`
+- **Cordis peer：** `@deepseek-ai/cordis >=4.0.1 <5`
+- **DSH：** 只使用显式 baseline，不依赖 floating version
 
-CI 同时覆盖最低支持的 Node 22 版本（`22.19.0`）与 Node 24。
+CI 同时覆盖 Node `22.19.0` 与 Node `24.x`。
 
-## 当前 DSH 目标
+## 当前 DSH Baseline
 
-可执行的兼容性目标统一定义在 `scripts/dsh-target.mjs`：
+`scripts/dsh-target.mjs` 是唯一 source of truth：
 
-- **DeepSeek Harness：** `0.1.0-rc.7`
-- **RC7 release commit：** `99f6f02fecdb7dff40c3fbc9470f5907c29f74ca`
+```js
+DSH_TARGET = {
+  repository: 'deepseek-ai/deepseek-harness',
+  version: '0.1.1-rc.2',
+  commit: 'b150a551b8d465e31e418e1b2eaf5e79bbb7d28e',
+}
+```
 
-所有面向 DSH 的 package pin 与 runtime probe 都必须使用这个目标。`pnpm verify`
-会检查 Web proof package 的版本 pin，避免下一次 prerelease 只更新一处、却把旧 evidence 静默留下。
+这是 v0.2 收口时选定的 DeepSeek Harness 当前 release。未来升级由我们手动、显式推进；blocking CI 不会自动跟随 npm `latest` 或 upstream `master`。
 
-## RC7 evidence refresh（R1）
+## Evidence Model
 
-R1 按受影响 seam 定向复验，而不是重新设计没有变化的层。
+Compatibility 从两个独立方向证明。
 
-RC6 → RC7 静态核对：
+### 精确 Upstream Source Identity
 
-| Evidence surface | RC7 source blob | 结果 |
-| --- | --- | --- |
-| `RpcMethodMap`（`packages/host/apiproxy/src/api/rpc-map.ts`） | `80dede179913fc3f96bc32e71e77c75ee8460cf9` | 与 RC6 相同 |
-| AgentLoop 入口（`packages/core/agent-loop/src/index.ts`） | `371154a7c9e849a444a4806268e4b2d861b8f22b` | 与 RC6 相同 |
-| Session service 入口（`packages/core/session/src/index.ts`） | `2d82a88623cf8b8d381f9ba905ba2e7088cbfe12` | 与 RC6 相同 |
+GitHub Actions checkout 精确 upstream release commit，并验证：
 
-RC7 可执行证据：
+- checkout HEAD 等于 `DSH_TARGET.commit`；
+- upstream root `package.json.version` 等于 `DSH_TARGET.version`。
 
-- `scripts/session-genesis-probe.mjs` 在干净临时 consumer 中安装目标 `dsh-session`，并断言 genesis 分析依赖的 publication / rollback 行为。
-- `scripts/admission-decorator-probe.mjs` 安装目标 Agent / AgentLoop / Session 包，并断言 create、fork、subagent、resume 四条路径都在 `sessions.enter` 前完成 admission。
-- `dsh-multi-tenant-web` 继续通过 `Record<keyof RpcMethodMap, Category>` 对真实 `RpcMethodMap` 做编译期穷举；因此 DSH unary surface 新增或变化而没有分类时，正常 CI typecheck 会直接失败。
+这明确了我们的架构结论究竟对应哪一份源码。
 
-这些 runtime probe 现在通过 `pnpm probe:dsh` 成为正式 CI gate，而不是依赖人工 release note。
+### 精确 Published-Package Behavior
 
-## 目标版本与历史证据
+`pnpm probe:dsh` 在干净的临时 consumer 中安装精确 DSH npm 版本并执行：
 
-“当前 target”不意味着可以改写历史。记录 RC6 proof 的文档继续标记 RC6；R1 是在其上增加 RC7 evidence。下一次 DSH 再升级时，先识别真正变化的 seam，只重新运行受影响的 probe / conformance check，并显式更新统一 target。
+- **session genesis proof** —— publication visibility 与 rollback 语义；
+- **admission/publication proof** —— create/fork/subagent/resume 的 setup 必须先于 session entry；
+- **Agent owner/composition proof** —— Principal-derived integration fiber 通过 caller-bound `ownerCtx` 进入真实 DSH Agent creation，同时保持 tenant/principal identity 与 capability resolution。
 
-版本升级是兼容性工作，不是把上游责任吸收到本仓库里的理由。如果新版本暴露了需要的 seam，就直接使用；如果 seam 属于生态但仍缺失，就定义最小、可复用的标准 / 上游提案；如果没有可靠 enforcement point，就明确边界，而不是制造脆弱的本地 fork。
+Web proof package 也把 `@deepseek-ai/dsh-host-apiproxy` 固定到同一个 target version，并由 `pnpm verify` 强制一致。
 
-## DSH prerelease pinning
+## 手动 Baseline Refresh
 
-**DSH prerelease 绝不依赖未限定的 `latest` tag。** 显式 pin prerelease 版本，并为 package type、runtime probe 或架构结论记录实际对应的 DSH commit SHA / release。
+当我们明确决定升级 DSH 时：
 
-当 DSH 推进到新的 prerelease 时：
+1. 选择明确的 DSH version 与 release commit；
+2. 更新 `scripts/dsh-target.mjs`；
+3. 所有 DSH-facing package pin 同步到该 version；
+4. 使用真实 npm registry 重新生成 `pnpm-lock.yaml`；
+5. 重跑 source identity verification 与全部 executable probes；
+6. 如果 contract 失败，从工程结构 / 数据结构 / 状态流转上修正，不削弱 evidence；
+7. 当前文档统一更新到新 baseline。
 
-1. 更新 `scripts/dsh-target.mjs`；
-2. 识别哪些面向 DSH 的 seam 真正变化；
-3. 从显式 prerelease pin 刷新 lockfile；
-4. 只重跑覆盖这些 seam 的 probe / conformance check；
-5. 与此次变化无关的层保持不动。
+历史 release note 保留当时真正验证过的版本。
 
-## CI 兼容性门
+## Compatibility Philosophy
 
-Pull request 与 `main` 都运行：
+项目处于快速 prerelease 开发期。如果早期 API 与更好的 ownership model、semantic type、lifecycle/state transition 冲突，我们不会为了兼容保留旧形态。
 
-- frozen-lockfile 安装；
-- 架构/package 验证（`pnpm verify`），其中包含 DSH pin 漂移检查；
-- typecheck、unit/contract test、build、真实 packed external-consumer smoke；
-- 真实 DSH runtime proof（`pnpm probe:dsh`）；
-- Node 22.19 与 Node 24 两条支持线。
+Compatibility 工作遵循三条原则：
 
-packed smoke 会把生成的 kernel tarball 安装到一个干净临时 consumer，并实际调用公开 subpath，因此 CI 检查的是可发布产物，而不仅是 workspace 源码。
+- 仓库自己拥有的边界，严格 enforce；
+- DSH / provider 生态拥有的 seam，定义或消费可复用 contract；
+- 没有可靠 enforcement point 的地方，明确记录 boundary，不用本地 fork 或平行 registry 掩盖问题。
 
-## 工具链
+## CI Gates
 
-- **pnpm** `>= 11`（CI 当前使用 pnpm 11）。
-- **TypeScript** `>= 6.0`（构建基线；`tsconfig.base.json`）。
+PR 与 `main` 必须通过：
 
-## 内核不变量
+- 精确 upstream DSH source baseline verification；
+- frozen-lockfile install；
+- package / architecture invariant（`pnpm verify`）；
+- release manifest preflight；
+- TypeScript typecheck；
+- unit / contract tests；
+- build；
+- packed external-consumer smoke；
+- Node 22.19 / Node 24 上的精确版本 DSH runtime probes。
 
-内核只依赖 Cordis —— 无 transport/vendor 运行时依赖（JWT / PostgreSQL / HTTP / MCP / Redis）。由 `scripts/verify-packages.mjs`（CI 门）强制，而非靠约定。
+## Kernel Invariant
+
+公开 runtime package 的运行时依赖只允许 Cordis。JWT、数据库、HTTP、MCP、Redis 等 vendor / transport implementation 不进入 core Runtime Contract；Provider Family 与 SaaS composition 在其上层组合。

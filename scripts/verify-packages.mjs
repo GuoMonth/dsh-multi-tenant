@@ -7,12 +7,12 @@
  *   - every package has build / typecheck / test scripts
  *   - the kernel's runtime dependencies are only the Cordis framework
  *   - publishable packages have consistent entry metadata + `engines.node`
- *   - DSH-facing proof packages stay pinned to the repository's target prerelease
+ *   - DSH-facing proof packages stay pinned to the repository's exact baseline
  */
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import { DSH_TARGET_VERSION } from './dsh-target.mjs'
+import { DSH_TARGET } from './dsh-target.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packagesDir = join(root, 'packages')
@@ -48,8 +48,8 @@ for (const name of readdirSync(packagesDir)) {
 
   if (pkg.name === 'dsh-multi-tenant-web') {
     const apiproxy = pkg.devDependencies?.['@deepseek-ai/dsh-host-apiproxy']
-    if (apiproxy !== DSH_TARGET_VERSION) {
-      errors.push(`${label}: @deepseek-ai/dsh-host-apiproxy must pin ${DSH_TARGET_VERSION}, got ${String(apiproxy)}`)
+    if (apiproxy !== DSH_TARGET.version) {
+      errors.push(`${label}: @deepseek-ai/dsh-host-apiproxy must pin ${DSH_TARGET.version}, got ${String(apiproxy)}`)
     }
   }
 
@@ -64,4 +64,4 @@ if (errors.length) {
   console.error('package verification failed:\n- ' + errors.join('\n- '))
   process.exit(1)
 }
-console.log(`package verification passed (${readdirSync(packagesDir).length} packages; DSH target ${DSH_TARGET_VERSION})`)
+console.log(`package verification passed (${readdirSync(packagesDir).length} packages; DSH ${DSH_TARGET.version} @ ${DSH_TARGET.commit.slice(0, 12)})`)

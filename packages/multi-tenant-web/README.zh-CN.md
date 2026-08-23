@@ -2,23 +2,50 @@
 
 # dsh-multi-tenant-web
 
-实验性的 DSH Web tenant-bound `ApiProxy` enforcement 研究。
+私有的 DSH Web / ApiProxy research package。
 
-> **在 0.1 kernel release 中仅保留在仓库。** 这个 workspace package 已设为 `private: true`，在 production principal-binding contract 仍依赖 DSH request/connection-scoped transport seam 时，刻意禁止发布。R3 只发布 `dsh-multi-tenant`。
+这个 package **不是当前 production layer，也不是 release artifact**。它保留有价值的 enforcement 实验与 DSH API surface 编译期证据；v0.3 会基于 canonical Tenant / Principal Runtime Contract 重新设计 authenticated transport。
 
-## 状态
+`private: true` 是刻意的。
 
-真实 `ApiProxy` facade 与 unary `RpcMethodMap` 穷举分类已经实现。当前策略刻意 fail-closed：
+## 当前作用
 
-- session-keyed point method 为 `guard`；
-- 当前只有 `session.list` 为 `filter`；
-- `session.create` 为 `admit`，在 principal-scoped pre-publication admission 可以安装以前继续拒绝；
-- `session.search`、host/global management、streams、`respond`、downloads 在真正具备支持的 tenant 语义以前继续拒绝。
+这个 package 仍然证明了一些有价值的事实：
 
-DSH RC7 公开的 `ConnectionRpcHandler` 只暴露解码后的 `(endpoint, payload, signal)`，真实 HTTP/WS request 留在 DSH Web carrier 内部。官方 carrier 文档也明确说明当前没有 authentication layer。因此 principal-scope 缺口被归类为**生态 seam**。
+- 真实 DSH `ApiProxy` facade 可以做 compile-time exhaustive classification；
+- session-keyed operation 可以 guard / fail closed；
+- collection filtering 必须保持 endpoint 语义，不能简单删除 foreign row；
+- 未建模 / global surface 在没有明确 tenant 语义前应该继续 deny。
 
-## 下一步
+它的 DSH-facing dependency 固定到仓库统一 baseline `0.1.1-rc.2`，并由 `pnpm verify` 强制检查。
 
-这个 package **不阻塞，也不会随第一次 `dsh-multi-tenant` kernel prerelease 一起发布**。Web 的下一项交付是一个小而通用的 upstream request/connection-scope proposal。DSH 提供足够 seam 以后，本 package 再增加 principal-bound HTTP/WS admission、streams、`respond` 与 two-tenant E2E suite，然后再冻结 production public contract。
+## 本 Package 不定义什么
 
-参见 [`ROADMAP.md`](../../ROADMAP.md) 与 [`docs/adr/web-enforcement.md`](../../docs/adr/web-enforcement.md)。
+旧 spike 不再定义 v0.3 transport architecture。Production transport 不应该变成另一套全局 `tenantId` plumbing，也不应该为了兼容旧 request model 反向污染 Runtime。
+
+v0.3 的目标结构是：
+
+```text
+HTTP / WebSocket / other wire boundary
+        ↓ authenticate
+TenantPrincipal
+        ↓ resolve canonical runtime
+Tenant -> Principal
+        ↓ derive operation fiber
+explicit inject of transport / agents / providers
+        ↓
+DSH operation
+```
+
+Wire / security boundary 保持 explicit identity；之后 capability 与 lifecycle context 通过 canonical Principal Runtime 与 derived integration fiber 自然传播。
+
+## Reuse Policy
+
+v0.3 只有在旧代码 / 结论能自然适配新结构时才复用。如果旧 spike 需要 compatibility shim、parallel registry 或 transport-specific exception 才能接入 Runtime Contract，应优先干净重构或替换。
+
+历史 Web seam 分析继续保存在：
+
+- [`docs/adr/web-enforcement.zh-CN.md`](../../docs/adr/web-enforcement.zh-CN.md)
+- [`docs/specs/web-seam-map.zh-CN.md`](../../docs/specs/web-seam-map.zh-CN.md)
+
+这些文档属于早期 investigation evidence，不是当前 architecture authority。当前架构见 [`docs/specs/architecture.zh-CN.md`](../../docs/specs/architecture.zh-CN.md)，下一阶段产品方向见 [`ROADMAP.zh-CN.md`](../../ROADMAP.zh-CN.md)。

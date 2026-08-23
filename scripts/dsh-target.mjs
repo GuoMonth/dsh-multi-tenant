@@ -1,11 +1,13 @@
 /**
- * Single source of truth for the DeepSeek Harness prerelease used by executable
- * compatibility evidence in this repository.
+ * Exact DeepSeek Harness compatibility baseline for this repository.
  *
- * v0.2 changes the multi-tenant architecture, not the dependency-resolution
- * baseline. Keep the already-proven RC7 closure here; upgrading the complete
- * DSH package graph is an independent follow-up. Historical documents keep the
- * versions they actually proved.
+ * The baseline is intentionally explicit and manually advanced. At each
+ * convergence point we select the current upstream release, pin both its npm
+ * version and release commit, then let CI prove our contracts against that
+ * immutable identity. CI never follows a floating `latest` or `master`.
  */
-export const DSH_TARGET_VERSION = '0.1.0-rc.7'
-export const DSH_TARGET_RELEASE_COMMIT = '99f6f02fecdb7dff40c3fbc9470f5907c29f74ca'
+export const DSH_TARGET = Object.freeze({
+  repository: 'deepseek-ai/deepseek-harness',
+  version: '0.1.1-rc.2',
+  commit: 'b150a551b8d465e31e418e1b2eaf5e79bbb7d28e',
+})

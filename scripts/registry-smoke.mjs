@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Post-publication registry smoke for the exact kernel prerelease. */
+/** Post-publication registry smoke for the exact published runtime version. */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -44,9 +44,9 @@ for (let attempt = 1; attempt <= 10; attempt++) {
 
 if (registryVersion !== version) throw new Error(`registry did not resolve ${PACKAGE_NAME}@${version}`)
 
-const nextVersion = npmJson(['view', `${PACKAGE_NAME}@next`, 'version'])
-if (nextVersion !== version) {
-  throw new Error(`npm next dist-tag resolves to ${String(nextVersion)}, expected ${version}`)
+const latestVersion = npmJson(['view', `${PACKAGE_NAME}@latest`, 'version'])
+if (latestVersion !== version) {
+  throw new Error(`npm latest dist-tag resolves to ${String(latestVersion)}, expected ${version}`)
 }
 
 const repository = npmJson(['view', `${PACKAGE_NAME}@${version}`, 'repository.url'])
@@ -69,15 +69,22 @@ try {
     'import { Context } from "@deepseek-ai/cordis";',
     'import Store from "dsh-multi-tenant/store";',
     'import Service from "dsh-multi-tenant";',
+    'import Runtime from "dsh-multi-tenant/runtime";',
     'import { assertTenantSessionStoreContract } from "dsh-multi-tenant/testing";',
     'const ctx = new Context();',
     'await ctx.plugin(Store);',
     'await ctx.plugin(Service);',
-    'const alice = { tenantId: "acme", userId: "alice" };',
-    'await ctx.multiTenant.claimSession("registry-s1", alice);',
-    'if ((await ctx.multiTenant.canAccessSession(alice, "registry-s1")) !== true) throw new Error("registry smoke: owner access denied");',
+    'await ctx.plugin(Runtime);',
+    'const tenant = await ctx.tenantRuntime.tenants.ensure("acme", { isolateServices: ["tenantAuth"] });',
+    'await tenant.ctx.plugin((child) => { child.provide("tenantAuth", "auth-A"); });',
+    'const alice = await tenant.principals.ensure("alice");',
+    'if (tenant.ctx.get("tenantAuth") !== "auth-A") throw new Error("registry smoke: tenant capability missing");',
+    'if (alice.ctx.get("tenantAuth") !== "auth-A") throw new Error("registry smoke: principal did not inherit tenant capability");',
+    'await alice.ctx.multiTenant.claimSession("registry-s1", alice.identity);',
+    'if ((await alice.ctx.multiTenant.canAccessSession(alice.identity, "registry-s1")) !== true) throw new Error("registry smoke: owner access denied");',
     'await assertTenantSessionStoreContract(async (c) => { await c.plugin(Store); return c.tenantSessionStore });',
-    'console.log("registry consumer smoke passed");',
+    'await tenant.dispose();',
+    'console.log("registry runtime smoke passed");',
   ].join('\n'))
 
   execFileSync('node', ['smoke.mjs'], {
@@ -89,4 +96,4 @@ try {
   rmSync(consumer, { recursive: true, force: true })
 }
 
-console.log(`registry smoke passed: ${PACKAGE_NAME}@${version}; next=${version}; integrity=${integrity.slice(0, 20)}…`)
+console.log(`registry smoke passed: ${PACKAGE_NAME}@${version}; latest=${version}; integrity=${integrity.slice(0, 20)}…`)

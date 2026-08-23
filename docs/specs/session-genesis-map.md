@@ -1,99 +1,74 @@
 [简体中文](./session-genesis-map.zh-CN.md) | English
 
-# Session Genesis Map
+# Session Genesis — historical investigation and current proof
 
-> Static analysis of DSH's session + agent lifecycle. Source read at
-> `deepseek-ai/deepseek-harness` @ `47f943859bef60e4160492346772ded9b24f765a`
-> (whose `@deepseek-ai/dsh-session` manifest is `0.1.0-rc.5`). The runtime probe
-> pins the npm-published `@deepseek-ai/dsh-session@0.1.0-rc.6`; F1/F2 behavior
-> is consistent across both.
+This document records the investigation that established the DSH session/Agent publication seam used by this project. It is evidence, not the current multi-tenant architecture authority; see [`architecture.md`](./architecture.md) for the Runtime Contract.
 
-## 1. Two layers: SessionStore publication vs. Agent genesis
+## Historical source investigation
 
-The low-level session store (`SessionStore`, `packages/core/session`) has a
-three-step publication transaction:
+The original static analysis was performed against DeepSeek Harness commit:
 
+`47f943859bef60e4160492346772ded9b24f765a`
+
+It identified two distinct publication layers.
+
+### Low-level SessionStore
+
+```text
+prepare(session)     unpublished
+      ↓
+enter(session)       registry-visible
+      ↓
+announce(session)    session/created dispatch
 ```
-prepare(id?, options)   # construct Session. NOT in store.
-enter(session)          # store.set(id, entry). → get/list/history see it.
-announce(session)       # emit `session/created` (synchronous dispatch).
-```
 
-The **real** genesis path is the agent factory (`packages/core/agent-loop`,
-`setupAndPublish`), which wraps that transaction with an **async,
-before-visibility `setup` hook**:
+`session/created` is therefore not a before-visibility admission point.
 
-```
-prepare Session           (sessions.prepare)
-prepare Agent             (agent-loop prepare)
-await setup(agent.ctx)    # ← ASYNC, before any store entry. Rejection → rollback.
+### Agent factory genesis
+
+The Agent factory adds an async setup window before publication:
+
+```text
+prepare Session
+prepare Agent
+      ↓
+await setup(agentCtx)       unpublished
+      ↓
 setupCommit?.commit()
-publish():
-    sessions.enter(session)   # store entry — get/list/history now see it
-    agents.enter(agent)
-    sessions.announce(session)  # `session/created` (sync dispatch)
-    agents.announce(agent)
+      ↓
+sessions.enter(session)
+agents.enter(agent)
+announce / start
 ```
 
-`CreateAgentOptions.setup` / `ResumeAgentOptions.setup` are **public** and are
-passed by **all four** genesis paths (create / fork / subagent / resume). DSH
-therefore **does** have an existing async, before-visibility admission point —
-the `setup` hook.
+This is the useful composition boundary: setup failure can abort before the Session/Agent becomes externally visible.
 
-The open question is **composability, not existence**: `setup` is a per-call
-option supplied by the caller (`composition.setup`), not a global middleware.
-Whether a third-party plugin can participate in *every* setup unfailingly is
-what M2.1 must answer.
+## Current executable evidence
 
-## 2. Genesis paths
+The repository no longer treats the historical source read as sufficient evidence. `scripts/session-genesis-probe.mjs` installs the exact current DSH baseline from `scripts/dsh-target.mjs` (`0.1.1-rc.2`) into a clean temporary consumer and asserts:
 
-| Path | Entry (RPC) | Owner source | Goes through | First visible | Rollback |
-| --- | --- | --- | --- | --- | --- |
-| **create** | `session.create` | caller principal — **not carried** | `ctx.agents.create({sessionId, meta, setup})` → `setupAndPublish` | `sessions.enter` → `list`/`get`; `announce` → `mux`/`host` | `setup` reject or sync `session/created` throw → `dispose()` |
-| **fork** | `session.fork` | **inherit parent** | `ctx.agents.create({parentSession, seed, setup})` | same | same |
-| **subagent** | `subagent.*` | **inherit parent** | `ctx.agents.create({origin:'subagent', parentSession, setup})` | same | same |
-| **resume** | `session.create`(preallocated)/`history`/`prompt` | **restore persisted** | `ctx.agents.resume({resumeSessionId, setup})` | same | same |
+1. `session/created` observes the Session already in the store;
+2. a synchronous `session/created` throw rolls publication back;
+3. an async listener rejection cannot veto already-completed synchronous publication.
 
-## 3. Hook candidates
+`scripts/admission-decorator-probe.mjs` separately proves Agent setup runs before `sessions.enter` across create, fork, subagent and resume paths.
 
-| Candidate | async | before store entry | composable | Verdict |
-| --- | --- | --- | --- | --- |
-| `setup` (`CreateAgentOptions.setup`) | ✅ | ✅ (before `sessions.enter`) | ❌ per-call, not global | the right point; **composability is the gap** |
-| `session/created` listener | ❌ sync-veto only | ❌ after `enter` | n/a | too late + no async veto |
-| wrap `ctx.agents` | ✅ (interpose) | ✅ | ⚠️ needs principal (create) / parent owner (fork/subagent) | possible but coupled to H3 |
+These probes are blocking CI on Node 22.19 and Node 24.
 
-## 4. Key findings
+## Architectural consequence
 
-- **F1** — `session/created` fires **after** `enter`; the session is already
-  store-visible when the event fires. (runtime-confirmed)
-- **F2** — `session/created` is **sync-veto-only**: a synchronous throw rolls
-  back `enter`, an async listener's rejection is logged, not vetoed. An async
-  ownership claim cannot ride it. (runtime-confirmed)
-- **F3** — the principal is dropped at the RPC boundary; only **top-level
-  create** needs it. fork/subagent need the parent owner, resume needs the
-  durable owner — neither needs the HTTP principal.
-- **F4** — fork/subagent inherit via `meta.parentSession`. The **store contract**
-  (`store.claim(childId, SessionOwner)`) already expresses inheritance; only the
-  `MultiTenantService.claimSession()` helper is Principal-oriented. This is an
-  **ergonomics** gap, not a capability gap.
-- **F5** — resume restores the durable owner. A same-owner claim is
-  **idempotent, not a conflict**; resume must read the durable ownership, not
-  re-claim.
+v0.2 applies the same publication principle to Tenant/Principal Runtime nodes:
 
-## 5. Invariant assessment
+```text
+prepare unpublished subtree
+      ↓
+await setup(signal)
+      ↓
+optional synchronous commit()
+      ↓
+publish canonical node
+```
 
-| Invariant | Status |
-| --- | --- |
-| 1. No ownership window | ✅ `setup` runs before `sessions.enter` — an admission in `setup` has no window |
-| 2. Child inheritance explicit | ⚠️ store contract can express it (F4), but the admission needs the parent owner at the hook |
-| 3. No ghost ownership on failure | ✅ reservation tombstone — no access grant; same-owner retry idempotent; different-owner retry conflicts (correct) |
-| 4. Resume doesn't steal | ✅ idempotent same-owner claim; restore, don't re-claim |
-| 5. Concurrent genesis unique | ✅ `sessionCreations` dedup + `enter` collision check |
+This is intentional semantic alignment with DSH rather than a parallel lifecycle model.
 
-## 6. Conclusion (see `../adr/session-genesis.md`)
-
-The `setup` hook is the before-visibility async admission point. Composability
-is via wrapping `ctx.agents` (the same mechanism H3 needs to wrap `ApiProxy`).
-Fork / subagent / resume are solvable today from the parent / durable owner;
-only top-level create needs the H3 request-scoped principal. Ghost ownership is
-a safe reservation tombstone. The upstream proposal shrinks to **H3 only**.
+Current DSH baseline/evidence policy lives in [`../reference/compatibility.md`](../reference/compatibility.md).

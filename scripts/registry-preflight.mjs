@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 /**
- * Read-only npm registry preflight used immediately before publication.
+ * Read-only npm registry preflight immediately before publication.
  *
- * It prevents publishing into an already-owned package name and makes release
- * workflow reruns idempotent when the exact version is already present.
+ * The npm package already exists and is owned by this repository. The only
+ * valid release states are therefore:
+ *
+ *   existing package + absent exact version  -> publish
+ *   existing package + existing exact version -> verify/recover
+ *
+ * Missing package identity or repository mismatch is a hard failure rather
+ * than an obsolete bootstrap branch in the release state machine.
  */
 import { execFileSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
@@ -41,32 +47,31 @@ function npmView(spec, field) {
 }
 
 const packageRepo = npmView(PACKAGE_NAME, 'repository.url')
-if (packageRepo.found) {
-  const actualRepo = normalizeRepository(packageRepo.value)
-  if (actualRepo !== EXPECTED_REPOSITORY) {
-    console.error(
-      `${PACKAGE_NAME} already exists in npm with repository ${String(packageRepo.value)}; ` +
-        `expected ${EXPECTED_REPOSITORY}. Refusing to publish.`,
-    )
-    process.exit(1)
-  }
-  console.log(`${PACKAGE_NAME} already exists and points at the expected repository`)
-} else {
-  console.log(`${PACKAGE_NAME} does not yet exist in npm; first-publication bootstrap is required`)
+if (!packageRepo.found) {
+  console.error(`${PACKAGE_NAME} is expected to exist in npm; refusing an implicit first-publication/bootstrap path`)
+  process.exit(1)
+}
+
+const actualRepo = normalizeRepository(packageRepo.value)
+if (actualRepo !== EXPECTED_REPOSITORY) {
+  console.error(
+    `${PACKAGE_NAME} points at repository ${String(packageRepo.value)}; expected ${EXPECTED_REPOSITORY}. Refusing to publish.`,
+  )
+  process.exit(1)
 }
 
 const exact = npmView(`${PACKAGE_NAME}@${version}`, 'version')
-const publishNeeded = !exact.found
-
 if (exact.found && exact.value !== version) {
   console.error(`registry returned unexpected version ${String(exact.value)} for requested ${version}`)
   process.exit(1)
 }
 
+const publishNeeded = !exact.found
+console.log(`${PACKAGE_NAME} repository identity verified`)
 console.log(
   publishNeeded
-    ? `${PACKAGE_NAME}@${version} is not present; publication is required`
-    : `${PACKAGE_NAME}@${version} already exists; publication step will be skipped`,
+    ? `${PACKAGE_NAME}@${version} is absent; publication is required`
+    : `${PACKAGE_NAME}@${version} already exists; publication will be skipped and verification may continue`,
 )
 
 if (process.env.GITHUB_OUTPUT) {

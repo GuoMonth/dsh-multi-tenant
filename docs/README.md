@@ -6,9 +6,9 @@ Navigation hub for `dsh-multi-tenant` documentation.
 
 ## Guides
 
-- [README](../README.md) — project overview
-- [CONTRIBUTING](../CONTRIBUTING.md) — development policy
-- [ROADMAP](../ROADMAP.md) — current release/ecosystem direction
+- [README](../README.md) — project overview and current Runtime Contract
+- [CONTRIBUTING](../CONTRIBUTING.md) — engineering and compatibility policy
+- [ROADMAP](../ROADMAP.md) — v0.2 freeze and v0.3 SaaS Framework direction
 
 ## Decision records (ADR)
 
@@ -18,16 +18,19 @@ Navigation hub for `dsh-multi-tenant` documentation.
 ## Specs & analysis
 
 - [Architecture](./specs/architecture.md) — capability/layer ownership
-- [Session genesis map](./specs/session-genesis-map.md) — `prepare → setup → enter → announce`
+- [Session genesis map](./specs/session-genesis-map.md) — `prepare -> setup -> enter -> announce`
 - [Admission composition](./specs/admission-composition.md) — plugin admission composition
 - [Web seam map](./specs/web-seam-map.md) — authorization surfaces
 
 ## Reference
 
-- [Compatibility & versioning](./reference/compatibility.md) — Node / Cordis / DSH ranges + pinning
-- [Kernel prerelease contract](./reference/release.md) — current artifact, proof, OIDC publication, and boundaries
+- [Compatibility & versioning](./reference/compatibility.md) — exact DSH baseline and CI evidence
+- [Release contract](./reference/release.md) — package-version source of truth, npm latest, OIDC publication and registry proof
 
 ## Releases
 
+- [`v0.2.0-rc.3`](./releases/v0.2.0-rc.3.md) — final v0.2 convergence candidate
+- [`v0.2.0-rc.2`](./releases/v0.2.0-rc.2.md) — canonical Runtime Contract convergence
+- [`v0.2.0-rc.1`](./releases/v0.2.0-rc.1.md) — first context-native v0.2 runtime candidate
+- [`v0.1.0-rc.2`](./releases/v0.1.0-rc.2.md) — frozen kernel API convergence
 - [`v0.1.0-rc.1`](./releases/v0.1.0-rc.1.md) — first public kernel prerelease
-- [`v0.1.0-rc.2`](./releases/v0.1.0-rc.2.md) — API subtraction / OIDC-only convergence candidate
