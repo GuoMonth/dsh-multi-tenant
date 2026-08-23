@@ -66,14 +66,20 @@ await root.plugin(TenantRuntimeService)
 await root.plugin(AgentRegistry)
 
 const factoryObservations = []
+const agentSetupObservations = new Map()
 let handleDisposals = 0
 
 async function makeHandle(ownerCtx, id, setup) {
   const agentFiber = ownerCtx.plugin(function fakeAgentOwner() {})
   await agentFiber
   const agentCtx = agentFiber.ctx
-  const commit = await setup?.(agentCtx)
-  commit?.commit()
+  try {
+    const commit = await setup?.(agentCtx)
+    commit?.commit()
+  } catch (error) {
+    await agentFiber.dispose()
+    throw error
+  }
   let disposed = false
   return {
     agent: { id, ctx: agentCtx, session: { id } },
@@ -97,6 +103,9 @@ root.agents.setFactory({
       credential: ownerCtx.get('credentials'),
       requestMarker: ownerCtx.get('requestMarker'),
     })
+    if (options.sessionId === 'acme-alice-fail') {
+      throw new Error('synthetic DSH create failure')
+    }
     return makeHandle(ownerCtx, options.sessionId, options.setup)
   },
   async resume(ownerCtx, options) {
@@ -178,10 +187,11 @@ async function createFrom(principalScope, sessionId) {
       const handle = await agents.create({
         sessionId,
         setup(agentCtx) {
-          agentCtx.provide('probeAgentMarker', expectedMarker)
+          assert(Context.is(agentCtx), 'Agent setup must receive a Cordis context')
+          agentSetupObservations.set(sessionId, expectedMarker)
         },
       })
-      assert(handle.agent.ctx.get('probeAgentMarker') === expectedMarker, 'Agent setup did not run before handle return')
+      assert(agentSetupObservations.get(sessionId) === expectedMarker, 'Agent setup must finish before handle return')
       await handle.dispose()
       return { expectedTenant, expectedCredential, expectedMarker }
     },
@@ -207,14 +217,35 @@ const resumeOperation = acmeAlice.operations.start({
 })
 await resumeOperation.result
 
-assert(semanticExecutions === 4, 'each user-visible Operation must execute exactly once')
-assert(factoryObservations.length === 4, 'factory must observe three creates and one resume')
+const failedOperation = acmeAlice.operations.start({
+  ...operationScope,
+  requires: ['agents', 'tenantConfig', 'credentials', 'requestMarker'],
+  async execute({ capabilities }) {
+    semanticExecutions += 1
+    const agents = capabilities.require<any>('agents')
+    await agents.create({ sessionId: 'acme-alice-fail' })
+  },
+})
+let failedAsExpected = false
+try {
+  await failedOperation.result
+} catch (error) {
+  failedAsExpected = String(error?.message ?? error).includes('synthetic DSH create failure')
+}
+assert(failedAsExpected, 'DSH create failure must be preserved as the Operation result error')
+assert(failedOperation.state === 'disposed', 'failed Operation must become quiescent')
+assert(acmeAlice.operations.size === 0, 'failed Operation must retire from the Principal registry')
+
+assert(semanticExecutions === 5, 'each user-visible Operation must execute exactly once')
+assert(factoryObservations.length === 5, 'factory must observe four successful attempts plus one failure')
+assert(agentSetupObservations.size === 3, 'each successful create setup must run exactly once')
 
 const expected = new Map([
   ['acme-alice-1', ['acme', 'alice']],
   ['acme-bob-1', ['acme', 'bob']],
   ['globex-alice-1', ['globex', 'alice']],
   ['acme-alice-persisted', ['acme', 'alice']],
+  ['acme-alice-fail', ['acme', 'alice']],
 ])
 for (const observed of factoryObservations) {
   const pair = expected.get(observed.sessionId)
@@ -225,7 +256,7 @@ for (const observed of factoryObservations) {
   assert(observed.credential === 'credential:' + pair[0] + '/' + pair[1], 'factory credential mismatch')
   assert(observed.requestMarker === 'operation:' + pair[0] + '/' + pair[1], 'factory operation capability mismatch')
 }
-assert(handleDisposals === 4, 'all fake DSH handles must be disposed')
+assert(handleDisposals === 4, 'all successful fake DSH handles must be disposed')
 
 await acme.dispose()
 assert(acmeBob.state === 'disposed', 'Tenant teardown must dispose sibling Principal Bob')
@@ -234,7 +265,7 @@ await globex.dispose()
 await deployment.dispose()
 await root.fiber.dispose()
 
-console.log(JSON.stringify({ semanticExecutions, factoryObservations, handleDisposals }))
+console.log(JSON.stringify({ semanticExecutions, factoryObservations, handleDisposals, failedAsExpected }))
 `)
 
   const out = execFileSync('pnpm', ['exec', 'tsx', 'probe.ts'], {
