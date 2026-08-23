@@ -47,6 +47,7 @@ describe('TenantRuntimeService runtime contract', () => {
     const [tenantA, tenantB] = await Promise.all([first, second])
 
     expect(tenantA).toBe(tenantB)
+    expect(await runtime.tenants.ensure('acme')).toBe(tenantA)
     expect(runtime.tenants.get('acme')).toBe(tenantA)
     expect(tenantA.state).toBe('active')
     expect(tenantA.ctx.get('tenantAuth')).toBe('auth-A')
@@ -100,6 +101,7 @@ describe('TenantRuntimeService runtime contract', () => {
 
     const [a1, a2, b] = await Promise.all([alice1, alice2, bob])
     expect(a1).toBe(a2)
+    expect(await tenant.principals.ensure('alice')).toBe(a1)
     expect(aliceSetups).toBe(1)
     expect(a1.identity).toEqual({ tenantId: 'acme', userId: 'alice' })
     expect(b.identity).toEqual({ tenantId: 'acme', userId: 'bob' })
