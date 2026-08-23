@@ -1,12 +1,8 @@
 /**
- * dsh-multi-tenant — Multi-tenant kernel primitives for DeepSeek Harness (DSH).
+ * dsh-multi-tenant — context-native multi-tenant runtime for DeepSeek Harness.
  *
- * Exposes two Cordis services:
- *   - `ctx.tenantSessionStore` — the replaceable ownership-storage seam.
- *   - `ctx.multiTenant` — claim-once session ownership and authorization.
- *
- * Public surface is deliberately small. Policy/RBAC concerns are not part of
- * this kernel contract.
+ * v0.2 keeps the v0.1 immutable session-ownership kernel and adds a Cordis
+ * context-native tenant/principal capability runtime (`ctx.tenantRuntime`).
  *
  * @module dsh-multi-tenant
  */
@@ -21,6 +17,19 @@ declare module '@deepseek-ai/cordis' {
 
 export { MultiTenantService }
 export default MultiTenantService
+
+export {
+  TenantRuntimeService,
+  MultiTenantRuntimeError,
+  tenantIdOf,
+  principalOf,
+} from './runtime.ts'
+export type {
+  TenantRuntimeScope,
+  PrincipalRuntimeScope,
+  TenantScopeOptions,
+  PrincipalScopeOptions,
+} from './runtime.ts'
 
 export { TenantSessionStore, InMemoryTenantSessionStore } from './store.ts'
 export type { TenantPrincipal, SessionOwner, ClaimResult } from './types.ts'

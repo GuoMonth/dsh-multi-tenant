@@ -35,12 +35,22 @@ export function validateSessionId(sessionId: unknown): void {
   requireOpaqueId(sessionId, 'sessionId')
 }
 
+/** Reject an invalid opaque tenant identifier. */
+export function validateTenantId(tenantId: unknown): void {
+  requireOpaqueId(tenantId, 'tenantId')
+}
+
+/** Reject an invalid user identifier. */
+export function validateUserId(userId: unknown): void {
+  requireOpaqueId(userId, 'userId')
+}
+
 /** Reject a malformed minimal ownership principal. Extra policy fields are ignored. */
 export function validateTenantPrincipal(principal: unknown): void {
   if (typeof principal !== 'object' || principal === null) {
     throw new ValidationError('principal must be an object')
   }
   const p = principal as TenantPrincipal
-  requireOpaqueId(p.tenantId, 'tenantId')
-  requireOpaqueId(p.userId, 'userId')
+  validateTenantId(p.tenantId)
+  validateUserId(p.userId)
 }

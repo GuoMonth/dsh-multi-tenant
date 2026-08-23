@@ -1,103 +1,142 @@
 [简体中文](./ROADMAP.zh-CN.md) | English
 
-# Roadmap — kernel released, converge toward stable 0.1
+# Roadmap — v0.2 Multi-Tenant Runtime
 
-Statuses: ✅ done · 🚧 release candidate · 🤝 ecosystem · 🧭 later / demand-gated · ⛔ explicit boundary.
+Status: ✅ done · 🚧 current · 🤝 ecosystem/upstream · 🧭 next · ⛔ boundary.
 
-## Current state
+## Version-line policy
 
-`dsh-multi-tenant` now has a real public prerelease line targeting DeepSeek
-Harness `0.1.0-rc.7`.
+### v0.1 — frozen
 
-- ✅ `0.1.0-rc.1` published to npm `next` with provenance.
-- ✅ Registry external-consumer smoke passed.
-- ✅ Matching Git tag / GitHub prerelease created.
-- ✅ npm Trusted Publishing is the publication path; the release workflow is now OIDC-only.
-- 🚧 `0.1.0-rc.2` is the final planned API-convergence candidate before deciding on `0.1.0` stable.
+Published v0.1 tags are frozen. They define the authorization kernel only:
 
-The release promise remains deliberately narrow: immutable session ownership and
-fail-closed authorization on surfaces this repository owns.
+- minimal `TenantPrincipal`;
+- immutable session ownership;
+- fail-closed authorization;
+- replaceable `TenantSessionStore` contract.
 
-## Boundary matrix
+No new feature work belongs on v0.1. Security fixes may be documented/backported only when necessary; runtime expansion belongs on v0.2.
 
-| Surface | Classification | Project position |
+### v0.2 — current
+
+Goal: **make DeepSeek Harness a real Multi-Tenant Runtime**.
+
+Current release candidate: `0.2.0-rc.1`.
+Executable DSH compatibility target for this PR: `0.1.0-rc.7` (the repository's proven lockfile closure). Current upstream `0.1.1-rc.2` scope behavior has been reviewed; dependency upgrade is a separate follow-up.
+
+## Architecture contract
+
+The runtime has distinct planes rather than one overloaded tenancy mechanism.
+
+| Plane | Owner | Purpose |
 | --- | --- | --- |
-| Tenant/user identity + session ownership + access decisions | **Control → enforce** | Kernel contract; fail closed and test-pin it. |
-| `TenantSessionStore` seam + shared contract suite | **Control → enforce** | Kernel-owned seam; in-memory reference only. |
-| Agent genesis admission (`setup`) | **Control → enforce** | RC7 runtime proof remains a compatibility gate. |
-| Unary `ApiProxy` classification | **Control → enforce** | Exhaustive fail-closed classification in the private Web spike. |
-| HTTP/WS request/connection principal scope | **Ecosystem → standardize** | Requires a generic DSH transport seam; do not fork the transport. |
-| Production Web streams / `respond` / admission | **After ecosystem seam** | Keep unsupported surfaces denied until principal scope exists. |
-| Durable ownership stores | **Later provider** | Add only when real contributor/user demand exists. |
-| Auth providers | **Later provider** | Only after a real transport principal scope exists. |
-| `session.search` tenant visibility | **Ecosystem / later** | Deny until correct scoped-query semantics exist. |
-| MCP tenant context | **Ecosystem / later** | Standardize only when the seam and demand are concrete. |
-| Shell/filesystem/process/container/network isolation | **Explicit boundary** | Deployment/runtime responsibility, not this plugin family. |
-| Billing/UI/org/user admin/general RBAC | **Explicit boundary** | Not a repository goal. |
-| Team sharing/ACL/reassignment | **Explicit v0.1 boundary** | Separate same-tenant policy plane if ever needed. |
+| Persistent authorization | `ctx.multiTenant` + `TenantSessionStore` | Session ownership invariant; always fail closed. |
+| Tenant capability graph | Cordis Context service isolation | Tenant-local auth/MCP/credential/provider instances and lifecycle. |
+| Principal capability graph | Cordis Context service isolation | User-local OAuth/credential/policy providers below a tenant. |
+| Agent/Preset registration view | DSH `@deepseek-ai/dsh-scope` | Tools, prompts, listeners and model-facing registration visibility. |
+| Strong runtime isolation | Deployment/container/K8S | Process, filesystem, shell, network and memory boundaries. |
 
-## Completed release track
+The Tenant Runtime must not create a second DI/service registry keyed by tenant id. Cordis Context is the dependency scope.
 
-- ✅ **R1 — RC7 compatibility refresh** — DSH target/pins centralized and the affected runtime proofs run on Node 22.19 + Node 24.
-- ✅ **R2 — Kernel release hardening** — package metadata, supported guarantees, explicit boundaries, packed external-consumer smoke, and release preflight established.
-- ✅ **R3 — First public prerelease** — `dsh-multi-tenant@0.1.0-rc.1` published to npm `next`; provenance, registry smoke, Git tag, and GitHub prerelease all succeeded.
+## ✅ R0 — v0.1 kernel retained
 
-Historical evidence remains in `docs/reference/compatibility.md`; current release mechanics live in `docs/reference/release.md`.
+The v0.1 security kernel remains intact inside v0.2. `multiTenant`, `tenantSessionStore`, `tenantRuntime`, and Cordis core services are reserved shared services and cannot be isolated out of a tenant graph.
 
-## 🚧 rc.2 — final API subtraction before stable
+## 🚧 R1 — Context-native runtime (`0.2.0-rc.1`)
 
-`0.1.0-rc.2` is intentionally a convergence release, not a feature release:
+Deliver the first executable runtime primitive:
 
-1. reduce `TenantPrincipal` to `{ tenantId, userId }`;
-2. remove the unused role validation/public contract;
-3. keep RBAC/policy attributes outside the ownership kernel;
-4. publish through npm Trusted Publishing/OIDC only — no bootstrap token fallback;
-5. rerun the same release proof and registry consumer smoke.
+- `ctx.tenantRuntime`;
+- canonical live Tenant Context per tenant id;
+- Principal Context below Tenant Context;
+- explicit `isolateServices` capability selection;
+- contextual `tenantIdOf(ctx)` / `principalOf(ctx)` metadata;
+- structural Cordis lifecycle disposal;
+- duplicate tenant graph rejection;
+- cross-tenant principal binding rejection;
+- two-tenant adversarial tests;
+- packed external-consumer runtime smoke;
+- retain the proven RC7 executable compatibility closure while validating the architecture against current upstream scope behavior.
 
-After rc.2, do **not** create another prerelease merely for roadmap progress.
-Without a real bug, upstream compatibility change, or user feedback requiring a
-contract change, the next decision is whether the kernel is ready for `0.1.0` stable.
+Exit criteria: all repository release gates pass and the packed package proves independent same-name service resolution for two tenants while sharing the ownership kernel.
 
-## Ecosystem track — non-blocking for the kernel
+## 🤝 R2 — Provider compatibility contracts
 
-### 🤝 E1 — DSH principal-scope seam
+A Context can isolate only capabilities whose providers respect Context/service scope. Inventory real DSH providers and classify them:
 
-Propose the smallest tenant-agnostic request/connection-scoped security-context
-seam upstream. It must cover HTTP request scope, WebSocket connection lifetime,
-concurrent principals without ambient/global cross-talk, admission before
-session publication, and event/response correlation where required.
+1. **Context-safe** — may be instantiated below a Tenant/Principal Context as-is.
+2. **Needs scoped global-state fix** — provider uses `ctx.root`, module singleton, global Map/Set, env, or another deployment-global identity.
+3. **Host-global by design** — should not become tenant-local; expose a safe tenant-facing facade instead.
 
-### 🤝 E2 — Production Web enforcement after E1
+First known gap in the reviewed current upstream: DSH MCP client reserves `serverName` per `ctx.root`. Propose the smallest upstream/provider change that makes namespace ownership scope-aware without forking MCP runtime.
 
-Only after DSH exposes an adequate principal-scope seam should
-`dsh-multi-tenant-web` become publishable: wire admission/unary/streams/respond
-under one principal scope and add minimal two-tenant adversarial E2E.
+Target capability families:
 
-### 🤝 E3 — Other contracts only on demand
+- Auth/session identity provider;
+- MCP connections and credentials;
+- credential/token store;
+- tenant configuration/secrets;
+- storage/workspace adapters where applicable;
+- model/provider policy where tenant-local instances are useful.
 
-Search visibility, MCP context propagation, and DSH-global resource tenancy are
-independent demand-gated contracts, not mandatory milestones.
+## 🧭 R2.5 — DSH dependency refresh
 
-## Later providers
+Upgrade the complete DSH package graph and `pnpm-lock.yaml` from the proven RC7 closure to a current release in a dedicated change. Do not couple that dependency-resolution churn to the v0.2 architecture PR.
 
-🧭 Durable store providers (PostgreSQL/Redis/MySQL), a reference auth provider,
-or lifecycle/admin cleanup may be added independently when there is real demand.
-They do not expand the kernel guarantee.
+## 🤝 R3 — Authenticated transport → Context binding
 
-## Explicit non-goals
+Define the production boundary as:
 
-⛔ The 0.1 line does not claim strong process/container isolation. A tenant-authorized
-Agent still has whatever shell/filesystem/network capabilities its deployment grants.
+```text
+HTTP request / WebSocket connection
+        ↓ authenticate
+TenantPrincipal
+        ↓ resolve/create
+Tenant Context / Principal Context
+        ↓
+DSH work driven from that context
+```
 
-⛔ The repository does not become a billing system, identity directory, UI product,
-or general RBAC framework.
+Do not spread `tenantId` parameters through every provider when Context can carry the dependency graph. Explicit identity remains mandatory at wire, durable, worker and authorization boundaries.
 
-⛔ It does not reimplement DSH Web transport, search, MCP runtime, or host resource
-models to make every concern locally solvable.
+Required proof:
 
-⛔ v0.1 ownership is immutable `(tenantId, userId)`. Roles and permissions are not
-part of `TenantPrincipal`; cross-user sharing and admin policy require a separate
-same-tenant policy plane.
+- concurrent Tenant A/B requests do not cross-talk;
+- WebSocket lifetime keeps the correct Principal Context;
+- no client field can choose a trusted tenant/principal identity;
+- session publication/lookup still passes the ownership kernel.
 
-The roadmap stays short on purpose: owned guarantees are enforced, ecosystem
-dependencies are standardized, and everything else remains an explicit boundary.
+## 🧭 R4 — Agent integration
+
+Integrate Tenant/Principal Context with DSH agent creation without competing with the existing Agent/Preset scope-parent chain.
+
+Preferred direction:
+
+- create/drive an Agent from a Tenant/Principal-derived Cordis context;
+- let DSH `agent.ctx` continue to own Agent-local registration lifecycle;
+- keep Preset standing-scope ancestry untouched;
+- define exactly which tenant-scoped services Agent creation inherits.
+
+## 🧭 R5 — Production providers
+
+Demand-driven, independently replaceable packages/providers:
+
+- durable ownership store (PostgreSQL/MySQL/Redis where justified);
+- reference auth/context binder;
+- tenant credential provider;
+- MCP tenant adapter after upstream namespace/global-state gaps are resolved;
+- audit/usage provider.
+
+These should compose as a plugin family rather than make the core runtime depend on one SaaS stack.
+
+## ⛔ Explicit boundaries
+
+Cordis Context is not a hostile-code sandbox. It does not isolate:
+
+- process memory/globals;
+- filesystem/shell;
+- network;
+- environment variables;
+- arbitrary malicious/trusted plugin code that deliberately escapes to `ctx.root` or process APIs.
+
+Deployments requiring strong tenant isolation should use a separate process/container/Pod boundary. Billing, organization UI, general RBAC and product-specific user management remain outside this repository's core contract.

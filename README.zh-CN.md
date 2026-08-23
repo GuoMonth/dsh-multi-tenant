@@ -2,40 +2,73 @@
 
 # dsh-multi-tenant
 
-面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的可组合多租户插件原语。
+目标：让 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）真正成为 **Multi-Tenant Runtime**，同时保留一个小而可审计的安全 Kernel。
 
-> **阶段：kernel prerelease 版本线。** `0.1.0-rc.1` 已真实公开发布；当前收敛 candidate 是 **`0.1.0-rc.2`**。DSH target 仍为 **`0.1.0-rc.7`**。参见 [ROADMAP.md](./ROADMAP.zh-CN.md) 与 [`docs/reference/release.zh-CN.md`](./docs/reference/release.zh-CN.md)。
+> **当前版本线：`0.2.0-rc.1`。** 已发布的 v0.1 tag 冻结为历史契约。v0.1 负责不可变 session ownership 与 fail-closed authorization；v0.2 在其上增加 Context-native Tenant / Principal capability scope。本 PR 的可执行 DSH compatibility closure 保持已经验证的 **`0.1.0-rc.7`**；设计阶段另外审阅了当前上游 `0.1.1-rc.2` 的 scope 行为。
 
-## 这是什么
+## 架构
 
-这是一个**带小型 kernel 的插件家族**，不是“把整套 SaaS 平台都实现掉”的承诺。`dsh-multi-tenant` 只拥有本仓库能够直接强制的 tenant/session 原语：最小 tenant/user identity、不可变 session ownership、fail-closed authorization，以及 `TenantSessionStore` provider contract。
+```text
+Deployment / Root Context
+│
+├── shared TenantSessionStore
+├── shared MultiTenantService        <- 持久授权 invariant
+├── shared TenantRuntimeService
+│
+├── Tenant A Cordis Context          <- capability graph
+│   ├── tenant-local auth / MCP / providers
+│   └── Principal A Context
+│       └── user-local credentials
+│
+└── Tenant B Cordis Context
+    ├── tenant-local auth / MCP / providers
+    └── Principal B Context
+        └── user-local credentials
+```
 
-其他能力只有在边界真实且确实有价值时才进入项目。依赖 DSH/第三方 seam 的事情，用最小 contract/conformance proposal 进行生态协作；当前无法可靠强制的 surface 直接作为边界说明，而不是吸收到本地 fork。
+项目刻意区分三层隔离：
 
-## 指导原则
+1. **Ownership Kernel** —— 持久 `(tenantId, userId) -> session` 授权，fail closed；
+2. **Cordis Context Isolation** —— Tenant / Principal service resolution 与 plugin lifecycle；
+3. **Deployment Isolation** —— process/filesystem/network/shell；需要强隔离时使用 one tenant per container / Pod。
 
-- **控制得住 → 严格强制** —— fail-closed，并用可执行 invariant 锁住。
-- **需要生态协作 → 制定标准** —— 定义最小可用 seam/contract，并优先向上游协作。
-- **控制不住 → 明确边界** —— 直接说明 threat-model/support boundary。复杂度不是证据。
-- **快速跟进 prerelease** —— 显式 pin DSH prerelease，只重验受影响 seam。
-- **单向依赖** —— kernel 不引入 JWT/PostgreSQL/HTTP/MCP/Redis 依赖。
-- **默认 ≠ 唯一** —— provider 通过共享 contract suite 即可替换。
+DSH 自己的 `@deepseek-ai/dsh-scope` 继续负责 Agent / Preset registration visibility。Tenant capability isolation 使用 Cordis service isolation，不去争抢 Agent scope 的 parent chain。
 
-## 发布范围
+## v0.1 冻结
 
-- `dsh-multi-tenant` —— 已发布 kernel：ownership、authorization、store seam、testing utilities。
-- `dsh-multi-tenant-web` —— private experimental enforcement spike；production principal binding 等待 DSH request/connection-scope seam。
+已经发布的 v0.1 tag 保持不变，继续表示原来的 Kernel contract：
 
-0.1 版本线**不**声称提供 shell/filesystem/process/container/network isolation、billing/UI/组织管理、host-global resource tenancy、general RBAC 或跨用户 team ACL。Kernel `TenantPrincipal` 刻意不包含 roles/permissions。
+- 最小 authenticated `TenantPrincipal`；
+- claim-once immutable session ownership；
+- fail-closed access decision；
+- 可替换 `TenantSessionStore` provider seam。
 
-## 包
+v0.1 不再增加新功能；这些保证作为 defense in depth 被完整保留进 v0.2。
 
-| 包 | 分发 | 角色 |
+## v0.2 Runtime
+
+`ctx.tenantRuntime` 创建真实 Cordis Tenant / Principal child lifecycle。显式选择的 service name 获得独立 isolation label，因此 Tenant A / Tenant B 下挂载的 provider 由 Cordis 原生解析，不需要再造一套应用级 `tenantId -> service` 容器。
+
+Runtime 保持 provider-neutral：auth、MCP、credential、storage、model 等 provider 通过挂载到正确 Context 下进入租户体系，同时 provider 自身不能绕开 Cordis resolution 使用 deployment-global state。
+
+上游/provider 的 gap 会明确记录，不会被第二套 registry 掩盖。例如在已审阅的当前上游里，DSH MCP client 的 `serverName` reservation 仍按 `ctx.root` 全局管理，所以不同 Tenant 复用同一个 serverName 目前还不能自动视为安全。
+
+## 原则
+
+- **控制得住 → 严格强制**：仓库拥有的边界做 fail-closed invariant；
+- **需要生态协作 → 制定标准**：优先使用 Cordis / DSH 原生 scope，缺 seam 时只推动最小上游 contract；
+- **控制不住 → 明确边界**：Context 不是 process sandbox；
+- **不再造 DI 容器**：Tenant capability resolution 属于 Cordis Context；
+- **Defense in depth**：Context routing 永远不能替代持久 session ownership 校验。
+
+## Packages
+
+| Package | Distribution | Role |
 | --- | --- | --- |
-| [`packages/multi-tenant`](./packages/multi-tenant) | npm `dsh-multi-tenant@next` | Kernel：`ctx.multiTenant` + `ctx.tenantSessionStore`，claim-once ownership、fail-closed authorization、provider contract/testing。 |
-| [`packages/multi-tenant-web`](./packages/multi-tenant-web) | private workspace | 实验性的 tenant-bound `ApiProxy` 研究；production principal binding 受 DSH transport seam 门控。 |
+| [`packages/multi-tenant`](./packages/multi-tenant) | npm `dsh-multi-tenant@next` | v0.2 runtime + 冻结的 v0.1 ownership kernel：`ctx.tenantRuntime`、`ctx.multiTenant`、`ctx.tenantSessionStore`。 |
+| [`packages/multi-tenant-web`](./packages/multi-tenant-web) | private workspace | Web/API enforcement 实验；production transport 仍需要真实 authenticated principal/context binding。 |
 
-开发规范见 [CONTRIBUTING.md](./CONTRIBUTING.zh-CN.md)，layer 归属见 [`docs/specs/architecture.zh-CN.md`](./docs/specs/architecture.zh-CN.md)。
+参见 [ROADMAP.zh-CN.md](./ROADMAP.zh-CN.md)、[`docs/releases/v0.2.0-rc.1.md`](./docs/releases/v0.2.0-rc.1.md) 与 [CONTRIBUTING.zh-CN.md](./CONTRIBUTING.zh-CN.md)。
 
 ## 开发
 
@@ -46,6 +79,12 @@ pnpm test
 pnpm build
 ```
 
-## 许可证
+完整 release gate：
+
+```sh
+pnpm release:check
+```
+
+## License
 
 MIT
