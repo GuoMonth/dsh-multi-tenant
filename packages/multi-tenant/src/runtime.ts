@@ -9,6 +9,7 @@
  */
 
 import { Service, type Context, type Fiber } from '@deepseek-ai/cordis'
+import { ValidationError } from './errors.ts'
 import type { PrincipalOperationRegistry } from './operation.ts'
 import { createPrincipalOperationRegistry } from './operation.ts'
 import { disposeFiber, isolatedContext, normalizeServiceNames, raceAbort } from './scope.ts'
@@ -45,6 +46,15 @@ export type RuntimeScopeSetup<I> = (
 
 export interface RuntimeScopeDefinition<I> {
   readonly isolateServices?: readonly string[]
+  /**
+   * Optional semantic identity of the creation recipe.
+   *
+   * Canonical consumers that only join by identity omit this field. Framework
+   * layers that know the recipe (for example a compiled SaaS plan) provide a
+   * deterministic key so an already-published node cannot silently accept a
+   * structurally different definition that happens to isolate the same names.
+   */
+  readonly definitionKey?: string
   readonly setup?: RuntimeScopeSetup<I>
 }
 
@@ -102,9 +112,17 @@ interface NormalizedDefinition<I> {
 
 function normalizeDefinition<I>(definition: RuntimeScopeDefinition<I> = {}): NormalizedDefinition<I> {
   const services = normalizeServiceNames(definition.isolateServices)
+  const definitionKey = definition.definitionKey
+  if (definitionKey !== undefined && (
+    typeof definitionKey !== 'string'
+    || definitionKey.length === 0
+    || definitionKey !== definitionKey.trim()
+  )) {
+    throw new ValidationError('runtime definitionKey must be a non-empty trimmed string')
+  }
   return {
     services,
-    signature: JSON.stringify(services),
+    signature: JSON.stringify({ services, definitionKey: definitionKey ?? null }),
     setup: definition.setup,
   }
 }
@@ -223,7 +241,7 @@ class CanonicalRuntimeRegistry<
     if (existing !== undefined) {
       if (definitionSupplied && existing.signature !== normalized.signature) {
         throw new RuntimeDefinitionConflictError(
-          'canonical runtime scope already exists with a different isolated-service definition',
+          'canonical runtime scope already exists with a different creation definition',
         )
       }
       const scope = await existing.creation.ready
