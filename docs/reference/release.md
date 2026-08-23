@@ -14,7 +14,7 @@ The project is in rapid prerelease development. Release mechanics are intentiona
 - **Publishing:** npm Trusted Publishing through GitHub Actions OIDC
 - **Provenance:** enabled
 
-`dsh-multi-tenant-web` remains private.
+The Runtime Contract is currently the only live workspace package and the only release artifact.
 
 ## Single source of truth
 
@@ -85,4 +85,4 @@ The workflow is idempotent for an already-published exact version: publication i
 
 Release automation should protect correctness without creating process ceremony. Current development prefers frequent, explicit releases over maintaining multiple channels or compatibility promises that slow structural improvement.
 
-If a better ownership model, data structure, lifecycle state machine or semantic type requires a breaking prerelease change, change the model and release the new version.
+Future v0.3 packages should enter the release graph only after their independent contract/lifecycle boundary exists. Do not create release machinery for speculative packages.

@@ -8,7 +8,7 @@
 - **Cordis peer：** `@deepseek-ai/cordis >=4.0.1 <5`
 - **DSH：** 只使用显式 baseline，不依赖 floating version
 
-CI 同时覆盖 Node `22.19.0` 与 Node `24.x`。
+CI 覆盖 Node `22.19.0` 与 Node `24`。
 
 ## 当前 DSH Baseline
 
@@ -22,7 +22,7 @@ DSH_TARGET = {
 }
 ```
 
-这是 v0.2 收口时选定的 DeepSeek Harness 当前 release。未来升级由我们手动、显式推进；blocking CI 不会自动跟随 npm `latest` 或 upstream `master`。
+未来升级由我们手动、显式推进；blocking CI 不会自动跟随 npm `latest` 或 upstream `master`。
 
 ## Evidence Model
 
@@ -35,17 +35,14 @@ GitHub Actions checkout 精确 upstream release commit，并验证：
 - checkout HEAD 等于 `DSH_TARGET.commit`；
 - upstream root `package.json.version` 等于 `DSH_TARGET.version`。
 
-这明确了我们的架构结论究竟对应哪一份源码。
-
 ### 精确 Published-Package Behavior
 
-`pnpm probe:dsh` 在干净的临时 consumer 中安装精确 DSH npm 版本并执行：
+`pnpm probe:dsh` 在干净的临时 consumer 中只验证当前架构真正依赖的 seam：
 
 - **session genesis proof** —— publication visibility 与 rollback 语义；
-- **admission/publication proof** —— create/fork/subagent/resume 的 setup 必须先于 session entry；
 - **Agent owner/composition proof** —— Principal-derived integration fiber 通过 caller-bound `ownerCtx` 进入真实 DSH Agent creation，同时保持 tenant/principal identity 与 capability resolution。
 
-Web proof package 也把 `@deepseek-ai/dsh-host-apiproxy` 固定到同一个 target version，并由 `pnpm verify` 强制一致。
+历史 Web/ApiProxy 与全局 admission-decorator 实验不再作为 blocking compatibility evidence。它们保留在 Git history；只有未来 v0.3 的真实设计重新依赖这些 seam 时，才重新研究并建立新的 contract/probe。
 
 ## 手动 Baseline Refresh
 
@@ -53,23 +50,23 @@ Web proof package 也把 `@deepseek-ai/dsh-host-apiproxy` 固定到同一个 tar
 
 1. 选择明确的 DSH version 与 release commit；
 2. 更新 `scripts/dsh-target.mjs`；
-3. 所有 DSH-facing package pin 同步到该 version；
-4. 使用真实 npm registry 重新生成 `pnpm-lock.yaml`；
-5. 重跑 source identity verification 与全部 executable probes；
-6. 如果 contract 失败，从工程结构 / 数据结构 / 状态流转上修正，不削弱 evidence；
+3. 更新届时真正存在的 DSH-facing pin；
+4. workspace dependency graph 变化时，从真实 npm registry 重新生成 `pnpm-lock.yaml`；
+5. 重跑 source identity verification 与当前 executable probes；
+6. contract 失败时从工程结构 / 数据结构 / 状态流转上修正，不削弱 evidence；
 7. 当前文档统一更新到新 baseline。
 
 历史 release note 保留当时真正验证过的版本。
 
 ## Compatibility Philosophy
 
-项目处于快速 prerelease 开发期。如果早期 API 与更好的 ownership model、semantic type、lifecycle/state transition 冲突，我们不会为了兼容保留旧形态。
+项目处于快速 prerelease 开发期。我们不因为某个旧 API 或旧调查 surface 技术上“正确”，就继续维护它。
 
 Compatibility 工作遵循三条原则：
 
 - 仓库自己拥有的边界，严格 enforce；
-- DSH / provider 生态拥有的 seam，定义或消费可复用 contract；
-- 没有可靠 enforcement point 的地方，明确记录 boundary，不用本地 fork 或平行 registry 掩盖问题。
+- DSH / provider 生态拥有、且当前架构真正依赖的 seam，才去证明或标准化；
+- 已经不服务于产品方向的旧 seam，从 live tree 删除，而不是维持 compatibility theater。
 
 ## CI Gates
 
@@ -85,6 +82,6 @@ PR 与 `main` 必须通过：
 - packed external-consumer smoke；
 - Node 22.19 / Node 24 上的精确版本 DSH runtime probes。
 
-## Kernel Invariant
+## Runtime Invariant
 
-公开 runtime package 的运行时依赖只允许 Cordis。JWT、数据库、HTTP、MCP、Redis 等 vendor / transport implementation 不进入 core Runtime Contract；Provider Family 与 SaaS composition 在其上层组合。
+公开 runtime package 的运行时依赖只允许 Cordis。JWT、数据库、HTTP、MCP、Redis 等 vendor / transport implementation 不进入 core Runtime Contract；只有 capability/provider/distribution 边界真正出现时，才在其上层创建对应 package。

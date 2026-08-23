@@ -17,11 +17,9 @@ v0.1 负责 durable authorization invariant：
 
 这一层应该保持小、稳定、无聊。
 
-### v0.2 —— Multi-Tenant Runtime Contract
+### v0.2 —— 已发布的 Multi-Tenant Runtime Contract
 
-v0.2 把 tenancy 变成 first-class runtime structure，而不是到处传 `tenantId`。
-
-最终收口 MR 全绿并合并后，v0.2 即视为完成。其核心 contract 为：
+`dsh-multi-tenant@0.2.0-rc.3` 已经是 v0.3 的公开 Runtime foundation。
 
 ```text
 Deployment / Root
@@ -30,7 +28,7 @@ Deployment / Root
        └─ Tenant                  canonical capability node
             └─ Principal         canonical capability node
                  └─ derived integration fibers
-                      └─ DSH Agent / transport / provider operations
+                      └─ DSH Agent / future product operations
 ```
 
 #### Canonical Runtime Structure
@@ -42,7 +40,7 @@ Deployment / Root
 
 #### Publication 与 Lifecycle
 
-- asynchronous work 之前先 reserve canonical identity；
+- asynchronous work 前先 reserve canonical identity；
 - setup 在 unpublished Cordis subtree 上运行；
 - 可选同步 `commit()` 拥有精确 publication boundary；
 - 并发 `ensure()` single-flight；
@@ -72,24 +70,25 @@ Deployment / Root
 
 Baseline 由我们手动推进；blocking CI 永远不跟随 floating upstream state。
 
-CI 同时证明两件事：
+CI 只证明当前架构真正依赖的 seam：
 
-1. checkout 精确 upstream release commit，验证源码身份；
-2. 对精确 npm package 运行 session genesis、admission/publication、Agent owner/composition executable probes。
+1. 精确 upstream source identity；
+2. Session publication / rollback 语义；
+3. Principal-derived Agent owner/context composition。
+
+历史 Web/ApiProxy 与全局 admission-decorator 研究由 Git history 保存，不再占据 live workspace。
 
 #### Release Model
-
-当前 release mechanics 刻意保持简单：
 
 - package version 只存在于 `packages/multi-tenant/package.json`；
 - 手动 GitHub release workflow 自动读取这个版本；
 - npm 只发布到 `latest`；
 - registry smoke 验证 `latest` 指向刚发布的版本；
-- prerelease / stable 语义由 SemVer 本身表达，不再维护第二个 npm channel。
+- prerelease / stable 语义由 SemVer 本身表达。
 
 ## v0.3 —— SaaS Framework
 
-v0.2 冻结后，主线直接进入 SaaS Framework。
+主开发线现在直接进入 SaaS Framework。
 
 目标是：**由可替换 Plugin Family 构成、但提供 opinionated 开箱即用体验的 SaaS Framework / Distribution**，而不是一个 monolithic super-plugin。
 
@@ -109,14 +108,18 @@ v0.2 冻结后，主线直接进入 SaaS Framework。
                  Runtime Contract + Kernel
 ```
 
+这张图描述的是目标 capability ownership，**不是提前批准好的 package name**。仓库不会预先 scaffold 这些 package。
+
 ### v0.3 优先级
 
 1. **SaaS composition model** —— 定义 provider slot 与强类型 configuration/composition graph；
-2. **Authenticated transport binding** —— wire boundary 完成认证，resolve canonical Tenant / Principal，再从 derived integration fiber 驱动工作；
+2. **Authenticated product boundary** —— 在真实 wire / product boundary 完成认证，resolve canonical Tenant / Principal，再从 derived integration fiber 驱动工作；
 3. **Agent orchestration** —— 从 Principal-owned integration boundary create/resume/drive DSH Agent，同时保持 DSH Agent/Preset scope 语义；
-4. **Reference Provider Family** —— Auth、credential/token storage、MCP tenancy、durable store、audit/usage 等按需求实现；
-5. **Distribution defaults** —— 提供一套官方推荐的开箱即用组合，同时所有 provider slot 可替换；
+4. **Reference Provider Family** —— Auth、credential/token storage、MCP tenancy、durable store、audit/usage 等，只有在独立 contract / lifecycle boundary 被证明后才实现；
+5. **Distribution defaults** —— 提供一套官方推荐的开箱即用组合，同时 provider slot 可替换；
 6. **Diagnostics & compatibility** —— startup validation、health、provider conformance、migration、清晰 compatibility matrix。
+
+只有独立 API、replacement boundary、lifecycle、versioning boundary 或 distribution boundary 真正存在时，才创建新 package。Research / experiment 在此之前留在 test / script / docs 中。
 
 Strong isolation 仍然是 deployment profile，不是 Context promise。未来 K8S profile 可以把一个 Tenant 映射到一个 Pod，同时保持同一套上层 SaaS contract。
 
@@ -126,10 +129,12 @@ Strong isolation 仍然是 deployment profile，不是 Context promise。未来 
 - 优先使用让非法状态不可表达的数据结构；
 - 显式建模 lifecycle / state transition；
 - 用 TypeScript 强类型与泛型携带语义；
+- 除技术正确性外，也必须考虑与当前产品方向的相关性；
 - package version、DSH baseline 等 identity 只保留一个 source of truth；
 - prerelease 阶段如果兼容性损害长期模型，直接破坏兼容；
+- Git history 足够保存的旧实验，不继续占据 live tree；
 - 使用 Cordis / DSH 原生抽象，不另造平行 registry 或本地 fork；
-- 控制得住的边界严格 enforce，需要生态协作的定义标准，控制不住的明确 boundary。
+- package boundary 只有在独立价值被证明后才创建。
 
 ## Explicit Security Boundary
 

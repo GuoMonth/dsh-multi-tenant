@@ -240,6 +240,8 @@ Runtime package 不引入 transport / vendor implementation。未来 SaaS Distri
                  Runtime Contract + Kernel
 ```
 
+这是一张 **capability / composition map，不是 package map**。Auth、Transport、MCP 等名称描述的是职责；只有独立 consumer API、replacement boundary、lifecycle 或 release boundary 被证明后，它们才应成为独立 package。
+
 Framework 提供开箱即用的产品体验与 opinionated defaults；Plugin Family 提供可替换、可组合的工程架构。
 
 ## 12. Explicit Boundary

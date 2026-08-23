@@ -14,7 +14,7 @@
 - **Publishing：** GitHub Actions OIDC + npm Trusted Publishing
 - **Provenance：** enabled
 
-`dsh-multi-tenant-web` 继续保持 private。
+Runtime Contract 目前是唯一 live workspace package，也是唯一 release artifact。
 
 ## Single Source of Truth
 
@@ -34,7 +34,7 @@ Release workflow 不再让操作者重复输入 version。只需要从 `main` �
 
 > `latest` = 项目明确选择发布的最新版本。
 
-Prerelease / stable 语义由 SemVer 本身表达（例如 `0.2.0-rc.3`，以后可能是 `0.2.0`），不再额外维护 `next`。
+Prerelease / stable 语义由 SemVer 本身表达，不再额外维护 `next`。
 
 安装当前版本：
 
@@ -85,4 +85,4 @@ CI 还会独立 checkout 精确 upstream DSH release commit 并验证源码 vers
 
 Release automation 的目标是保护 correctness，而不是制造流程负担。当前阶段优先 frequent explicit release，不维护多个 channel，也不为了兼容承诺阻碍结构优化。
 
-如果更好的 ownership model、数据结构、lifecycle state machine 或 semantic type 需要 prerelease breaking change，就直接改模型并发布新版本。
+未来 v0.3 package 只有在独立 contract / lifecycle boundary 真正出现后，才进入 release graph。不要为 speculative package 提前创建发布机制。

@@ -17,6 +17,16 @@ const expectedTag = 'latest'
 const expectedRepository = 'git+https://github.com/GuoMonth/dsh-multi-tenant.git'
 const errors = []
 
+/** Extract executable GitHub Action references from workflow `uses:` steps. */
+function workflowActionRefs(source) {
+  const refs = []
+  for (const line of source.split('\n')) {
+    const match = line.match(/^\s*-\s+uses:\s*([^\s#]+)\s*(?:#.*)?$/)
+    if (match) refs.push(match[1])
+  }
+  return refs
+}
+
 const packages = readdirSync(packagesDir).map((dirName) => {
   const dir = join(packagesDir, dirName)
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
@@ -62,18 +72,19 @@ if (!runtime) {
   }
 }
 
-const web = packages.find(({ pkg }) => pkg.name === 'dsh-multi-tenant-web')
-if (!web) errors.push('dsh-multi-tenant-web: package not found')
-else if (web.pkg.private !== true) errors.push('dsh-multi-tenant-web: must stay private until its production contract is ready')
-
 const releaseWorkflowPath = join(root, '.github/workflows/release.yml')
 if (!existsSync(releaseWorkflowPath)) {
   errors.push('release artifact missing: .github/workflows/release.yml')
 } else {
   const workflow = readFileSync(releaseWorkflowPath, 'utf8')
+  const actionRefs = new Set(workflowActionRefs(workflow))
+
   if (!workflow.includes('id-token: write')) errors.push('release workflow must grant id-token: write for npm OIDC')
   if (!workflow.includes('environment: npm-release')) errors.push('release workflow must use the npm-release environment')
-  if (!workflow.includes('actions/setup-node@v7')) errors.push('release workflow must use actions/setup-node@v7')
+  if (!actionRefs.has('actions/checkout@v7')) errors.push('release workflow must use actions/checkout@v7')
+  if (!actionRefs.has('actions/setup-node@v7')) errors.push('release workflow must use actions/setup-node@v7 so npm Trusted Publishing remains available')
+  if (!actionRefs.has('pnpm/setup@v2')) errors.push('release workflow must use pnpm/setup@v2 for pnpm 11+')
+  if ([...actionRefs].some((ref) => ref.startsWith('pnpm/action-setup@'))) errors.push('release workflow must not execute legacy pnpm/action-setup')
   if (workflow.includes('registry-url:')) errors.push('release workflow must not let setup-node generate token auth; npm Trusted Publishing owns registry authentication')
   if (workflow.includes('NPM_BOOTSTRAP_TOKEN')) errors.push('release workflow must be OIDC-only; bootstrap token fallback is not allowed')
   if (workflow.includes('inputs.version')) errors.push('release workflow must derive the version from package.json instead of duplicating version input')
@@ -85,6 +96,7 @@ for (const requiredPath of [
   'docs/releases/v0.2.0-rc.2.md',
   'docs/releases/v0.2.0-rc.1.md',
   'docs/releases/v0.1.0-rc.2.md',
+  'scripts/session-genesis-probe.mjs',
   'scripts/agent-owner-context-probe.mjs',
   'scripts/registry-preflight.mjs',
   'scripts/registry-smoke.mjs',

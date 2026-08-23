@@ -2,13 +2,11 @@
 
 # ADR — Session / Agent publication boundary
 
-> Status: **accepted finding; implementation guidance updated by v0.2 Runtime Contract**.
+> Status: **accepted runtime fact**.
 
 ## Decision
 
-DSH Agent `setup` is the supported before-publication composition window for Agent create/resume flows.
-
-The relevant lifecycle is:
+DSH Agent `setup` is the supported before-publication composition window for Agent creation flows.
 
 ```text
 prepare Session + Agent
@@ -22,23 +20,20 @@ sessions.enter / agents.enter
 announce / start
 ```
 
-Tenant admission or product composition that must happen before an Agent becomes visible belongs in this setup transaction, not in `session/created` after the Session has already entered its registry.
+Work that must complete before an Agent becomes visible belongs in this transaction, not in `session/created` after registry publication.
 
-## Evidence
+## Current evidence
 
-The original static investigation is preserved in [`../specs/session-genesis-map.md`](../specs/session-genesis-map.md).
+Blocking CI re-proves the facts that still matter against the exact DSH baseline:
 
-Current blocking CI re-proves the contract against the exact DSH baseline `0.1.1-rc.2`:
+- `scripts/session-genesis-probe.mjs` — Session visibility and rollback semantics;
+- `scripts/agent-owner-context-probe.mjs` — a Principal-derived Context reaches Agent creation as caller-bound `ownerCtx` while preserving tenant/principal capability resolution.
 
-- `scripts/session-genesis-probe.mjs` proves SessionStore visibility/rollback semantics;
-- `scripts/admission-decorator-probe.mjs` proves setup-before-entry across create, fork, subagent and resume;
-- `scripts/agent-owner-context-probe.mjs` proves caller-bound Principal-derived Context reaches Agent creation as `ownerCtx`.
+Historical experiments around globally decorating `ctx.agents`, Web transport enforcement, and earlier static source maps remain available in Git history. They are not part of the current architecture contract.
 
-## Updated composition guidance
+## Composition guidance
 
-The earlier investigation suggested globally wrapping `ctx.agents` so every call received admission logic. That remains a valid compatibility technique and is useful as a probe, but it is **not the target SaaS architecture**.
-
-The v0.2/v0.3 structural path is:
+The target structural path is:
 
 ```text
 canonical Tenant
@@ -52,19 +47,20 @@ ownerCtx.agents.create(...)
 Agent setup transaction
 ```
 
-The SaaS Framework owns the authenticated product entry points, so Agent operations should naturally originate from the correct Principal-derived integration boundary rather than rely on ambient global middleware.
+The SaaS Framework owns authenticated product entry points. Agent work should therefore originate from the correct Principal-derived boundary rather than rely on ambient global middleware.
 
 ## Durable ownership interaction
 
-The v0.1 `TenantSessionStore` ownership claim is persistent and independent from the in-process Agent lifecycle. If a caller reserves/claims a Session identity before final Agent publication and a later publication step fails, the durable claim may remain as an ownership reservation.
+The v0.1 `TenantSessionStore` ownership claim is persistent and independent from the in-process Agent lifecycle. If product composition reserves ownership before final Agent publication, failed publication may leave a durable ownership reservation.
 
-That behavior is safe from cross-tenant takeover because ownership is immutable and same-owner reclaim is idempotent, but product-level v0.3 composition should model reservation/finalization semantics explicitly if it needs reclamation or user-visible failed-session cleanup. Do not silently turn immutable ownership into rollbackable authorization state.
+That is safe from cross-tenant takeover because ownership is immutable and same-owner reclaim is idempotent. If v0.3 needs reclamation or user-visible failed-session cleanup, model reservation/finalization explicitly rather than making authorization state implicitly rollbackable.
 
 ## Consequences
 
-- `session/created` is observation, not async admission.
-- DSH Agent setup and v0.2 Tenant/Principal setup intentionally share the same unpublished-setup -> optional commit -> publication vocabulary.
-- Principal identity/capability comes from the caller-owned Runtime boundary; `Agent.ctx` remains DSH-owned Agent/Preset scope.
-- Persistent ownership remains a separate defense-in-depth plane.
+- `session/created` is observation, not async admission;
+- DSH Agent setup and Tenant/Principal setup intentionally share unpublished setup → optional commit → publication semantics;
+- Principal identity/capability comes from the caller-owned Runtime boundary;
+- `Agent.ctx` remains DSH-owned Agent/Preset scope;
+- persistent ownership remains a separate defense-in-depth plane.
 
 Current architecture authority: [`../specs/architecture.md`](../specs/architecture.md).

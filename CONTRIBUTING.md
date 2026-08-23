@@ -13,8 +13,9 @@ Before changing code, model the system globally:
 3. **Semantic types** — which identity/capability/lifecycle meanings should TypeScript encode instead of leaving as loosely related fields?
 4. **Native framework structure** — can Cordis/DSH already express the dependency, lifecycle or registration plane instead of adding another registry/facade?
 5. **Executable contract** — what test or conformance harness proves the abstraction independently of one implementation?
+6. **Relevance** — does this component still serve the current product direction, or is it merely technically correct historical work?
 
-Only then implement the smallest coherent structure. Do not accumulate local patches around a weak model.
+Only then implement the smallest coherent structure. Do not accumulate local patches around a weak model, and do not keep obsolete experiments alive just because they are correct.
 
 ## Boundary-first decision rule
 
@@ -70,10 +71,10 @@ Current exact baseline:
 A DSH refresh must:
 
 1. select an explicit version + release commit;
-2. update every DSH-facing pin consistently;
-3. regenerate the lockfile from the real registry;
+2. update every active DSH-facing pin consistently;
+3. regenerate the lockfile from the real registry when the workspace graph changes;
 4. verify the exact upstream source identity in GitHub Actions;
-5. rerun the exact-version published-package runtime probes;
+5. rerun the exact-version runtime probes the current architecture actually depends on;
 6. fix failures structurally rather than weakening evidence;
 7. update current docs while preserving historical release evidence.
 
@@ -81,11 +82,25 @@ See `docs/reference/compatibility.md`.
 
 ## Package conventions
 
+**Do not create a package because a directory seems useful. Create it only when an independent boundary is real.**
+
+A package must justify at least one of these independently meaningful properties:
+
+- consumer-facing contract/API;
+- replaceable provider capability;
+- independent lifecycle/composition boundary;
+- independent versioning/release boundary;
+- product distribution boundary.
+
+Research, compatibility exploration and one-off evidence should normally live in focused tests/scripts/docs or Git history, not as a long-lived workspace package. Promote research into a package only when the resulting boundary becomes part of the current architecture.
+
+General rules:
+
 - One package = one independently composable/replaceable capability, one integration boundary, or one indivisible security invariant.
 - Prefer native DSH/Cordis Service, Context, Fiber, scope and typed protocol seams.
 - Contract and default implementation may co-locate early; split only when replacement/lifecycle/versioning value is real.
-- Do not scaffold speculative packages.
-- The future SaaS Framework should be an opinionated Distribution assembled from a Plugin Family, not a monolithic implementation package.
+- Do not scaffold speculative packages or names for future v0.3 capabilities.
+- The SaaS Framework should be an opinionated Distribution assembled from a Plugin Family, not a monolithic implementation package.
 
 ## Dependency direction
 
@@ -93,21 +108,23 @@ See `docs/reference/compatibility.md`.
 Runtime/kernel primitives <- capability contracts <- providers <- SaaS distribution
 ```
 
-The runtime package keeps transport/vendor implementations out of core. Auth products, databases, HTTP/WebSocket transport, MCP product integration, audit/usage implementations and deployment profiles compose above the Runtime Contract.
+The runtime package keeps transport/vendor implementations out of core. Auth products, databases, HTTP/WebSocket transport, MCP product integration, audit/usage implementations and deployment profiles compose above the Runtime Contract only when their boundaries become concrete.
 
 ## Tests: contract vs conformance
 
 - **Provider contract suites** prove a replaceable seam (for example `TenantSessionStore` or Runtime Capability Provider Contract).
 - **Conformance/invariant suites** prove cross-component properties such as tenant isolation, publication ordering and lifecycle ownership.
-- **Compatibility probes** prove assumptions about exact external DSH versions.
+- **Compatibility probes** prove assumptions about exact external DSH versions that the active architecture relies on.
 - **Packed/registry smoke** proves the artifact users actually install, not only workspace source.
 
 ## Definition of done
 
 - architecture/data/state/type implications reviewed globally;
+- the change is demonstrably relevant to the current product direction;
 - current docs/ADR/spec updated where behavior is decided;
 - upstream/boundary ownership is explicit;
 - exact DSH compatibility evidence is green when relevant;
 - `pnpm release:check` is green;
 - no transport/vendor implementation leaks into the runtime kernel;
+- no speculative package/scaffold is introduced without a real boundary;
 - no compatibility shim is added solely to preserve an obsolete prerelease abstraction.
