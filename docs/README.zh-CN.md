@@ -7,13 +7,20 @@
 ## 指南
 
 - [README](../README.zh-CN.md) — 项目概览与当前 Runtime Contract
-- [CONTRIBUTING](../CONTRIBUTING.zh-CN.md) — 工程与兼容性规范
+- [CONTRIBUTING](../CONTRIBUTING.zh-CN.md) — 工程、相关性与 assumption-first 规范
 - [ROADMAP](../ROADMAP.zh-CN.md) — v0.2 基础与 v0.3 SaaS Framework 方向
 
 ## 当前架构
 
 - [架构](./specs/architecture.zh-CN.md) — canonical Tenant / Principal Runtime 模型
 - [Session / Agent Publication Boundary](./adr/session-genesis.zh-CN.md) — 当前 DSH setup / publication 决策
+
+## v0.3 P0 Specs
+
+- [P0 底座](./specs/v0.3-foundation.zh-CN.md) — scope、开发顺序与 promotion gate
+- [SaaS Composition](./specs/saas-composition.zh-CN.md) — `SaaSDefinition -> CompositionPlan -> Runtime Composition`
+- [Principal Operation Lifecycle](./specs/operation-lifecycle.zh-CN.md) — Principal-owned one-shot work 与 Agent boundary
+- [`v0.3-assumptions.json`](./specs/v0.3-assumptions.json) — 机器可读 blocking assumption 与 executable proof
 
 ## 参考
 
