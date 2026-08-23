@@ -8,9 +8,9 @@
  * DSH must carry that caller-bound derived context into the Agent factory as
  * ownerCtx, preserving Principal identity and tenant capability resolution.
  */
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { DSH_TARGET } from './dsh-target.mjs'
@@ -20,10 +20,9 @@ const tmp = mkdtempSync(join(tmpdir(), 'dsh-mt-agent-owner-'))
 const src = join(tmp, 'src')
 
 try {
-  mkdirSync(src)
-  for (const name of ['runtime.ts', 'service.ts', 'store.ts', 'types.ts', 'errors.ts', 'validation.ts']) {
-    copyFileSync(join(root, 'packages', 'multi-tenant', 'src', name), join(src, basename(name)))
-  }
+  // Copy the source module as one architectural unit. The probe must follow
+  // legitimate internal refactors instead of hard-coding yesterday's file graph.
+  cpSync(join(root, 'packages', 'multi-tenant', 'src'), src, { recursive: true })
 
   writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'agent-owner-probe', private: true, type: 'module' }))
   writeFileSync(join(tmp, 'pnpm-workspace.yaml'), 'allowBuilds:\n  esbuild: false\n')
