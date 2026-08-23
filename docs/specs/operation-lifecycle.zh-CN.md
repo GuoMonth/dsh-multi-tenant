@@ -2,135 +2,158 @@
 
 # Spec —— Principal Operation Lifecycle
 
-> Status：P0 design contract。最终 public Operation API 被 assumption `A6` 刻意阻塞。
+> Status：**v0.3 M2 / M3 已实现并证明**。Assumption `A6` 已由 contract test 与 pinned DSH SaaS Core vertical probe 证明。
 
-## 问题
+## 目标
 
-SaaS request 不能从任意 root Context 直接调用 DSH。一次工作必须从一个 canonical Principal 发起，并拥有独立的 ephemeral lifecycle boundary，用来承载 dependency acquisition、cancellation、tracing 与 Agent orchestration。
-
-目标路径：
+一次用户可见的 SaaS 动作不是一次 Cordis plugin activation，而是归属于一个 canonical Principal 的一次 semantic attempt。
 
 ```text
-Authenticated identity
-      ↓
-canonical Tenant
-      ↓
+Tenant
+  └─ Principal
+       └─ Operation
+            ├─ operation-local providers
+            ├─ one-shot capability snapshot
+            ├─ execute exactly once
+            └─ deterministic teardown
+```
+
+进入 DSH 的结构路径：
+
+```text
 canonical Principal
       ↓
-begin one Operation
+Principal-owned Operation Fiber
+      ↓ setup operation-local capabilities
+one-shot required-capability snapshot
       ↓
-derived Cordis lifecycle boundary
+execute exactly once
       ↓
-acquire required capabilities
-      ↓
-DSH Agent create / resume / drive
+ctx.agents.create / resume
+      ↓ caller-bound ownerCtx
+DSH Agent setup / publication
       ↓
 Operation teardown
 ```
 
-## Ownership Rule
+## Ownership
 
-一个 Operation 只能属于一个 Principal，不能在 Principal / Tenant 之间迁移。
-
-生命周期 ownership：
+一个 Operation 只能属于一个 Principal，不能跨 Principal / Tenant 迁移。
 
 ```text
 Tenant owns Principal
-Principal owns Operation
-Operation owns operation-local resources
+Principal owns Operation registry
+Operation Fiber owns ephemeral resources
 ```
 
-Principal dispose 完成前，所有属于它的 Operation 必须已经进入 quiescent。Cordis child fiber 的这条行为由 executable probe 证明，对应 assumption `A3`。
+Principal dispose 会先关闭 Operation admission，再 cancel / drain 已存在的 Operation，最后 dispose Principal Fiber。因此 Tenant teardown 会递归让 Principal 与 Operation 全部进入 quiescent。
 
-## Semantic State
+## State Model
 
-最终命名现在不冻结，但 P0 使用下面状态机推理：
+当前实现使用下面的 semantic state：
 
 ```text
-CREATED
-  ↓ start
 PREPARING
-  ├─ dependency / setup failure -> FAILED -> DISPOSED
-  ├─ cancel                     -> CANCELLING -> DISPOSED
-  └─ ready                      -> ACTIVE
-                                   ├─ complete -> DISPOSING -> DISPOSED
-                                   ├─ failure  -> FAILED -> DISPOSED
-                                   └─ cancel   -> CANCELLING -> DISPOSED
+  ├─ missing dependency / setup failure -> FAILED -> DISPOSING -> DISPOSED
+  ├─ cancel                             -> CANCELLING -> DISPOSING -> DISPOSED
+  └─ snapshot ready                     -> ACTIVE
+                                           ├─ complete -> DISPOSING -> DISPOSED
+                                           ├─ failure  -> FAILED -> DISPOSING -> DISPOSED
+                                           └─ cancel   -> CANCELLING -> DISPOSING -> DISPOSED
 ```
 
-Required capability acquisition 和 operation setup 成功之前，consumer 不能观察到 ACTIVE Operation。
+setup 与 required capability acquisition 成功以前，`execute()` 不会运行。所有 terminal path 都会尝试 quiescent cleanup，并把 Operation 从 Principal registry 中 retire。
 
-## One-shot Work 与 Reactive Injection
+## A6 的最终选择：Snapshot，而不是 Reactive Execute
 
-Cordis `ctx.inject()` 是 reactive plugin primitive。仓库 probe 会证明：required service 消失时 callback unload；service 重新出现后 callback 可以再次执行，对应 assumption `A4`。
+Cordis `ctx.inject()` 本来就是 reactive primitive：required service 消失时 callback unload，service 恢复以后 callback 可能重新执行（`A4`）。对于 plugin lifecycle 这是正确语义，但对于一次用户 transaction 是错误语义。
 
-因此，下面这段代码**不能**直接被定义为“一次用户 Operation”的语义：
+所以 semantic Operation **不能**这样定义：
 
 ```ts
 principal.ctx.inject(['agents'], async (ctx) => {
-  await performExternallyVisibleUserWork(ctx)
+  await performUserWork(ctx)
 })
 ```
 
-除非 Operation abstraction 能证明 dependency churn 下 exactly-once / idempotent 行为。
+v0.3 采用另一套结构：
 
-P0 在冻结 public API 前必须显式选择并证明更安全的模型。候选方案可以是 one-shot acquisition 后显式拥有 lifetime，或者通过 idempotent transaction token 拒绝 callback re-entry；这个 foundation Spec 不提前选择实现。
+1. 创建普通的 Principal-owned child Fiber，不使用 reactive `inject`；
+2. materialize operation-local provider；
+3. 在 Operation Context 上一次性解析全部 required capability；
+4. 冻结成 `OperationCapabilitySnapshot`；
+5. 只调用一次 `execute()`；
+6. 无论 success / failure / cancellation 都 dispose Operation。
 
-这个尚未解决的设计点就是 assumption / gate `A6`。
+捕获到的 Cordis capability 在其 provider 后续被 dispose 后，可能自己变得不可用。Framework **不承诺 provider 永生**。真正的保证更窄但更关键：provider churn 永远不会让同一个用户 Operation 被 re-enter 或悄悄重复执行。
 
-## Agent Boundary
+Contract test 会在 Operation 运行期间卸载 v1 provider、挂载 v2 provider，并证明当前 Operation 仍然只执行一次、消费最初捕获的 capability。
 
-当 Operation 在一次 attempt 生命周期内拥有稳定的 Principal-derived Context 后，Agent creation 使用已经验证的 seam：
+## Capability Snapshot
 
-```text
-Operation Context
-   ↓ caller-bound ownerCtx
-ctx.agents.create / resume
-   ↓
-DSH Agent setup transaction
-   ↓
-DSH publication
+Snapshot 是 immutable 且刻意保持小：
+
+```ts
+interface OperationCapabilitySnapshot {
+  readonly keys: readonly string[]
+  has(name: string): boolean
+  get<T>(name: string): T | undefined
+  require<T>(name: string): T
+}
 ```
 
-Operation 不复制 Cordis 私有 isolation map 到 `Agent.ctx`，也不创建平行的 Agent tenant registry。
+它不是第二套 DI Container。Capability resolution 仍然属于 Cordis；Snapshot 只是记录这个 semantic attempt 已经解析出的精确 capability 集合。
 
-## Cancellation
+## DSH Agent Boundary
 
-P0 至少要求一个 cancellation direction 从结构上成立：
+CI 直接运行真实 public `@deepseek-ai/dsh-agent` `AgentRegistry`。从 Operation 调用捕获到的 `agents` capability 时，DSH factory 收到的 caller-bound `ownerCtx` 仍然是正确的 Operation Context。
+
+Vertical proof 并发覆盖：
+
+- Acme / Alice create；
+- Acme / Bob create；
+- Globex / Alice create；
+- Acme / Alice resume；
+- DSH create failure。
+
+每次 create / resume 中，factory 都能看到正确的 Tenant identity、Principal identity、Tenant capability、Principal capability 和 Operation-local capability。Factory failure 会保留为 Operation 的 causal error，同时 failed Operation 完整 retire。
+
+Operation 不复制 Cordis 私有 isolation map 到 `Agent.ctx`，不创建平行 Agent tenant registry，也不重新定义 DSH Agent / Preset scope 语义。
+
+## Cancellation 与 Teardown
+
+Cancellation 从结构上成立：
 
 ```text
 Principal disposal
-    ↓
-Operation cancellation / teardown
+      ↓ close Operation admission
+cancel / drain Operations
+      ↓
+dispose Principal
 ```
 
-Operation-local cancellation 也必须 dispose Operation 自己拥有的资源。具体 AbortSignal / public API shape 不在这个 foundation PR 冻结。
+Operation 自己也拥有 `AbortSignal` 供显式 cancellation 使用。重复 `cancel()` / `dispose()` 是幂等的，并 join 同一个 quiescent teardown。
 
-Cancellation 不自动等于 durable authorization rollback。v0.1 ownership kernel 是 immutable + persistent，Session ownership reservation / finalization 仍然是独立产品语义。
+Durable Session ownership 是另一条 plane。取消 Operation 不自动 rollback v0.1 persistent authorization invariant。
 
-## Failure Semantics
+## Error Boundary
 
-Operation failure 至少需要在概念上区分：
+第一版 public taxonomy 刻意保持 semantic，而不是 vendor-specific：
 
-- composition / dependency 无法获得；
-- caller cancellation；
-- Agent setup / publication failure；
-- Agent execution failure；
-- teardown failure。
+- `OperationRegistryClosedError` —— Principal teardown 开始以后不再接受新工作；
+- `OperationDependencyUnavailableError` —— 执行前 required capability 缺失；
+- `OperationCancelledError` —— caller / owner cancellation；
+- 下游 DSH / provider error —— 保留 causal error，不为了统一错误而丢失语义。
 
-Framework 应保留 causal error 信息，同时仍然尝试 quiescent cleanup。最终 public error class 等 behavior test 存在以后再冻结。
+下游失败以后仍然执行 cleanup。
 
-## Public API 前必须具备的 P0 Tests
+## Executable Evidence
 
-第一版 Operation implementation 必须证明：
+当前 contract 由下面证据持续保护：
 
-1. Operation 结构上绑定到一个 Principal；
-2. Tenant A/B 和 Principal sibling capability state 不串；
-3. Principal dispose 会 drain ACTIVE / PREPARING Operation；
-4. Operation-local resource exactly-once cleanup；
-5. dependency churn 不能重复产生外部可见工作；
-6. create / resume 使用正确 Principal-derived DSH owner context；
-7. Agent publication failure 不留下 live partial Operation / Agent graph；
-8. 重复 dispose / cancel 幂等且 quiescent。
+- `packages/multi-tenant/tests/operation.test.ts` —— one-shot snapshot、missing dependency、Principal drain、幂等 teardown；
+- `scripts/cordis-operation-lifecycle-probe.mjs` —— Cordis child ownership 与 reactive `inject` 行为；
+- `scripts/saas-core-vertical-slice-probe.mjs` —— multi-tenant Operation 通过真实 DSH AgentRegistry create / resume / failure；
+- Node 22.19 与 Node 24 GitHub Actions lanes。
 
-第 5 条没有证明以前，Operation public API 保持 gated。
+因此 `A6` 已经是 `proven`，不再是 open design gate。
