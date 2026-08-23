@@ -10,10 +10,6 @@ import {
 } from '../src/runtime.ts'
 import { ValidationError } from '../src/errors.ts'
 
-function provideMarker(ctx: Context, config: { name: string; value: string }): void {
-  ctx.provide(config.name, config.value)
-}
-
 async function createRuntime(): Promise<{ ctx: Context; runtime: TenantRuntimeService }> {
   const ctx = new Context()
   await ctx.plugin(InMemoryTenantSessionStore)
