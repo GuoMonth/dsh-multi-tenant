@@ -45,9 +45,15 @@ describe('TenantRuntimeService', () => {
     expect(tenantA.ctx.get('sharedAdapter')).toBe('shared')
     expect(tenantB.ctx.get('sharedAdapter')).toBe('shared')
 
-    // The v0.1 authorization kernel is one shared invariant below both tenants.
-    expect(tenantA.ctx.get('multiTenant')).toBe(ctx.get('multiTenant'))
-    expect(tenantB.ctx.get('multiTenant')).toBe(ctx.get('multiTenant'))
+    // Prove the v0.1 kernel is one shared persistent invariant by behavior,
+    // rather than comparing Cordis trace proxies (whose identity is caller-bound).
+    const alice = { tenantId: 'acme', userId: 'alice' }
+    await tenantA.ctx.multiTenant.claimSession('shared-kernel', alice)
+    await expect(ctx.multiTenant.getSessionOwner('shared-kernel')).resolves.toEqual(alice)
+    await expect(tenantB.ctx.multiTenant.canAccessSession(
+      { tenantId: 'globex', userId: 'bob' },
+      'shared-kernel',
+    )).resolves.toBe(false)
   })
 
   it('adds a principal-local capability layer below the tenant layer', async () => {
@@ -118,7 +124,6 @@ describe('TenantRuntimeService', () => {
     await alice.ctx.multiTenant.claimSession('session-a', alice.principal)
     await expect(alice.ctx.multiTenant.canAccessSession(alice.principal, 'session-a')).resolves.toBe(true)
     await expect(eve.ctx.multiTenant.canAccessSession(eve.principal, 'session-a')).resolves.toBe(false)
-    expect(alice.ctx.multiTenant).toBe(ctx.multiTenant)
-    expect(eve.ctx.multiTenant).toBe(ctx.multiTenant)
+    await expect(ctx.multiTenant.getSessionOwner('session-a')).resolves.toEqual(alice.principal)
   })
 })
