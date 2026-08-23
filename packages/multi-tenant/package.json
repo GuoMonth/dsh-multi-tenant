@@ -30,6 +30,14 @@
       "types": "./dist/runtime.d.mts",
       "import": "./dist/runtime.mjs"
     },
+    "./operation": {
+      "types": "./dist/operation.d.mts",
+      "import": "./dist/operation.mjs"
+    },
+    "./composition": {
+      "types": "./dist/composition.d.mts",
+      "import": "./dist/composition.mjs"
+    },
     "./store": {
       "types": "./dist/store.d.mts",
       "import": "./dist/store.mjs"
