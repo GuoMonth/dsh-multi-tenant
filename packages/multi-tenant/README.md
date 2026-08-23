@@ -27,7 +27,7 @@ Deployment / Root
 
 DSH Agent/Preset scope remains a separate registration plane. A Principal Context is the **owner/composition boundary** from which Agent creation is invoked; Agent setup explicitly projects/composes the capabilities it needs. v0.2 does not fake direct service inheritance into `Agent.ctx` by copying private Cordis isolation state.
 
-## Supported guarantees
+## Supported guarantee
 
 v0.2 combines two independent enforcement layers:
 
