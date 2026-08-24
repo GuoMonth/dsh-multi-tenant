@@ -9,6 +9,7 @@ export default defineConfig({
     'src/runtime-composition.ts',
     'src/ingress.ts',
     'src/credentials.ts',
+    'src/mcp.ts',
     'src/store.ts',
     'src/testing.ts',
   ],
