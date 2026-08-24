@@ -2,58 +2,54 @@
 
 # Direction
 
-项目不再维护一份很长的逐 Milestone Roadmap。当前文件只回答两个问题：**现在做什么**，以及**长期希望往哪里演进**。具体架构 contract 仍以 `docs/specs/*` 与 executable tests 为权威。
+项目不再维护长篇逐 Milestone Roadmap。当前 contract 以 `docs/specs/*` 与 executable tests 为权威；本文件只记录**当前交付焦点**和**非绑定长期方向**。
 
 ## 当前状态
 
 ```text
 v0.1  Security Kernel                         已冻结
 v0.2  Multi-Tenant Runtime Contract           已发布基础
-v0.3  SaaS Framework Core                     当前主线
+v0.3  SaaS Framework Core                     M5 已完成；下一步只做 release convergence
 ```
 
-当前 v0.3 Core 已具备：
+当前 v0.3 已经证明：
 
-- deterministic typed `SaaSDefinition -> CompositionPlan`；
-- scope-local canonical Tenant / Principal identity；
-- Principal-owned one-shot Operation；
-- 真实 DSH create / resume / failure evidence；
-- 精确 `CompositionPlan <-> RuntimeComposition` binding / attestation；
+- deterministic typed Composition -> canonical Tenant / Principal Runtime；
+- exact `RuntimeComposition` whole-plan binding / attestation；
 - trusted Product Ingress -> canonical Principal；
-- 一个真实、可替换的 Principal Credentials capability。
+- Principal-scoped replaceable Credentials；
+- Principal-owned one-shot Operation；
+- Tenant-scoped MCP configuration；
+- Principal-bound create/resume 在任何 DSH work 前 enforce Session ownership；
+- Principal-owned long-lived DSH Agent；
+- 官方 `@deepseek-ai/dsh-mcp-client` 在 Agent publication 前完成 initial discovery；
+- 真正 Agent-scoped MCP Tools 通过 DSH ToolRuntime 执行；
+- Acme/Alice、Acme/Bob、Globex/Alice 并发隔离；
+- Node 22.19 / Node 24 上的 create / resume / startup-failure / teardown executable evidence。
 
-## 现在只聚焦：M5 真实 Agent Integration
+## 下一步且唯一短期目标：v0.3.0-rc.1 Release Convergence
 
-短期不再改造 M4，也不提前设计 universal Broker API。先使用现有 `PrincipalCredentials` primitive 跑通一条真正有产品价值的 DSH MCP Tools vertical slice：
+第一个真正可用的 v0.3 prerelease 之前，不再开启新的架构 Milestone。
+
+下一 PR 应该非常小，只围绕发布：
 
 ```text
-trusted product request
-  -> Product Ingress
-  -> RuntimeComposition
-  -> Tenant MCP config + Principal Credentials
-  -> one-shot Operation snapshot
-  -> Agent Integration
-  -> DSH Agent setup
-  -> @deepseek-ai/dsh-mcp-client
-  -> native DSH MCP Tools
+M5 green on main
+  -> package version = 0.3.0-rc.1
+  -> 收敛 README / release note
+  -> registry smoke 升级到 v0.3 产品路径
+  -> pnpm release:check
+  -> publish exact artifact
+  -> 验证 npm latest + Git tag + GitHub Release
 ```
 
-M5 只要求：
-
-- 使用官方 DSH MCP client / native Tool bridge；
-- 并发 Tenant / Principal isolation 正确；
-- create / resume / failure / teardown 有 executable evidence；
-- 当前 DSH 没有稳定 native consumer seam 时，不造 Resources / Prompts compatibility stack；
-- 不为了未来想象提前拆 package；
-- 如果实现中自然出现 brokered helper，先保持 private，不把它提前冻结成 Core contract。
-
-**目标是先把真实产品闭环做出来。**
+发版标准也很简单：产品开发者只提供 trusted identity resolution、Tenant MCP config、Principal credentials，就能 create/resume 一个真正 multi-tenant 的 DSH Agent，并直接得到 native MCP Tools，而不用自己手工拼 DSH / MCP composition path。
 
 ## 长期方向：Credential-as-Data -> Capability-as-Authority
 
-`PrincipalCredentials` 当前是有意保持很小的 low-level credential primitive；它验证 M4 所需的 ownership / isolation / replacement，但不代表长期推荐的 Agent-facing API。
+`PrincipalCredentials` 继续是当前 low-level primitive。它对 v0.3 / M5 很有用，但不代表 raw credential 是最终 Agent / application-facing abstraction。
 
-长期希望逐步演进到：
+长期更偏向：
 
 ```text
 Core identity / lifecycle
@@ -67,26 +63,20 @@ Typed Client / Transport capability
 Operation
 ```
 
-例如 Operation 最终更应该消费 `ErpClient.query(...)` / `McpTransport.call(...)`，而不是直接拿 token 自己 fetch。不同 ERP / MCP / GitHub 等协议接入应成为可组合 Integration Plugin；Broker 也应是可替换 plugin capability，而不是 Core 中的上帝对象。
-
-但这个方向**现在不冻结 API**。推荐证据路径是：
+这仍然是 Vision，不进入本次 release scope。证据路径保持：
 
 ```text
-M5 真实 MCP integration
+真实 MCP integration（M5）       ✅
         ↓
-第二个真实 integration（例如 ERP）
+第二个真实 integration（ERP 等）
         ↓
-观察重复的 authority / refresh / injection / audit 语义
+比较重复出现的 authority / refresh / injection / audit 语义
         ↓
-提炼最小 Broker contract
+只提炼最小且被证明的 Broker contract
         ↓
-下一个 prerelease 允许 deliberate breaking change
+如果确有价值，允许后续 prerelease deliberate breaking change
 ```
 
-完整的非绑定长期原则见 [`docs/vision/authority-capabilities.zh-CN.md`](./docs/vision/authority-capabilities.zh-CN.md)。
-
-## 一条长期总纲
+详见 [`docs/vision/authority-capabilities.zh-CN.md`](./docs/vision/authority-capabilities.zh-CN.md)。
 
 > **Core 管身份和生命周期；Broker 管授权与 secret；Integration 管厂商协议；Operation 消费 typed ability；Secret 在可行时留在 authority boundary 后面。**
-
-M5 之后继续根据真实 release evidence 与使用反馈决定下一步，不恢复长篇 speculative milestone list。
