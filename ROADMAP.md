@@ -2,7 +2,7 @@
 
 # Direction
 
-The project no longer maintains a long milestone-by-milestone Roadmap. The detailed M0–M8 planning served its purpose while the v0.3 architecture was uncertain; keeping it alive now creates more narrative debt than engineering value.
+The project no longer maintains a long milestone-by-milestone Roadmap. This file now answers only two questions: **what we are doing now**, and **where we want the architecture to evolve long term**. Current contracts remain authoritative in `docs/specs/*` and executable tests.
 
 ## Current state
 
@@ -22,31 +22,71 @@ The live v0.3 Core now has:
 - trusted Product Ingress -> canonical Principal;
 - a real replaceable Principal Credentials capability.
 
-The current architecture is documented in `docs/specs/*`; those specs and executable tests are authoritative, not this file.
+## Near-term focus only: M5 real Agent Integration
 
-## Next target: M5 Agent Integration reference path
-
-M5 should prove one useful end-to-end path without inventing another protocol framework:
+Do not redesign M4 again and do not block on a universal Broker API. First use the existing `PrincipalCredentials` primitive to ship one real DSH MCP Tools vertical slice with product value:
 
 ```text
 trusted product request
   -> Product Ingress
-  -> bound RuntimeComposition
-  -> Tenant config + Principal Credentials
+  -> RuntimeComposition
+  -> Tenant MCP config + Principal Credentials
   -> one-shot Operation snapshot
-  -> Agent Integration recipe
+  -> Agent Integration
   -> DSH Agent setup
   -> @deepseek-ai/dsh-mcp-client
   -> native DSH MCP Tools
 ```
 
-The target is deliberately narrow:
+M5 only requires:
 
-- use the official DSH MCP client and native Tool bridge;
-- consume the M4 Credentials contract rather than adding auth logic to Agent integration;
-- preserve Tenant/Principal isolation across concurrent Agents;
-- cover create/resume/failure/teardown in executable evidence;
-- keep MCP Resources/Prompts out until the pinned Harness has a stable native consumer seam;
-- do not create a separate package unless the implementation proves an independent boundary.
+- official DSH MCP client/native Tool bridge;
+- correct concurrent Tenant/Principal isolation;
+- executable create/resume/failure/teardown evidence;
+- no Resources/Prompts compatibility stack while DSH lacks a stable native consumer seam;
+- no speculative package split;
+- if a brokered helper naturally appears, keep it private until real evidence justifies a public contract.
 
-After M5, further work will be prioritized from release evidence and real usage rather than another long speculative milestone list.
+**The goal is to ship the real product loop first.**
+
+## Long-term direction: Credential-as-Data -> Capability-as-Authority
+
+`PrincipalCredentials` is intentionally a small low-level credential primitive today. It proves the M4 ownership/isolation/replacement model, but it is not necessarily the long-term recommended Agent-facing API.
+
+The preferred direction is:
+
+```text
+Core identity / lifecycle
+        ↓
+Authority / Credential Broker plugin
+        ↓
+Service Integration plugin
+        ↓
+Typed Client / Transport capability
+        ↓
+Operation
+```
+
+An Operation should eventually prefer `ErpClient.query(...)` or `McpTransport.call(...)` over receiving a raw token and performing arbitrary fetches. Different ERP/MCP/GitHub/vendor integrations should remain composable Integration Plugins; the Broker should also be a replaceable plugin capability rather than a Core god object.
+
+This direction **does not freeze an API today**. The evidence path is:
+
+```text
+M5 real MCP integration
+        ↓
+second real integration (for example ERP)
+        ↓
+observe repeated authority / refresh / injection / audit semantics
+        ↓
+extract the smallest proven Broker contract
+        ↓
+allow a deliberate breaking change in the next prerelease
+```
+
+See the non-binding long-term principles in [`docs/vision/authority-capabilities.md`](./docs/vision/authority-capabilities.md).
+
+## Long-term rule in one sentence
+
+> **Core owns identity/lifecycle; Broker owns authority/secrets; Integration owns vendor protocol; Operation consumes typed abilities; secrets stay behind the authority boundary whenever practical.**
+
+After M5, priorities continue to come from real release evidence and usage rather than another speculative milestone list.

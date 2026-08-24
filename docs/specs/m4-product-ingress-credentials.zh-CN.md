@@ -41,6 +41,14 @@ interface PrincipalCredentials {
 
 它不提供枚举、序列化，也不假装自己是 universal secret-store API。
 
+### Contract Positioning
+
+这个 API 被明确定位成**当前 v0.3 的 low-level credential primitive**。它用一个真实 capability 证明 Principal ownership、isolation、provider replacement、lifecycle，并让 M5 能够先完成真正的 integration。
+
+它**不意味着 application / Agent code 长期都应该直接拿 raw credential**。后续如果真实 vertical slice 证明有价值，可以把 credential access 放到 authority / broker plugin 后面，再让 Operation 消费 service-specific typed client / transport。
+
+这个长期方向当前是 non-binding，不改变 M4 contract，也不能成为阻塞 M5、提前设计 universal Broker API 的理由。见 `../vision/authority-capabilities.zh-CN.md`。
+
 ## Provider Adapter
 
 `definePrincipalCredentialsProvider()` 在 Principal setup 中拿到 resolved Principal 与 AbortSignal。Conforming provider 可以从任意后端加载 secret；Core 只要求最终 `PrincipalCredentials` value 被 materialize 到正确 scope。
@@ -58,6 +66,17 @@ M4 contract tests 证明：
 - missing credential 显式失败；
 - 替换 credentials provider 不需要修改 Framework Core；
 - RuntimeComposition dispose 后可以 clean recreation Principal / provider lifecycle。
+
+## Non-goals
+
+M4 不定义：
+
+- universal Credential Broker API；
+- ERP / MCP / GitHub 等 service-specific client contract；
+- 跨 vendor 的 credential refresh / audit / policy 通用语义；
+- hostile-code secret sandbox。
+
+这些 abstraction 必须先由后续真实 integration 挣出来，再考虑 deliberate breaking public contract。
 
 ## Security Boundary
 

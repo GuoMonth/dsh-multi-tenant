@@ -111,6 +111,22 @@ Source reading can explain *why* a behavior probably exists; it does not replace
 
 The sequence is iterative: a later vertical slice may expose an over-coupled earlier abstraction. Refactor the live model and Spec instead of preserving prerelease compatibility around disproven structure.
 
+## Vision is not contract
+
+Long-term direction may be documented under `docs/vision/*`, but Vision has a different status from Spec:
+
+- `docs/specs/*` describes implemented/current contracts;
+- `docs/vision/*` records non-binding architectural direction;
+- Vision does not create a release gate;
+- Vision must not be used to pre-approve package names, public APIs or abstract provider families;
+- promotion from Vision to Spec requires real vertical-slice evidence.
+
+The current authority-capability Vision prefers `Capability-as-Authority` over permanently exposing raw credentials to Agent/application code. That means a future Broker may become a replaceable plugin capability and service-specific integrations may provide typed clients/transports. This is **not** permission to redesign M4 again or block M5 on a universal Broker API.
+
+The expected evidence sequence is: ship the real MCP integration first, then a second real integration such as ERP, compare repeated authority/refresh/injection/audit semantics, and only then extract the smallest proven public Broker contract if one actually exists.
+
+See `docs/vision/authority-capabilities.md`.
+
 ## Package conventions
 
 **Do not create a package because a directory seems useful. Create it only when an independent boundary is real.**
@@ -130,7 +146,7 @@ General rules:
 - One package = one independently valuable boundary, not one buzzword/capability name.
 - Prefer native DSH/Cordis Service, Context, Fiber, Agent/Preset scope and typed protocol seams.
 - Contract/default implementation may co-locate early; split only when replacement/lifecycle/versioning value is real.
-- Do not scaffold speculative `saas`, Auth, Credentials, MCP or Transport packages.
+- Do not scaffold speculative `saas`, Auth, Credentials, MCP, Broker, ERP or Transport packages.
 - A future product Distribution may provide opinionated defaults, but Distribution concerns must not dictate Core topology prematurely.
 
 ## Dependency and boundary direction
@@ -153,7 +169,9 @@ Agent Integration
 Native DSH / Cordis
 ```
 
-Credentials are a natural Principal-owned Runtime capability. MCP is currently expected to prove Agent Integration by consuming Tenant config + Principal credentials + Operation state and composing the native DSH MCP Tools plugin.
+Credentials are a natural Principal-owned Runtime capability in the current v0.3 contract. M5 is expected to prove Agent Integration by consuming Tenant config + Principal credentials + Operation state and composing the native DSH MCP Tools plugin.
+
+Long term, service-specific typed clients/transports may sit above a Broker/authority plugin so Operations consume abilities instead of raw credentials. That remains Vision until multiple real integrations prove the common boundary.
 
 Do not build a parallel protocol stack merely to make every product concern look like a Runtime Provider.
 
@@ -171,6 +189,7 @@ Do not build a parallel protocol stack merely to make every product concern look
 - architecture/data/state/type implications reviewed globally;
 - the change is demonstrably relevant to the current product direction;
 - current docs/ADR/spec updated where behavior is decided;
+- Vision is not silently promoted into a public contract without real evidence;
 - blocking external assumptions are proven or explicitly gate unfinished API design;
 - boundary ownership is explicit: Product Ingress vs Runtime capability vs Operation vs Agent Integration;
 - exact DSH/Cordis compatibility evidence is green when relevant;
