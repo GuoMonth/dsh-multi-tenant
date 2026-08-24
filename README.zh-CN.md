@@ -4,11 +4,11 @@
 
 让 DeepSeek Harness（DSH）真正成为 **Multi-Tenant Runtime**，并在不替换 Cordis / DSH 生命周期语义的前提下提供可组合的 **SaaS Framework Core**。
 
-> 已发布基础：`dsh-multi-tenant@0.2.0-rc.3`。
->
-> 当前 v0.3 主线：**M5 真实 DSH-native MCP Tools Agent Integration 已实现并有 executable evidence；下一步只做 `0.3.0-rc.1` release convergence。**
+> Release candidate：**`dsh-multi-tenant@0.3.0-rc.1`**。M5 已完成；当前只做 release convergence。
 >
 > 当前 pinned DSH baseline：`0.1.1-rc.2` / `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`；CI 不追 floating `latest` / `master`。
+>
+> npm publication 只会在完整 release proof 通过后从 `main` 执行；registry 实际状态由 workflow 验证，不在这里硬编码。
 
 ## Product Path
 
@@ -88,7 +88,7 @@ const handle = await mcp.create({ sessionId })
 
 完整 contract / quick start 见 `docs/specs/m5-mcp-agent-integration.zh-CN.md` 和 `packages/multi-tenant/README.zh-CN.md`。
 
-## Executable Evidence
+## Release Evidence
 
 GitHub Actions 在 Node 22.19 与 Node 24 上证明：
 
@@ -103,13 +103,19 @@ GitHub Actions 在 Node 22.19 与 Node 24 上证明：
 - cross-Principal resume 在 DSH factory 调用前拒绝；
 - MCP startup failure 不留下 half-published Agent，但保留 fail-closed ownership reservation；
 - Agent / Principal teardown 清理 MCP tools / connection；
-- typecheck、unit / contract tests、build 与 packed external-consumer smoke。
+- typecheck、unit / contract tests 与 build；
+- tarball export smoke；
+- **clean installed-artifact smoke**：把 packed candidate 与 `@deepseek-ai/dsh@0.1.1-rc.2` 安装到干净 consumer，并真正触发已打包 M5 路径，包括官方 MCP client 的动态解析。
 
-## 下一步：v0.3.0-rc.1
+发布后 `scripts/registry-smoke.mjs` 会复用同一套 installed-consumer contract 验证 npm exact artifact。
 
-第一个真正可用的 v0.3 prerelease 之前，不再开启新的架构 Milestone。下一步只做 release convergence：version bump、release note、v0.3 registry smoke、`pnpm release:check`，然后验证 exact npm artifact / Git tag / GitHub Release。
+## Release：v0.3.0-rc.1
 
-见 [Direction](./ROADMAP.zh-CN.md)。
+这个 candidate 不再包含新的 architecture milestone。Release convergence 只处理 exact version identity、release note、package / docs 对齐、永久 artifact / registry smoke 与现有 full release proof。
+
+Publication 仍然必须从 `main` 手动执行 `.github/workflows/release.yml`。Workflow 会跑 `pnpm release:check`，通过 npm Trusted Publishing / OIDC 发布，验证 exact registry artifact 与 `latest`，最后创建 matching Git tag 和 prerelease GitHub Release。
+
+见 [Direction](./ROADMAP.zh-CN.md) 与 [Release Contract](./docs/reference/release.zh-CN.md)。
 
 ## 长期原则
 
