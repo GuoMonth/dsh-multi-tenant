@@ -10,7 +10,7 @@ Old prerelease notes, milestone names, superseded investigation documents and on
 
 - [Project README](../README.md) — what problem the project solves, installation and the first product flow
 - [Direction](../DIRECTION.md) — current direction without a milestone roadmap
-- [CONTRIBUTING](../CONTRIBUTING.md) — engineering and evidence policy
+- [CONTRIBUTING](../CONTRIBUTING.md) — engineering, evidence and live-tree policy
 
 ## Current product/runtime contracts
 
