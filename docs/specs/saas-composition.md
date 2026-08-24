@@ -1,235 +1,102 @@
 [简体中文](./saas-composition.zh-CN.md) | English
 
-# Spec — SaaS Composition Model
+# Spec — SaaS Composition
 
-> Status: **implemented and hardened after v0.3 M1–M3**. The live model is protected by compiler tests, scope-local canonical-drift tests, packed-consumer smoke and the pinned-DSH vertical proof.
+> Status: live v0.3 compiler/materialization contract.
 
-## Purpose
-
-v0.2 owns canonical Tenant/Principal lifecycle. v0.3 adds the smallest SaaS semantics needed to answer:
-
-- which typed capabilities constitute a composition;
-- which provider is selected for each capability;
-- which Runtime scope owns the capability;
-- which selected capabilities it depends on;
-- whether the graph is valid before traffic;
-- whether a canonical Runtime node is already running a conflicting **local creation slice**.
-
-It is deliberately **not** another DI container. Cordis continues to own service resolution, provider lifetime, Context isolation and Fiber cleanup.
-
-## Three representations
+## Pipeline
 
 ```text
-SaaSDefinition
-  mutable intent
+SaaSDefinition                  mutable product intent
       ↓ compile
-CompositionPlan
-  normalized + deterministic + immutable
+CompositionPlan                 normalized / deterministic / immutable
       ↓ materialize
-Runtime Composition
-  native Cordis providers in Deployment/Tenant/Principal/Operation scopes
+RuntimeComposition              exact bound product Runtime
+      ↓
+Tenant -> Principal -> Operation
 ```
 
-## Typed capability identity
+The compiler owns provider selection, dependency validation, scope visibility and deterministic bootstrap order. Cordis owns service resolution and lifecycle.
 
-A capability is no longer represented by independent string/scope fields.
+## Capability identity
 
-```ts
-const credentials = defineCapability<Credentials, 'principal'>(
-  'credentials',
-  'principal',
-)
-```
+Every declared capability uses `CapabilityToken<T, Scope>` so key/type/scope cannot drift independently.
 
-`CapabilityToken<T, Scope>` binds:
+Provider dependencies reference tokens, not untyped strings. The compiler rejects:
 
-```text
-stable service key
-+ semantic TypeScript value type
-+ lifecycle / authority scope
-```
+- duplicate/unknown capabilities;
+- missing required providers;
+- ambiguous selection;
+- token scope mismatch;
+- descendant dependency visibility violations;
+- cycles;
+- non-deployment ambient providers pretending to own a scoped capability.
 
-The token is a typed identity over a Cordis service key. `provideCapability()` and `getCapability()` are thin typed facades over Cordis `ctx.provide()` / `ctx.get()`; they do not own storage or resolution.
+## Immutable Plan
 
-This removes invalid states such as declaring the same capability as Tenant-scoped in one place and Principal-scoped in another, and removes consumer-side type assertions such as `require<MyType>('credentials')`.
+`compileSaaSDefinition()` sorts/normalizes equivalent input into an immutable Plan with:
 
-## SaaSDefinition
+- selected capabilities/providers;
+- deterministic `bootstrapOrder`;
+- whole `fingerprint`;
+- per-scope `scopeFingerprints`.
 
-Definitions contain capability tokens, provider candidates, optional selection and dependency edges:
-
-```ts
-interface CapabilityDefinition {
-  capability: CapabilityToken
-  required?: boolean
-  defaultProvider?: string
-}
-
-interface CapabilityProviderDefinition {
-  id: string
-  capability: CapabilityToken
-  requires?: readonly CapabilityToken[]
-  definitionKey?: string
-  setup?: CapabilityProviderSetup
-}
-```
-
-Runtime code never repeatedly interprets the mutable Definition.
-
-## CompositionPlan
-
-The compiler resolves ambiguity before Runtime bootstrap. A Plan contains:
-
-- normalized typed capability bindings;
-- selected provider definitions;
-- deterministic topological bootstrap order;
-- a global structural `fingerprint` for exact whole-plan comparison and diagnostics;
-- `scopeFingerprints` for Deployment/Tenant/Principal/Operation dependency closures.
-
-Fingerprints exclude JavaScript callback object identity. Provider authors use stable provider IDs plus optional `definitionKey` when configuration changes the semantic creation recipe.
-
-## Scope means real authority
-
-Scopes are lifecycle/authority semantics:
-
-```text
-deployment -> tenant -> principal -> operation
-```
-
-- deployment — application/process-wide capability;
-- tenant — owned by one canonical Tenant;
-- principal — owned by one canonical Principal;
-- operation — owned by one ephemeral Principal Operation.
-
-A non-deployment provider must materialize inside its declared scope. Ambient externally mounted capabilities are deployment-only.
-
-This prevents a declaration such as “principal credentials” from secretly resolving an inherited root service.
-
-## Compile-time invariants
-
-`compileSaaSDefinition()` fails before Runtime bootstrap for:
-
-- duplicate capability declarations;
-- duplicate provider IDs;
-- unknown provider/dependency/selection capability;
-- capability-token scope disagreement for the same key;
-- missing required capability provider;
-- ambiguous provider selection;
-- invalid explicit/default provider selection;
-- ambient provider pretending to own Tenant/Principal/Operation scope;
-- unbound dependency;
-- dependency visibility violation;
-- dependency cycle.
-
-Errors remain semantic and machine-distinguishable.
-
-## Dependency visibility
-
-A provider may depend only on capabilities visible from its Context:
-
-```text
-deployment -> tenant -> principal -> operation
-```
-
-A child may consume an ancestor. A parent cannot consume a descendant. Principal siblings cannot depend on one another.
+Callback object identity is intentionally not fingerprinted. Provider semantic configuration that affects creation must be represented by stable `definitionKey` metadata.
 
 ## Global identity vs canonical local identity
 
-MR-A initially used the entire Plan fingerprint as the Tenant and Principal canonical definition identity. That was safe but too coarse: changing an unrelated Operation provider could falsely invalidate an otherwise identical Tenant.
-
-The hardened model separates:
-
 ```text
-CompositionPlan.fingerprint
-  = exact whole-plan structural identity
+plan.fingerprint
+  exact whole Plan identity / RuntimeComposition attestation
 
-CompositionPlan.scopeFingerprints[scope]
-  = providers owned by that scope
-    + selected ancestor providers in their dependency closure
+plan.scopeFingerprints[scope]
+  that scope's selected provider dependency closure
 ```
 
-Examples:
+A scope fingerprint includes providers owned at that scope plus selected ancestor providers they actually depend on. Unrelated descendants are excluded.
+
+Consequences:
+
+- Operation-only change -> Operation fingerprint changes, Tenant/Principal may stay stable;
+- Principal-only change -> Principal changes, unrelated Tenant stays stable;
+- changed Deployment dependency used by Tenant/Principal -> dependent scope fingerprints change.
+
+## Materialization
+
+Low-level helpers remain available:
 
 ```text
-Operation-only provider change
-  -> global fingerprint changes
-  -> Operation scope fingerprint changes
-  -> Principal fingerprint stays stable
-  -> Tenant fingerprint stays stable
-
-Principal provider change
-  -> Principal fingerprint changes
-  -> Tenant fingerprint stays stable
-
-Deployment provider used by Tenant changes
-  -> Tenant fingerprint changes because it belongs to Tenant's dependency closure
+bootstrapDeploymentComposition(plan)
+tenantDefinitionFromPlan(plan)
+principalDefinitionFromPlan(plan)
+operationDefinitionFromPlan(plan)
 ```
 
-Canonical Tenant/Principal Runtime definitions use their **scope fingerprint**, not the whole Plan fingerprint.
+They are framework primitives, not the preferred product composition surface.
 
-This preserves two guarantees simultaneously:
-
-- true creation drift still fails with `RuntimeDefinitionConflictError`;
-- unrelated descendant evolution does not create false parent conflicts.
-
-v0.3 still does not define hot mutation of an active canonical node. Recreate the affected slice rather than ambiguously changing its creation recipe in place.
-
-## Materialization transaction
-
-```text
-validated CompositionPlan
-      ↓
-isolate owned capability service names
-      ↓
-prepare selected providers in dependency order
-      ↓
-verify dependency visibility
-      ↓
-await setup
-      ↓
-verify the capability is materially visible
-      ↓
-optional synchronous commit
-      ↓
-publish canonical scope / activate Operation
-```
-
-Tenant/Principal use the existing unpublished Runtime transaction. Deployment and Operation each have explicit Cordis owner Fibers.
-
-## Operation consumption
-
-Operations consume typed tokens:
+Product code should use:
 
 ```ts
-const operation = principal.operations.start({
-  requires: [agents, credentials],
-  execute({ capabilities }) {
-    const dshAgents = capabilities.require(agents)
-    const credential = capabilities.require(credentials)
-  },
-})
+const runtime = await materializeRuntimeComposition(ctx, plan)
+const principal = await runtime.principal({ tenantId, userId })
 ```
 
-The token determines the return type. Operation still captures values exactly once before semantic execution.
+`RuntimeComposition` binds the exact whole Plan and removes Plan parameters from downstream Tenant/Principal/Operation creation. A different active whole Plan on the same root fails rather than consuming whatever same-key service happens to exist.
 
-## Boundary planes
+## Provider setup and publication
 
-Composition is only one plane in the Framework. Product identity ingress and Agent integration are separate semantic boundaries. See [`saas-boundaries.md`](./saas-boundaries.md).
+For each scope, selected providers execute in topological order. Required dependencies must already resolve in the scoped Context. Managed provider setup may return synchronous `{ commit() }`; commits run only after preparation succeeds.
 
-In particular, the next stage must not assume Authenticated Identity, Credentials and MCP are three equivalent Provider slots:
+Tenant/Principal creation remains unpublished until setup succeeds. Operation setup occurs before its one-shot capability snapshot.
 
-- identity enters before canonical Runtime selection;
-- credentials are a Principal-owned Runtime capability;
-- MCP is expected to be exercised first as an Agent integration consuming multiple Runtime capabilities and DSH-native seams.
+## Bound Operation requirements
 
-## Package boundary
+A product-facing composed Principal can request only capability tokens declared by its Plan. This prevents the bound path from reaching ambient same-key capabilities that are outside the intended composition.
 
-No new `dsh-saas` package is justified by this hardening pass. Typed capability, Composition, Runtime and Operation still form one tightly related lifecycle contract inside `dsh-multi-tenant`.
+## Non-goals
 
-Package topology remains revisitable only when a real independent consumer/lifecycle/release boundary appears.
-
-## Executable evidence
-
-- `packages/multi-tenant/tests/composition.test.ts` — typed normalization, validation, scope authority, dependency-closure fingerprints and canonical locality;
-- `packages/multi-tenant/tests/operation.test.ts` — typed one-shot Operation snapshots and lifecycle;
-- `scripts/saas-core-vertical-slice-probe.mjs` — typed multi-tenant Plan -> Operation -> real DSH AgentRegistry create/resume/failure;
-- `scripts/package-smoke.mjs` — the packed npm artifact proves the same typed/locality contract.
+- second DI/provider container;
+- deep-cloning capability values;
+- arbitrary active-plan hot mutation;
+- using package names as capability scopes;
+- inventing MCP/Auth package topology before implementation proves it.

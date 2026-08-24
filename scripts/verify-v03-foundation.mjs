@@ -17,6 +17,10 @@ const requiredSpecs = [
   'docs/specs/saas-boundaries.zh-CN.md',
   'docs/specs/saas-composition.md',
   'docs/specs/saas-composition.zh-CN.md',
+  'docs/specs/runtime-composition.md',
+  'docs/specs/runtime-composition.zh-CN.md',
+  'docs/specs/m4-product-ingress-credentials.md',
+  'docs/specs/m4-product-ingress-credentials.zh-CN.md',
   'docs/specs/operation-lifecycle.md',
   'docs/specs/operation-lifecycle.zh-CN.md',
   'docs/specs/v0.3-assumptions.json',
@@ -38,23 +42,35 @@ requireMarkers('docs/specs/architecture.md', [
   'Product Ingress Boundary',
   'CapabilityToken<T, Scope>',
   'scopeFingerprints[scope]',
+  'RuntimeComposition',
   'Agent Integration',
 ])
 requireMarkers('docs/specs/saas-boundaries.md', [
   'Product Ingress Boundary',
   'Typed Runtime Capability Ownership',
   'Composition locality',
+  'RuntimeComposition',
   'Agent Integration Boundary',
 ])
 requireMarkers('docs/specs/saas-composition.md', [
   'CapabilityToken<T, Scope>',
   'scopeFingerprints',
   'Global identity vs canonical local identity',
+  'RuntimeComposition',
+])
+requireMarkers('docs/specs/runtime-composition.md', [
+  'RuntimeComposition',
+  'whole-plan attestation',
+  'RuntimeCompositionConflictError',
+  'RuntimeCompositionCapabilityError',
+])
+requireMarkers('docs/specs/m4-product-ingress-credentials.md', [
+  'Product Ingress Boundary',
+  'principalCredentials',
+  'PrincipalCredentials',
+  'definePrincipalCredentialsProvider',
 ])
 
-// These strings describe superseded live architecture, not historical release
-// evidence. Guard only current authority/entry documents so Git history and
-// release notes remain untouched.
 for (const path of [
   'README.md',
   'README.zh-CN.md',
@@ -64,6 +80,8 @@ for (const path of [
   'docs/specs/architecture.zh-CN.md',
   'docs/specs/saas-composition.md',
   'docs/specs/saas-composition.zh-CN.md',
+  'docs/specs/runtime-composition.md',
+  'docs/specs/runtime-composition.zh-CN.md',
 ]) {
   if (!existsSync(join(root, path))) continue
   const source = readFileSync(join(root, path), 'utf8')
@@ -121,4 +139,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log('v0.3 architecture verification passed: live specs, boundaries and assumption ledger are structurally valid')
+console.log('v0.3 architecture verification passed: binding, M4 boundaries and assumption ledger are structurally valid')

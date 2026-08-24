@@ -2,282 +2,156 @@
 
 # dsh-multi-tenant
 
-让 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）真正成为 **Multi-Tenant Runtime**，并在不替换底层 DSH/Cordis 架构的前提下成长为可组合的 **SaaS Framework Core**。
+让 DeepSeek Harness（DSH）真正成为 **Multi-Tenant Runtime**，并在不替换 Cordis / DSH 生命周期语义的前提下提供可组合的 **SaaS Framework Core**。
 
-> **已发布基础：** `dsh-multi-tenant@0.2.0-rc.3` —— canonical Tenant/Principal Runtime Contract + 冻结的 ownership kernel。
+> 已发布基础：`dsh-multi-tenant@0.2.0-rc.3`。
 >
-> **当前主开发线：** **v0.3 SaaS Framework Core**。M1–M3 已建立 typed composition、Principal-owned one-shot Operation 与真实 DSH Agent create/resume/failure evidence；当前 hardening pass 正在清掉过粗 composition identity，之后再进入产品 capability 阶段。
+> 当前 v0.3 开发线：CompositionPlan 绑定/attestation、Product Ingress、Principal Credentials 已进入 Core contract。
 >
-> **当前 DSH compatibility baseline：** `0.1.1-rc.2`，上游 release commit 为 `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`。CI 永远不追 floating `latest` / `master`。
+> 当前 pinned DSH baseline：`0.1.1-rc.2` / `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`；CI 不追 floating `latest` / `master`。
 
-## 版本方向
+## 架构
 
 ```text
-v0.1  Security Kernel
-  ↓
-v0.2  Multi-Tenant Runtime Contract       已发布
-  ↓
-v0.3  SaaS Framework Core                当前开发
-  ↓
-v0.4  Production Provider Ecosystem      预告
-```
-
-v0.1 回答 **“谁拥有 Session”**；v0.2 回答 **“Tenant / Principal 在 Runtime 中是什么”**；v0.3 回答 **“一个 SaaS 产品如何进入、组合并执行这套 Runtime，同时不把产品身份、Runtime capability 与 Agent integration 压成同一种机制”**。
-
-## v0.3 North Star
-
-```text
-Product / Transport
-      ↓ 产品自己完成 authentication
-Trusted Subject
-      ↓ identity resolution
+Product / Transport authentication
+        ↓ 已经可信的 subject
 Product Ingress Boundary
-      ↓
-TenantPrincipal
-      ↓
-canonical Tenant / Principal
-      ↓
-Typed Runtime Capabilities
-      ↓
-Principal-owned one-shot Operation
-      ↓ immutable capability snapshot
+        ↓ TenantPrincipal
+RuntimeComposition                 exact whole-plan attestation
+        ↓
+canonical Tenant                   scope-local identity
+        ↓
+canonical Principal                Principal Credentials
+        ↓
+Principal-owned Operation          one-shot typed snapshot
+        ↓
 Agent Integration
-      ↓ DSH-native Agent setup / plugin composition
+        ↓
 DeepSeek Harness
 ```
 
-这里最重要的是：这些是**不同语义 plane**。
+关键边界保持分离：
 
-- Product ingress 决定哪个可信 `TenantPrincipal` 进入 Runtime；
-- Runtime capability 存在于 Deployment / Tenant / Principal / Operation ownership 中；
-- Operation 为一次 semantic action 捕获 immutable capability snapshot；
-- Agent integration 把可信 Runtime view 转换成 DSH-native Agent/Preset/plugin composition。
+- 产品/Transport 自己负责 authentication；
+- Product Ingress 只把 trusted subject 映射成 `TenantPrincipal`；
+- `RuntimeComposition` 把一张精确 `CompositionPlan` 绑定到一个 active materialized product Runtime；
+- Tenant / Principal canonical identity 继续使用 scope-local dependency-closure fingerprint；
+- Runtime capability 仍然是 Cordis service，不建立第二套 DI container；
+- Operation 是一次 semantic work，不使用 reactive `ctx.inject()` 直接承载用户 transaction；
+- Agent Integration 把可信 Runtime state 转成 DSH-native Agent / Preset / plugin composition；
+- hostile-code strong isolation 属于 process / container / Pod boundary。
 
-参见 [`docs/specs/saas-boundaries.zh-CN.md`](./docs/specs/saas-boundaries.zh-CN.md)。
+## Bound RuntimeComposition
 
-## 当前 Runtime 结构
-
-```text
-Deployment / Root
-│
-├── shared TenantSessionStore          persistent ownership storage
-├── shared MultiTenantService         fail-closed authorization kernel
-├── shared TenantRuntimeService
-│
-├── Tenant(acme)                      canonical capability node
-│   ├── tenant capabilities
-│   ├── Principal(alice)              canonical capability node
-│   │   ├── principal capabilities
-│   │   └── Operation                 ephemeral, one-shot
-│   │       ├── operation capabilities
-│   │       └── typed immutable snapshot -> DSH Agent integration
-│   └── Principal(bob)
-│
-└── Tenant(globex)
-```
-
-Persistent authorization、Runtime capability ownership、DSH Agent/Preset registration 与 strong process/container isolation 继续保持独立。
-
-## Typed Capability
-
-v0.3 不再用彼此独立的 string + scope 表示 capability identity。
+v0.2 的 low-level Runtime API 仍然保留，但 SaaS 产品代码应该先 materialize 一张 Plan，再通过 bound view 使用 Runtime，而不是手工把 Plan A/B/C 的 definition 拼起来：
 
 ```ts
-import { defineCapability, provideCapability } from 'dsh-multi-tenant'
+const plan = compileSaaSDefinition(definition)
+const app = await materializeRuntimeComposition(ctx, plan)
 
-const tenantMcpConfig = defineCapability<TenantMcpConfig, 'tenant'>(
-  'tenantMcpConfig',
-  'tenant',
-)
-const credentials = defineCapability<Credentials, 'principal'>(
-  'credentials',
-  'principal',
-)
-```
+const acme = await app.tenants.ensure('acme')
+const alice = await acme.principals.ensure('alice')
 
-`CapabilityToken<T, Scope>` 把：
-
-```text
-stable key + value type + lifecycle/authority scope
-```
-
-绑定成一个 semantic identity。
-
-它只是 Cordis service key 之上的 typed 层；Cordis 仍然负责 service resolution / lifecycle，不存在第二套 DI container。
-
-## Composition Compiler
-
-`dsh-multi-tenant/composition` 把 mutable intent 与 executable structure 分开：
-
-```ts
-const plan = compileSaaSDefinition({
-  capabilities: [
-    { capability: agents, required: true },
-    { capability: tenantMcpConfig, required: true },
-    { capability: credentials, required: true },
-  ],
-  providers: [
-    { id: 'dsh-agents', capability: agents },
-    {
-      id: 'tenant-mcp-config',
-      capability: tenantMcpConfig,
-      setup({ ctx }) {
-        provideCapability(ctx, tenantMcpConfig, loadTenantMcpConfig())
-      },
-    },
-    {
-      id: 'credentials',
-      capability: credentials,
-      requires: [tenantMcpConfig],
-      setup({ ctx }) {
-        provideCapability(ctx, credentials, loadPrincipalCredentials())
-      },
-    },
-  ],
+const operation = alice.operations.start({
+  requires: [someCapability],
+  execute({ capabilities }) {
+    return capabilities.require(someCapability)
+  },
 })
 ```
 
-Compiler 在 traffic 前 resolve provider selection、dependency visibility、cycle 与 bootstrap order。
+同一个 Plan 的 materialization 会 join / single-flight；同一个 root 上出现不同 whole-plan fingerprint 会直接抛 `RuntimeCompositionConflictError`。Composed Tenant / Principal 都携带同一份 attestation；`scopeFingerprints` 仍然只负责 canonical creation drift。
 
-### Composition Locality
+`RuntimeComposition.dispose()` 会先关闭产品侧 admission，drain 它触达过的 Tenant（因此也包括 Principal / Operation），最后释放 deployment composition。
 
-一个 Plan 现在拥有两级 identity：
+详见 `docs/specs/runtime-composition.zh-CN.md`。
 
-```text
-plan.fingerprint
-  exact whole-plan identity / diagnostics
+## M4：Product Ingress + Principal Credentials
 
-plan.scopeFingerprints
-  Deployment / Tenant / Principal / Operation dependency-closure identity
-```
-
-Canonical Tenant / Principal 使用自己的 scope-local fingerprint。因此只修改 Operation provider，不再错误地让无关 Tenant / Principal 发生 conflict；但如果真正参与 Tenant creation 的 provider 或其 ancestor dependency 改变，仍然会明确抛出 `RuntimeDefinitionConflictError`。
-
-这不等于 hot reconfiguration：v0.3 依然不原地修改 active canonical node 的 creation recipe。
-
-## One-shot Operation
-
-Cordis `ctx.inject()` 是 reactive primitive，dependency 消失后恢复时 callback 可以重新执行。这是正确的 plugin lifecycle，但不是一次用户 transaction。
-
-所以 v0.3 使用 Principal-owned non-reactive Operation：
+Authentication protocol parsing 明确不进入 Core：
 
 ```ts
-const tenant = await ctx.tenantRuntime.tenants.ensure('acme', tenantDefinitionFromPlan(plan))
-const alice = await tenant.principals.ensure('alice', principalDefinitionFromPlan(plan))
+const ingress = createProductIngress(app, trustedSubject => ({
+  tenantId: trustedSubject.organization,
+  userId: trustedSubject.account,
+}))
 
-const operation = alice.operations.start({
-  ...operationDefinitionFromPlan(plan),
-  requires: [agents, credentials],
-  async execute({ capabilities, signal }) {
-    const dshAgents = capabilities.require(agents)
-    const credential = capabilities.require(credentials)
+const principal = await ingress.resolve(trustedSubject)
+```
 
-    return dshAgents.create({
-      sessionId,
-      signal,
-      setup(agentCtx) {
-        // DSH-native Agent / Preset / plugin composition 在这里发生。
-      },
+第一个真实 product-facing Runtime capability 是 canonical Principal Credentials：
+
+```ts
+const provider = definePrincipalCredentialsProvider({
+  id: 'credentials',
+  definitionKey: 'v1',
+  create({ principal }) {
+    return new InMemoryPrincipalCredentials({
+      erpApiToken: loadTokenFor(principal),
     })
   },
 })
 
-const handle = await operation.result
+const definition = {
+  capabilities: [{ capability: principalCredentials, required: true }],
+  providers: [provider],
+}
 ```
 
-Snapshot 的返回类型由 token 决定。Required capability 只在 `execute()` 前捕获一次，provider churn 不会让 semantic work re-entry。
+`principalCredentials` 是 Principal-scoped：不同 sibling / Tenant 隔离；provider 可以替换而不改 Core；消费发生在 one-shot Operation snapshot 中。In-memory 实现只用于 reference / test，不是 production secret store，并且刻意不提供枚举 secret 的 API。
 
-## 下一阶段真正要证明什么
+详见 `docs/specs/m4-product-ingress-credentials.zh-CN.md`。
 
-下一阶段不再描述成三个并列的“Auth / Credentials / MCP Provider”。MR-A 已经证明它们处在不同边界。
+## 当前 Core Guarantees
 
-### M4 —— Product Ingress + Principal Capability Contract
+现有 executable evidence 覆盖：
 
-- **Trusted identity resolution**：authenticated product subject -> `TenantPrincipal` -> canonical Runtime topology；
-- **Credentials**：第一个真实 Principal-owned typed Runtime capability；
-- 验证 replacement / lifecycle / isolation，不把 JWT/OAuth 厂商逻辑塞进 Core。
+- immutable claim-once Session ownership 与 fail-closed authorization；
+- canonical Tenant / Principal publication、rollback、single-flight、teardown；
+- typed `CapabilityToken<T, Scope>` composition 与 fail-fast dependency validation；
+- global Plan fingerprint + scope-local canonical fingerprint；
+- 每个 root Context 只能有一张精确 active `RuntimeComposition`，whole-plan 混搭会失败；
+- bound Operation 不能读取 Plan 之外的 capability；
+- trusted subject -> canonical Tenant / Principal；
+- Principal Credentials sibling / Tenant isolation、missing secret failure、provider replacement；
+- Principal-owned Operation 在 provider churn 下仍只执行一次 semantic work；
+- pinned DSH Agent create / resume / failure owner-context evidence；
+- Node 22.19 / Node 24 与 packed external consumer。
 
-### M5 —— Agent Integration Reference Path
+## M5 预告
 
-- 消费 Tenant config + Principal credentials + Operation snapshot；
-- 转换成 DSH-native Agent setup；
-- 使用官方 `@deepseek-ai/dsh-mcp-client` 作为第一个 MCP **Tools** reference integration；
-- 不重新造 MCP protocol stack，也不为 pinned Harness 当前没有 consumer 的 Resources / Prompts 写 compatibility bridge。
-
-先跑通一条真实 Product Ingress -> Principal -> Capability -> Operation -> Agent Integration -> DSH 路径，再进入 diagnostics/hardening。
-
-## Package Boundary
-
-**继续一个 package。** 本次 hardening 不创建 `dsh-saas`、Auth package 或 MCP package。
-
-只有真实实现证明了独立 consumer API、replacement/lifecycle boundary、release cadence 或 Distribution boundary，新 package 才出现。
-
-## v0.3 Roadmap 一览
+下一目标刻意保持很小：
 
 ```text
-M0    Spec / Assumption Foundation                         ✅
-M1    Composition Compiler                                 ✅
-M2    Principal Operation Kernel + A6                      ✅
-M3    Multi-tenant real-DSH Core Vertical Slice            ✅
-M3.5  Post-MR-A architecture hardening                     ← 当前
-      typed capability + scope-local composition identity
-M4    Product Ingress + Principal Capability contracts
-M5    Agent Integration reference path + minimal defaults
-M6    Diagnostics / explainability
-M7    Conformance + compatibility hardening
-M8    v0.3 release convergence
+Product Ingress
+  -> RuntimeComposition
+  -> Tenant MCP config + Principal Credentials
+  -> Operation snapshot
+  -> Agent Integration
+  -> DSH Agent setup
+  -> @deepseek-ai/dsh-mcp-client
+  -> native MCP Tools
 ```
 
-完整 release definition 见 [ROADMAP.zh-CN.md](./ROADMAP.zh-CN.md)。
+不造平行 MCP protocol stack；DSH 没有稳定 native consumer seam 前不桥接 Resources / Prompts。详细 milestone Roadmap 已退休，`ROADMAP.zh-CN.md` 只保留当前状态与 M5 目标。
 
-## 工程方法
+## Public Subpaths
 
 ```text
-Spec
-  → Assumption Ledger
-  → executable external probe / contract test
-  → strong types + state model
-  → failing behavior test
-  → smallest implementation
-  → vertical-slice CI proof
+dsh-multi-tenant
+dsh-multi-tenant/runtime
+dsh-multi-tenant/operation
+dsh-multi-tenant/composition
+dsh-multi-tenant/runtime-composition
+dsh-multi-tenant/ingress
+dsh-multi-tenant/credentials
+dsh-multi-tenant/store
+dsh-multi-tenant/testing
 ```
 
-真正重要的规则：
+## Security Boundary
 
-- **Structure before patches** —— 通过重构 ownership / data / state，让 feature 自然生长；
-- **Strong semantic types** —— 让非法 topology 尽量无法表达；
-- **Assumption-first verification** —— DSH / Cordis 行为必须有 executable evidence；
-- **相关性优先于“正确性展示”** —— 技术上正确但已经不服务 architecture 的 live surface 直接删除；
-- **控制得住 -> enforce；生态协作 -> standardize；控制不住 -> explicit boundary；**
-- **不再造第二套 DI** —— Cordis 继续承担 service / lifecycle substrate；
-- **不预判 package topology** —— package boundary 必须由证据挣出来；
-- **Prerelease freedom** —— 早期 API 阻碍长期正确模型时，不为兼容背债。
-
-## Compatibility Evidence
-
-GitHub Actions 当前在 Node 22.19 / Node 24 上验证：
-
-- 精确 upstream DSH release identity；
-- DSH Session setup / publication / rollback；
-- caller-bound DSH Agent owner context；
-- Cordis parent / child teardown 与 reactive injection；
-- Runtime capability provider isolation；
-- typed SaaSDefinition -> CompositionPlan -> Tenant/Principal -> Operation -> 真实 DSH create/resume/failure；
-- packed external consumer 的 typed snapshot 与 composition-locality 行为。
-
-Machine-readable ledger 在 [`docs/specs/v0.3-assumptions.json`](./docs/specs/v0.3-assumptions.json)，当前 `A1`–`A6` 全部 proven。
-
-## Explicit Security Boundary
-
-Cordis Context 是 trusted same-process composition / lifecycle boundary，不是 hostile-code sandbox。它不隔离 process memory、filesystem、shell、network、environment variable 或恶意同进程插件。
-
-Strong isolation 属于 process/container/Pod deployment profile。
-
-## v0.4 预告
-
-v0.4 预计把 v0.3 Framework Core 扩展为更完整的 **Production Provider Ecosystem & Productization**：production identity integration、durable secrets / credentials、更丰富 MCP integration、operational provider、durable store / migration、更强 deployment profile 与更完善 Distribution / 安装体验。
-
-详细 v0.4 Roadmap 会根据 v0.3 的真实 architecture 与使用证据再规划。
+Cordis Context 是 trusted same-process composition / lifecycle boundary，不隔离 process memory、filesystem、shell、network、environment variable 或恶意同进程插件。Strong isolation 属于 process / container / Pod deployment profile。
 
 ## 安装
 
@@ -285,9 +159,7 @@ v0.4 预计把 v0.3 Framework Core 扩展为更完整的 **Production Provider E
 dsh plugin --profile <profile> add dsh-multi-tenant
 ```
 
-Marketplace / custom installer 不在当前 critical path。npm + DSH-native bundle path 就是当前支持的 baseline。
-
-## 开发
+## 验证
 
 ```sh
 pnpm install --frozen-lockfile
