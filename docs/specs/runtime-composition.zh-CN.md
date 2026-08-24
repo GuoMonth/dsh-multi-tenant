@@ -2,13 +2,13 @@
 
 # Spec —— RuntimeComposition Binding / Attestation
 
-> Status：v0.3 当前 product-facing composition contract。
+> 状态：当前 `0.3` product-facing composition contract。
 
 ## 问题
 
 `CompositionPlan` 可以派生 Deployment / Tenant / Principal / Operation definition，但这些 low-level helper 本来就是彼此独立的 primitive。产品代码不能因为 capability key 恰好能 resolve，就允许 Deployment 用 Plan A、Tenant 用 Plan B、Operation 用 Plan C。
 
-Scope-local fingerprint 解决的是 canonical creation locality；它本身不能证明“一条产品请求链只使用了一张 whole Plan”。
+Scope-local fingerprint 解决的是 canonical creation locality；它本身不能证明一条产品请求链只使用了一张 whole Plan。
 
 ## Contract
 
@@ -41,22 +41,20 @@ plan.scopeFingerprints.tenant / principal
   对应 Runtime scope 的 canonical creation identity
 ```
 
-Operation-only change 可以不改变 Tenant / Principal scope fingerprint，这仍然是正确的；但它已经是另一张 whole product Plan，不能静默加入一个已经 active 的 product-facing `RuntimeComposition`。
-
-这样既保留 composition locality，又堵住 Plan 混搭。
+Operation-only change 可以不改变 Tenant / Principal scope fingerprint；但它已经是另一张 whole product Plan，不能静默加入已经 active 的 `RuntimeComposition`。
 
 ## Bound Handle
 
-`ComposedTenant` / `ComposedPrincipal` 携带同一份 immutable `RuntimeCompositionAttestation`，它们的 creation API 不再接受另一张 Plan / definition。
+`ComposedTenant` / `ComposedPrincipal` 携带同一份 immutable `RuntimeCompositionAttestation`，creation API 不再接受另一张 Plan / definition。
 
 Bound Principal Operation 只接受：
 
 - `requires`；
 - `execute`。
 
-Operation-local provider setup / isolation 来自 bound Plan。Operation 请求的 capability 也必须由该 Plan 声明，否则在 semantic work 之前抛 `RuntimeCompositionCapabilityError`。
+Operation-local provider setup / isolation 来自 bound Plan。Operation 请求的 capability 必须由该 Plan 声明，否则在 semantic work 之前抛 `RuntimeCompositionCapabilityError`。
 
-v0.2 low-level Runtime 与 `*DefinitionFromPlan()` 仍保留给 framework / integration 使用，但不再推荐产品层直接手工拼装。
+Low-level Runtime 与 `*DefinitionFromPlan()` 仍保留给 framework / integration 使用，但产品代码应该优先使用 bound `RuntimeComposition` surface。
 
 ## Lifecycle
 
