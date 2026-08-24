@@ -2,7 +2,7 @@
 
 # Architecture
 
-> Live authority for the current `dsh-multi-tenant` Runtime/SaaS Core.
+> Live authority for the current `0.3` Runtime / SaaS Agent foundation.
 
 ## Topology
 
@@ -17,30 +17,33 @@ RuntimeComposition
 TenantRuntimeService
   └─ canonical Tenant
        └─ canonical Principal
-            └─ Principal-owned Operation
-                 └─ Agent Integration
-                      └─ DeepSeek Harness
+            ├─ typed Runtime capabilities
+            ├─ one-shot Operation
+            └─ Principal-owned DSH Agent
+                 └─ native DSH integrations / MCP Tools
 ```
 
-The architecture deliberately separates five planes:
+The architecture separates five concerns:
 
 1. **Persistent authorization** — `TenantSessionStore` + `MultiTenantService` own immutable Session ownership.
-2. **Product Ingress Boundary** — maps an already trusted product subject to `TenantPrincipal`; it does not parse authentication protocols.
-3. **Runtime composition** — `RuntimeComposition` binds one exact `CompositionPlan` to one materialized product Runtime.
-4. **Runtime capabilities / Operations** — Cordis Context/Fiber owns Deployment/Tenant/Principal/Operation capabilities and lifecycle.
-5. **Agent Integration** — converts a trusted Operation view into native DSH Agent/Preset/plugin composition.
+2. **Product Ingress** — maps an already trusted product subject to `TenantPrincipal`; authentication protocols stay outside Core.
+3. **Runtime composition** — `RuntimeComposition` binds one exact `CompositionPlan` to one active materialized product Runtime.
+4. **Runtime capabilities / Operations** — Cordis Context/Fiber owns Deployment/Tenant/Principal/Operation capability lifecycles.
+5. **Agent Integration** — turns trusted Runtime state into native DSH Agent/plugin composition.
 
-Strong hostile-code isolation remains a process/container/Pod concern.
+Strong hostile-code isolation remains a deployment concern.
 
 ## Canonical Runtime ownership
 
-The v0.2 structural invariant remains:
+The current structural invariant is:
 
 ```text
-Root -> Tenant -> Principal -> Operation
+Root -> Tenant -> Principal
+                   ├-> Operation
+                   └-> DSH Agent
 ```
 
-Tenant and Principal are canonical nodes. Creation is transactional:
+Tenant and Principal are canonical nodes. Canonical creation is transactional:
 
 ```text
 reserve
@@ -50,9 +53,9 @@ reserve
   -> publish
 ```
 
-Preparing creation is cancellable state. Registry teardown closes admission, cancels preparing transactions, drains published children and only then disposes the owner Fiber.
+Preparing creation is cancellable. Teardown closes admission, cancels preparing work, drains published descendants and only then disposes the owner Fiber.
 
-The v0.1 ownership kernel remains shared across this tree. Context identity is composition metadata, never durable authorization.
+Durable Session ownership is shared authorization state; Context identity is composition metadata, never the authorization record itself.
 
 ## Typed capability authority
 
@@ -70,9 +73,9 @@ Scopes are:
 deployment -> tenant -> principal -> operation
 ```
 
-A scope is real authority, not metadata. Non-deployment providers must materialize their capability inside the corresponding Cordis scope. A parent-scoped provider cannot depend on a descendant-scoped capability.
+Scope is real ownership, not a label. Non-deployment providers materialize inside their declared Cordis scope, and a parent-scoped provider cannot depend on descendant authority.
 
-Cordis remains the only service resolver/registry. `CapabilityToken`, `provideCapability()` and `getCapability()` are typed semantics over Cordis, not a second DI system.
+Cordis remains the only service resolver/registry. `CapabilityToken`, `provideCapability()` and `getCapability()` add typed semantics; they do not create a second DI system.
 
 ## Composition identity
 
@@ -86,18 +89,14 @@ scopeFingerprints[scope]
   selected provider dependency closure for one authority scope
 ```
 
-`scopeFingerprints[scope]` prevents unrelated descendant changes from invalidating parent canonical nodes. For example, an Operation-only provider revision does not change Tenant/Principal creation identity.
-
-`RuntimeComposition` solves a different problem: one active product Runtime must not mix whole Plans. Same exact Plan joins; a different active whole-plan fingerprint on the same root fails.
-
-This distinction is intentional:
+Scope-local fingerprints prevent unrelated descendant evolution from invalidating canonical parents. Whole-plan attestation solves a different problem: one active product Runtime must not silently mix plans.
 
 - scope-local fingerprint = canonical creation drift;
 - whole-plan attestation = product Runtime composition integrity.
 
 ## One-shot Operation
 
-Cordis `ctx.inject()` is dependency-reactive. Losing/restoring a dependency may rerun the callback. That behavior is correct for plugin lifecycle and incorrect for one user transaction.
+Cordis `ctx.inject()` is dependency-reactive and may rerun when dependencies disappear/recover. That is correct for plugin lifecycle, not for one user transaction.
 
 A Principal-owned Operation therefore:
 
@@ -105,51 +104,52 @@ A Principal-owned Operation therefore:
 2. materializes Operation-scoped providers from the bound Plan;
 3. captures required typed capabilities once;
 4. invokes semantic `execute()` once;
-5. drains its Fiber deterministically.
+5. drains deterministically.
 
-Bound product Operations may only request capabilities declared by their `RuntimeComposition` Plan.
+Bound Operations may request only capabilities declared by their `RuntimeComposition` Plan.
 
-The capability snapshot freezes selection, not arbitrary object internals. If a capability value is a mutable client/resource, its own lifetime contract remains the provider's responsibility. v0.3 does not promise arbitrary provider hot reconfiguration.
+The snapshot freezes capability selection, not arbitrary mutable object internals. Provider-owned clients/resources retain their own lifetime contract.
 
-## Product Ingress and Credentials
+## Product Ingress and credentials
 
-`createProductIngress()` begins after authentication:
+`createProductIngress()` starts after authentication:
 
 ```text
 trusted subject -> resolver -> TenantPrincipal -> RuntimeComposition.principal()
 ```
 
-The first concrete product-facing Runtime capability is `principalCredentials`, a Principal-scoped `CapabilityToken<PrincipalCredentials, 'principal'>`. A provider is recreated/isolated with the Principal lifecycle and is consumed through the same Operation snapshot mechanism.
+`principalCredentials` is a Principal-scoped low-level capability. Production authentication and secret-store implementations remain product/provider concerns.
 
-Vendor authentication and production secret-store implementations remain outside Core.
+## MCP Agent boundary
 
-## Agent boundary
-
-Runtime capability state does not automatically become Agent state. Agent Integration is explicit:
+The current DSH-native integration is explicit:
 
 ```text
-Operation snapshot
-  -> integration recipe
-  -> ownerCtx.agents.create/resume
+TenantMcpConfig + PrincipalCredentials
+  -> one-shot create/resume Operation
+  -> Session authorization
+  -> Principal Context
   -> DSH Agent setup(agentCtx)
-  -> DSH-native tools/plugins/listeners
+  -> official @deepseek-ai/dsh-mcp-client
+  -> Agent-scoped native MCP Tools
 ```
 
-Do not copy Cordis private isolation maps into `Agent.ctx`; do not create a parallel Agent tenant registry.
+The short Operation owns the decision/snapshot. The long-lived Agent belongs to the Principal and is drained by Principal teardown.
+
+Do not copy Cordis private isolation maps into `Agent.ctx`; do not create a parallel Agent or MCP registry.
 
 ## Security boundary
 
-Guaranteed:
+Guaranteed for conforming trusted same-process code:
 
 - durable Session ownership checks;
-- trusted same-process Tenant/Principal capability isolation for conforming providers;
-- deterministic lifecycle and composition checks.
+- Tenant/Principal capability separation;
+- deterministic composition, publication and teardown checks.
 
-Not guaranteed by this package:
+Not guaranteed:
 
 - process-memory isolation;
 - filesystem/shell/network isolation;
-- protection from malicious same-process plugins;
-- one-tenant-per-machine or one-tenant-per-Pod isolation.
+- protection from malicious same-process plugins.
 
-Those belong to deployment architecture.
+Use process/container/Pod/sidecar/remote boundaries when the threat model needs stronger isolation.
