@@ -4,45 +4,63 @@
 
 **Turn DeepSeek Harness into a multi-tenant SaaS Agent runtime.**
 
-`dsh-multi-tenant` is for teams that already like the DeepSeek Harness execution model, but need to run it behind a real SaaS product where different organizations and users must keep identity, credentials, MCP configuration, Sessions and Agent lifecycles separated.
+If you already like DeepSeek Harness but now need to put it behind a real SaaS product, this project handles the layer that usually becomes dangerous first: **which organization/user owns the request, which credentials and MCP config they may use, which Session they may resume, and which long-lived Agent lifecycle belongs to them.**
 
 > Release candidate: **`dsh-multi-tenant@0.3.0-rc.1`**
 >
 > Compatible DSH baseline: `0.1.1-rc.2` at `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`.
 
-## The problem it solves
+## The SaaS problem
 
-A normal single-user Agent integration is easy to sketch:
+A single-user Agent is simple:
 
 ```text
 request -> Agent -> MCP -> backend
 ```
 
-A SaaS product is not. The moment the same runtime serves multiple organizations and users, you need answers to questions such as:
+A shared SaaS runtime is not:
+
+```text
+Acme / Alice   -> Acme ERP MCP + Alice credential + Alice Sessions
+Acme / Bob     -> Acme ERP MCP + Bob credential   + Bob Sessions
+Globex / Alice -> Globex ERP MCP + Globex/Alice credential + Globex Sessions
+```
+
+Without an explicit runtime boundary, all of these questions become product bugs or security bugs:
 
 - Which Tenant and Principal owns this request?
 - Which MCP endpoint/config belongs to this Tenant?
 - Which credential belongs to this Principal?
 - Can Bob resume Alice's Session?
-- Can two Tenants use the same logical MCP server name without colliding?
-- If Agent/MCP setup fails, can a half-configured Agent leak into the runtime?
+- Can different Tenants use the same logical MCP server name without colliding?
+- Can Agent/MCP setup fail without publishing a half-configured Agent?
 - When a Principal is disposed, are its long-lived Agents and MCP tools actually drained?
 
-`dsh-multi-tenant` provides that product/runtime boundary while continuing to use native Cordis and DSH lifecycle semantics.
+`dsh-multi-tenant` gives DSH a reusable answer to those questions while preserving native Cordis/DSH lifecycle semantics.
 
-### Typical scenario
-
-Imagine a hosted ERP assistant:
+## What changes after you add it
 
 ```text
-Acme / Alice   -> Acme ERP MCP + Alice credential
-Acme / Bob     -> Acme ERP MCP + Bob credential
-Globex / Alice -> Globex ERP MCP + Globex/Alice credential
+Before
+------
+product request
+  -> hand-written tenant checks
+  -> hand-written credential plumbing
+  -> hand-written MCP wiring
+  -> DSH Agent
+
+After
+-----
+trusted product subject
+  -> Product Ingress
+  -> canonical Tenant / Principal
+  -> Tenant MCP config + Principal Credentials
+  -> fail-closed Session ownership
+  -> Principal-bound create/resume
+  -> native DSH Agent + MCP Tools
 ```
 
-All three can run concurrently in the same trusted process. They may use the same logical MCP server name (`erp`), but the runtime keeps Tenant config, Principal credentials, Session ownership and Agent-scoped tools separated.
-
-## What you get in 0.3
+In `0.3`, you get:
 
 - trusted product subject -> canonical `Tenant / Principal`;
 - exact `CompositionPlan -> RuntimeComposition` binding so product code cannot silently mix plans;
@@ -53,28 +71,27 @@ All three can run concurrently in the same trusted process. They may use the sam
 - official `@deepseek-ai/dsh-mcp-client` integration — no parallel MCP protocol stack;
 - native Agent-scoped MCP Tools;
 - long-lived Agents owned by the Principal rather than by a short request Operation;
-- real Node 22.19 / Node 24 release evidence against the pinned DSH baseline;
-- clean installed-artifact and post-publication registry smoke tests.
+- clean installed-artifact and post-publication registry verification.
 
 ## Install
 
-For a normal DSH profile:
+Inside a normal DSH profile:
 
 ```sh
 dsh plugin --profile <profile> add dsh-multi-tenant
 ```
 
-For framework code that already owns a compatible DSH installation:
+Or from framework code that already owns a compatible DSH installation:
 
 ```sh
 pnpm add dsh-multi-tenant
 ```
 
-The MCP integration intentionally reuses the official MCP client supplied by the compatible DSH installation instead of vendoring/forking it.
+The MCP path reuses the official MCP client supplied by the compatible DSH installation instead of vendoring or forking it.
 
 ## Minimal product flow
 
-Your product owns authentication. Once the request is trusted, map it to a Tenant/Principal, provide Tenant MCP config and Principal credentials, then create or resume an Agent.
+Your product still owns authentication. Once a request is trusted, map it to a Tenant/Principal, provide Tenant MCP config and Principal credentials, then create or resume an Agent.
 
 ```ts
 const plan = compileSaaSDefinition({
@@ -115,7 +132,7 @@ const agents = createMcpAgentIntegration(principal)
 const handle = await agents.create({ sessionId })
 ```
 
-When `create()` resolves, the official MCP client has completed initial discovery inside Agent setup, so the Agent already owns its native MCP Tools. `resume()` checks Session ownership before DSH persistence/setup is invoked.
+When `create()` resolves, the official MCP client has completed initial discovery inside Agent setup, so the returned Agent already owns its native MCP Tools. `resume()` checks Session ownership before DSH persistence/setup is invoked.
 
 ## Architecture
 
@@ -139,10 +156,10 @@ official @deepseek-ai/dsh-mcp-client
 native Agent-scoped MCP Tools
 ```
 
-The important ownership rules are:
+The ownership rules are intentionally small:
 
 - **Product owns authentication.** Core starts after identity is already trusted.
-- **Core owns identity/lifecycle/composition.** It does not become a vendor auth or ERP framework.
+- **Core owns identity, lifecycle and composition.** It does not become a vendor-auth or ERP framework.
 - **Operation is short-lived semantic work.** It captures required capabilities once and does not own the long-lived Agent.
 - **Principal owns the Agent.** Principal teardown drains its Agents and Agent-scoped MCP resources.
 - **DSH owns MCP wire behavior.** This project composes the official MCP client instead of reimplementing MCP.
@@ -155,29 +172,27 @@ This project provides strong **same-process identity/lifecycle separation** for 
 
 For hostile-code or secret non-disclosure requirements, use process/container/Pod/sidecar/remote authority boundaries.
 
-## Compatibility and evidence
-
-The current baseline is intentionally explicit rather than floating:
+## Compatibility and release evidence
 
 - Node: `^22.19.0 || >=24.0.0`
 - Cordis: `>=4.0.1 <5`
 - DSH: `0.1.1-rc.2` at the pinned release commit above
 
-CI proves the external DSH/Cordis assumptions, a real stdio MCP server, real `tools/list`, real DSH `ToolRuntime.execute()` -> MCP `tools/call`, concurrent Tenant/Principal isolation, denied cross-Principal resume, startup failure behavior, teardown, and the actual packed npm artifact.
+CI proves the real external assumptions, a real stdio MCP server, real `tools/list`, real DSH `ToolRuntime.execute()` -> MCP `tools/call`, concurrent Tenant/Principal isolation, denied cross-Principal resume, startup failure behavior, teardown, and the actual packed npm artifact.
 
 See [`docs/reference/compatibility.md`](./docs/reference/compatibility.md).
 
-## Long-term direction
+## Where this is going
 
-The current `PrincipalCredentials` capability is deliberately low-level. The preferred long-term direction is **Capability-as-Authority**: Operations should consume typed abilities such as an `ErpClient`/transport while secrets stay behind replaceable Broker/authority plugins whenever practical.
+The current `PrincipalCredentials` capability is deliberately low-level. The preferred long-term direction is **Capability-as-Authority**: Operations consume typed abilities such as an `ErpClient`/transport while secrets stay behind replaceable Broker/authority plugins whenever practical.
 
-That is a Vision, not a frozen 0.3 API. See [`docs/vision/authority-capabilities.md`](./docs/vision/authority-capabilities.md) and [`DIRECTION.md`](./DIRECTION.md).
+That is Vision, not a frozen `0.3` API. See [`docs/vision/authority-capabilities.md`](./docs/vision/authority-capabilities.md) and [`DIRECTION.md`](./DIRECTION.md).
 
-## Release
+## Release status
 
-`0.3.0-rc.1` is still a prerelease. Breaking changes remain acceptable when real integrations prove a better contract.
+`0.3.0-rc.1` is a prerelease and the project is intentionally moving fast. Breaking changes are acceptable when real integrations prove a better contract.
 
-Publication is explicit from `main` through the retained release workflow; the exact registry artifact is installed and exercised again after publication.
+The live repository keeps only current `0.3` release documentation and current release infrastructure; older prerelease archaeology stays in Git history/tags rather than the active tree.
 
 See [`docs/releases/v0.3.0-rc.1.md`](./docs/releases/v0.3.0-rc.1.md) and [`docs/reference/release.md`](./docs/reference/release.md).
 
