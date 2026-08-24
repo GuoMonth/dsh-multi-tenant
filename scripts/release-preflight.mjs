@@ -26,6 +26,17 @@ function workflowActionRefs(source) {
   return refs
 }
 
+function requireMarker(path, marker, label = path) {
+  const absolute = join(root, path)
+  if (!existsSync(absolute)) {
+    errors.push(`release artifact missing: ${path}`)
+    return
+  }
+  if (!readFileSync(absolute, 'utf8').includes(marker)) {
+    errors.push(`${label} missing release marker ${JSON.stringify(marker)}`)
+  }
+}
+
 const packages = readdirSync(packagesDir).map((dirName) => {
   const dir = join(packagesDir, dirName)
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
@@ -44,7 +55,11 @@ if (!runtime) {
 } else {
   const { pkg, dir } = runtime
   releaseVersion = pkg.version
-  if (typeof releaseVersion !== 'string' || releaseVersion.length === 0) errors.push(`${expectedPackageName}: version is required`)
+  if (typeof releaseVersion !== 'string' || releaseVersion.length === 0) {
+    errors.push(`${expectedPackageName}: version is required`)
+  } else if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(releaseVersion)) {
+    errors.push(`${expectedPackageName}: version must be SemVer-like, got ${releaseVersion}`)
+  }
   if (pkg.publishConfig?.access !== 'public') errors.push(`${expectedPackageName}: publishConfig.access must be public`)
   if (pkg.publishConfig?.tag !== expectedTag) errors.push(`${expectedPackageName}: publishConfig.tag must be ${expectedTag}`)
   if (pkg.publishConfig?.provenance !== true) errors.push(`${expectedPackageName}: publishConfig.provenance must be true`)
@@ -109,6 +124,23 @@ if (!existsSync(releaseWorkflowPath)) {
   if (workflow.includes('NPM_BOOTSTRAP_TOKEN')) errors.push('release workflow must be OIDC-only; bootstrap token fallback is not allowed')
   if (workflow.includes('inputs.version')) errors.push('release workflow must derive the version from package.json instead of duplicating version input')
   if (workflow.includes('--tag next')) errors.push('release workflow must publish the package default latest channel, not next')
+  if (!workflow.includes('pnpm release:check')) errors.push('release workflow must run the full release:check before registry publication')
+  if (!workflow.includes('release:registry-smoke')) errors.push('release workflow must verify the exact registry artifact after publication')
+}
+
+const rootPackage = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+if (!String(rootPackage.scripts?.smoke ?? '').includes('artifact-consumer-smoke.mjs --local')) {
+  errors.push('root smoke must include the clean installed-artifact v0.3 consumer proof')
+}
+const registrySmoke = readFileSync(join(root, 'scripts/registry-smoke.mjs'), 'utf8')
+if (!registrySmoke.includes('artifact-consumer-smoke.mjs')) {
+  errors.push('registry smoke must reuse the installed-artifact v0.3 consumer proof')
+}
+
+// Investigation workflows are allowed on release branches but must not survive
+// release convergence into main. Their conclusion belongs in permanent tests.
+if (existsSync(join(root, '.github/workflows/release-candidate-audit.yml'))) {
+  errors.push('temporary release-candidate-audit.yml must be removed before release')
 }
 
 for (const requiredPath of [
@@ -129,10 +161,21 @@ for (const requiredPath of [
   'scripts/m5-mcp-agent-integration-probe.mjs',
   'scripts/fixtures/mcp-identity-server.mjs',
   'scripts/package-smoke.mjs',
+  'scripts/artifact-consumer-smoke.mjs',
   'scripts/registry-preflight.mjs',
   'scripts/registry-smoke.mjs',
 ]) {
   if (!existsSync(join(root, requiredPath))) errors.push(`release artifact missing: ${requiredPath}`)
+}
+
+if (releaseVersion) {
+  requireMarker('README.md', `dsh-multi-tenant@${releaseVersion}`, 'root README')
+  requireMarker('README.zh-CN.md', `dsh-multi-tenant@${releaseVersion}`, 'root Chinese README')
+  requireMarker('packages/multi-tenant/README.md', `dsh-multi-tenant@${releaseVersion}`, 'package README')
+  requireMarker('packages/multi-tenant/README.zh-CN.md', `dsh-multi-tenant@${releaseVersion}`, 'package Chinese README')
+  requireMarker('docs/reference/release.md', releaseVersion, 'release reference')
+  requireMarker('docs/reference/release.zh-CN.md', releaseVersion, 'Chinese release reference')
+  requireMarker(`docs/releases/v${releaseVersion}.md`, releaseVersion, 'release note')
 }
 
 if (errors.length) {
@@ -140,4 +183,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; M5 DSH-native MCP Agent surface; OIDC-only publishing`)
+console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; v0.3 installed-artifact + M5 release surface; OIDC-only publishing`)
