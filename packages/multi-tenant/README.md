@@ -2,7 +2,9 @@
 
 Context-native multi-tenant Runtime and v0.3 SaaS Framework Core primitives for DeepSeek Harness.
 
-> Published npm foundation: `0.2.0-rc.3`. The repository v0.3 line now converges on a usable DSH-native MCP Tools Agent path.
+> Package release identity: **`dsh-multi-tenant@0.3.0-rc.1`**.
+>
+> Compatible DSH baseline: `0.1.1-rc.2` @ `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`.
 
 ## Product-facing path
 
@@ -136,7 +138,8 @@ The v0.2 APIs remain available under `dsh-multi-tenant/runtime`, `operation` and
 - one-shot Operation semantics with Principal-owned long-lived Agents;
 - official DSH MCP client initial discovery before Agent publication;
 - Agent-scoped native MCP Tools and deterministic per-Session runtime namespaces;
-- pinned real-DSH/MCP executable evidence.
+- pinned real-DSH/MCP executable evidence;
+- clean installed-artifact smoke from the packed npm candidate.
 
 ## Public subpaths
 
@@ -155,7 +158,7 @@ dsh-multi-tenant/testing
 
 ## Runtime requirement for MCP
 
-`dsh-multi-tenant/mcp` composes the official `@deepseek-ai/dsh-mcp-client` from the compatible DSH installation at runtime. The M5 compatibility probe installs and tests the exact pinned public package. The integration does not vendor or fork that protocol implementation.
+`dsh-multi-tenant/mcp` composes the official `@deepseek-ai/dsh-mcp-client` supplied by the compatible DSH installation at runtime. `0.3.0-rc.1` release checks install the **packed `dsh-multi-tenant` artifact + `@deepseek-ai/dsh@0.1.1-rc.2` into a clean consumer and trigger the packaged M5 path**, proving that this resolution works in the supported installation layout. The integration does not vendor or fork the MCP protocol implementation.
 
 ## Security boundary
 
