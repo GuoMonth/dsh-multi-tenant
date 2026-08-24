@@ -1,127 +1,71 @@
 [English](./compatibility.md) | 简体中文
 
-# Compatibility & Versioning Policy
+# Compatibility & Evidence
 
-## Runtime Baseline
+`0.3` 使用显式 platform baseline。Blocking CI 不跟 floating DSH / npm latest。
+
+## Supported Baseline
 
 - **Node：** `^22.19.0 || >=24.0.0`
-- **Cordis peer：** `@deepseek-ai/cordis >=4.0.1 <5`
-- **DSH：** 只使用显式 baseline，不依赖 floating version
+- **Cordis：** `@deepseek-ai/cordis >=4.0.1 <5`
+- **DSH：** `0.1.1-rc.2`
+- **DSH release commit：** `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`
 
-CI 覆盖 Node `22.19.0` 与 Node `24`。
+`scripts/dsh-target.mjs` 是 DSH version / commit 的 source of truth。
 
-## 当前 DSH Baseline
+## CI 到底证明什么
 
-`scripts/dsh-target.mjs` 是唯一 source of truth：
+### 精确 upstream identity
 
-```js
-DSH_TARGET = {
-  repository: 'deepseek-ai/deepseek-harness',
-  version: '0.1.1-rc.2',
-  commit: 'b150a551b8d465e31e418e1b2eaf5e79bbb7d28e',
-}
-```
+CI 会 checkout 精确 DSH release commit，并在 compatibility job 前验证 source version。
 
-未来升级由我们手动、显式推进；blocking CI 不会自动跟随 npm `latest` 或 upstream `master`。
+### 0.3 仍然依赖的 DSH lifecycle seam
 
-## Evidence Model
+`pnpm probe:dsh` 只保留当前产品链仍然依赖的两个外部事实：
 
-Compatibility 从多个独立方向证明。只有**当前 live architecture**真正依赖的 evidence 全绿，baseline 才可接受；历史版本曾经依赖的 seam 不会永久占据 blocking CI。
+- Agent setup / publication ordering 能阻止 setup failure 暴露 half-configured Agent；
+- DSH Agent creation 保持 caller-bound Principal-derived owner context。
 
-### 精确 Upstream Source Identity
+这些 probe 继续存在，是因为 `0.3` 当前还依赖这些 upstream behavior，不是为了给旧 release line 保历史。
 
-GitHub Actions checkout 精确 upstream release commit，并验证：
+### Cordis lifecycle seam
 
-- checkout HEAD 等于 `DSH_TARGET.commit`；
-- upstream root `package.json.version` 等于 `DSH_TARGET.version`。
+`pnpm probe:cordis` 证明 parent / child Fiber teardown，以及 `ctx.inject()` 的 reactive 语义。后者正是用户 semantic work 使用 non-reactive Principal Operation 的原因。
 
-### DSH Publication 与 Owner-context Behavior
+### 真实 MCP Agent integration
 
-`pnpm probe:dsh` 在 clean temp consumer 安装精确 published DSH package，并证明：
+`pnpm probe:mcp` 是当前最重要的 upstream vertical proof。它安装 pinned public DSH packages，并通过真实 stdio MCP server 验证：
 
-- **Session genesis** —— setup / publication visibility 与 rollback；
-- **caller-bound Agent owner context** —— DSH Agent creation 保持 trusted Tenant / Principal caller metadata 与 capability resolution。
+- 官方 MCP client 的 `serverName` 行为；
+- 真实 `tools/list` discovery；
+- 真实 DSH `ToolRuntime.execute()` -> MCP `tools/call`；
+- Agent-scoped Tool visibility；
+- Tenant / Principal config 与 credential 并发隔离；
+- cross-Principal resume 在 DSH Agent seam 前拒绝；
+- startup-failure 与 teardown 行为。
 
-这只是 upstream seam evidence，不再被误当成“一次用户 Operation”的语义定义。
+### Installed artifact
 
-### Cordis Lifecycle Behavior
+`pnpm smoke` 会 build / pack `dsh-multi-tenant`，检查 tarball 与 export targets，然后把 packed artifact 与 `@deepseek-ai/dsh@0.1.1-rc.2` 一起安装到 clean consumer，执行当前 Product Ingress / RuntimeComposition / Credentials / MCP contract。
 
-`pnpm probe:cordis` 证明 Runtime 依赖的外部 lifecycle assumption：
-
-- child Fiber ownership / cleanup 跟随 parent lifetime；
-- `ctx.inject()` dependency-reactive，provider 消失再恢复时 callback 可能重新执行。
-
-第二条正是 user-visible work 必须使用 non-reactive Principal Operation，而不能直接使用 raw inject callback 的原因。
-
-### SaaS Core Vertical Compatibility
-
-`pnpm probe:saas-core` 使用 pinned public AgentRegistry 执行当前完整 DSH-facing 主链：
-
-```text
-Typed CompositionPlan
-  -> Tenant / Principal
-  -> Principal-owned one-shot Operation
-  -> typed capability snapshot
-  -> real DSH Agent create / resume / failure
-```
-
-Proof 覆盖多个 Tenant / Principal、caller-bound identity / capability visibility、exactly-once semantic execution、create/resume、downstream failure、quiescent cleanup。
-
-这是当前 v0.3 Core 最重要的 integration evidence。
-
-### Packed Artifact Behavior
-
-`pnpm smoke` 会 build + pack npm artifact，把 tarball 安装到 clean external consumer，再执行 public Runtime / Composition / Operation contract，包括 typed capability snapshot 与 scope-local composition identity。
-
-只测 source workspace 不足以证明 release artifact。
-
-## Historical Evidence 不是永久 Gate
-
-历史 Web/ApiProxy、global admission-decorator、raw reactive integration-fiber 实验继续留在 Git history，不作为 live blocking compatibility suite。
-
-未来如果架构真的重新依赖某个 seam，应从届时的 current requirement 重新建立 focused proof，而不是默认复活旧 surface。
-
-## 手动 Baseline Refresh
-
-当明确升级 DSH / Cordis 时：
-
-1. 选择显式 version；DSH 同时选择 release commit；
-2. 更新 `scripts/dsh-target.mjs` 与当前 active dependency pin；
-3. workspace graph 变化时从真实 registry 重新生成 `pnpm-lock.yaml`；
-4. 验证精确 upstream source identity；
-5. 执行 `pnpm probe:platform`，让 DSH + Cordis + SaaS Core assumption 一起验证；
-6. 执行 quality / packed-consumer gate；
-7. contract 失败时从工程结构 / 数据结构 / 状态模型修正，不削弱 evidence；
-8. current docs 更新到新 baseline，历史 release notes 不改写。
+发布后的 registry smoke 复用同一套 installed-consumer proof 去验证 exact npm version。
 
 ## Compatibility Philosophy
 
-项目处于快速 prerelease 开发期。旧 API、test harness、investigation surface 只因为“曾经正确”并不足以继续保留。
+项目仍处于快速 prerelease：
 
-Compatibility 遵循：
+- 当前产品依赖的 external seam 才值得长期证明；
+- 旧 milestone 名称、历史 release note、被替代的 probe 从 live tree 删除；
+- 真实 integration 如果证明 contract 不够好，可以做 breaking change；
+- Git history / tag 负责考古，live repository 只优化当前 correctness 与迭代速度。
 
-- 仓库自己拥有的边界严格 enforce；
-- DSH / Cordis / provider / integration 生态拥有、且 live architecture 真正依赖的 seam，才去证明或 standardize；
-- 已不服务产品方向的 seam，从 live tree 删除，不维护 compatibility theater。
+## Baseline Upgrade
 
-## CI Gates
+明确升级 DSH / Cordis 时：
 
-PR 与 `main` 必须通过：
-
-- 精确 upstream DSH source baseline verification；
-- frozen-lockfile install；
-- package / architecture invariant（`pnpm verify`）；
-- release manifest preflight；
-- TypeScript typecheck；
-- unit / contract tests；
-- build；
-- packed external-consumer smoke；
-- Node 22.19 / Node 24 上的 DSH + Cordis + SaaS Core platform probes。
-
-## Runtime / Core Dependency Invariant
-
-当前 publishable package 保持 runtime dependency 最小，并优先使用 Cordis / DSH native seam，而不是把 vendor implementation 塞进 Core。
-
-Product authentication protocol、durable secret store、database、HTTP/WebSocket server、具体 vendor integration 默认都属于 Core 之外，除非未来真实 boundary 明确证明例外必要。
-
-MCP 按 selected DSH baseline 提供的 native integration seam 组合；v0.3 不为了兼容广度建立第二套平行 MCP protocol stack。
+1. 选择显式 version 与 DSH release commit；
+2. 更新 `scripts/dsh-target.mjs` 与 active dependency pins；
+3. 需要时重建 lockfile；
+4. 跑 source identity、platform probes 与 installed-artifact smoke；
+5. 从结构上修失败，不削弱 evidence；
+6. 更新 live docs 到新 baseline。
