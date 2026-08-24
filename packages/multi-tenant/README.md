@@ -1,87 +1,46 @@
 # dsh-multi-tenant
 
-Context-native multi-tenant Runtime and v0.3 SaaS Framework Core primitives for DeepSeek Harness.
+**Multi-tenant SaaS runtime primitives for DeepSeek Harness.**
 
-> Package release identity: **`dsh-multi-tenant@0.3.0-rc.1`**.
+Use this package when one DSH-based product must safely serve many organizations and users without mixing Tenant configuration, Principal credentials, Session ownership or Agent-scoped MCP Tools.
+
+> Package candidate: **`dsh-multi-tenant@0.3.0-rc.1`**
 >
-> Compatible DSH baseline: `0.1.1-rc.2` @ `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`.
+> Compatible DSH baseline: `0.1.1-rc.2`.
 
-## Product-facing path
+## Why you would install it
+
+A product developer usually does not want to hand-build all of this every time:
 
 ```text
-trusted product subject
-  -> Product Ingress
-  -> RuntimeComposition
-  -> canonical Tenant / Principal
-  -> Tenant MCP Config + Principal Credentials
-  -> one-shot create/resume Operation
-  -> Principal-owned DSH Agent
-  -> official DSH MCP client
-  -> native Agent-scoped MCP Tools
+trusted user
+  -> Tenant / Principal
+  -> Tenant-specific MCP config
+  -> Principal-specific credentials
+  -> safe Session ownership
+  -> DSH Agent create/resume
+  -> native MCP Tools
 ```
 
-### 1. Compile and bind one Plan
+This package provides the reusable Runtime/composition layer for that flow while leaving authentication, databases, secret stores and vendor business logic in your product or plugins.
 
-```ts
-const plan = compileSaaSDefinition(definition)
-const app = await materializeRuntimeComposition(ctx, plan)
+## Install
+
+Inside a compatible DSH profile:
+
+```sh
+dsh plugin --profile <profile> add dsh-multi-tenant
 ```
 
-`RuntimeComposition` owns exact whole-plan attestation. The same Plan joins; a different active Plan on the same root throws `RuntimeCompositionConflictError`. Canonical Tenant/Principal drift still uses scope-local fingerprints.
+Or from framework code that already owns the compatible DSH installation:
 
-### 2. Resolve a trusted product subject
-
-```ts
-const ingress = createProductIngress(app, subject => ({
-  tenantId: subject.organization,
-  userId: subject.account,
-}))
-
-const principal = await ingress.resolve(subject)
+```sh
+pnpm add dsh-multi-tenant
 ```
 
-Authentication is outside Core. The resolver receives a subject the product already trusts.
-
-### 3. Principal Credentials
+## Quick start
 
 ```ts
-const credentialsProvider = definePrincipalCredentialsProvider({
-  id: 'credentials',
-  definitionKey: 'v1',
-  create({ principal }) {
-    return new InMemoryPrincipalCredentials({
-      erpApiToken: loadTokenFor(principal),
-    })
-  },
-})
-```
-
-`principalCredentials` is a canonical `CapabilityToken<PrincipalCredentials, 'principal'>`. It is isolated by Principal lifecycle and can be replaced without changing Framework Core. `InMemoryPrincipalCredentials` is reference/test infrastructure, not a production secret store.
-
-`PrincipalCredentials` is intentionally a **low-level current primitive**, not a promise that raw tokens are the long-term recommended Agent-facing abstraction. The long-term direction is for service-specific Integration Plugins to provide typed clients/transports while authority/credential Broker plugins keep secrets behind a narrower boundary. That direction is non-binding today.
-
-## MCP Agent integration
-
-M5 adds a real Tenant MCP capability and a Principal-bound DSH Agent integration.
-
-```ts
-const mcpProvider = defineTenantMcpConfigProvider({
-  id: 'tenant-mcp',
-  definitionKey: 'v1',
-  load({ tenantId }) {
-    return {
-      servers: [{
-        transport: 'streamable-http',
-        serverName: 'erp',
-        url: endpointFor(tenantId),
-        credentialHeaders: {
-          Authorization: { credential: 'erpApiToken', prefix: 'Bearer ' },
-        },
-      }],
-    }
-  },
-})
-
 const plan = compileSaaSDefinition({
   capabilities: [
     { capability: tenantMcpConfig, required: true },
@@ -91,55 +50,47 @@ const plan = compileSaaSDefinition({
 })
 
 const app = await materializeRuntimeComposition(ctx, plan)
-const ingress = createProductIngress(app, subject => ({
-  tenantId: subject.organization,
-  userId: subject.account,
-}))
+const ingress = createProductIngress(app, resolveTrustedSubject)
 const principal = await ingress.resolve(subject)
-const mcp = createMcpAgentIntegration(principal)
 
-const handle = await mcp.create({ sessionId })
+const agents = createMcpAgentIntegration(principal)
+const handle = await agents.create({ sessionId })
 ```
 
-`create()` reserves Session ownership before entering DSH setup. `resume()` checks Session ownership before DSH persistence/setup. The integration mounts the compatible official `@deepseek-ai/dsh-mcp-client` during Agent setup with startup failure treated as fatal, so the returned Agent already has its initial MCP Tools.
+When `create()` resolves, the official DSH MCP client has completed initial discovery and the returned Agent owns its native Agent-scoped MCP Tools.
 
-The long-lived Agent is created through the canonical Principal Context rather than the short Operation Fiber. It therefore survives the create/resume Operation but is still structurally drained by Principal teardown.
+## Core product contracts
 
-Each configured logical server receives a deterministic runtime namespace per Principal Session. The returned handle exposes the mapping:
+### Product Ingress
 
-```ts
-handle.servers
-// [{ serverName: 'erp', runtimeServerName: 'erp-...', toolPrefix: 'mcp__erp-...__' }]
+The framework starts after authentication. `createProductIngress()` maps an already trusted product subject into a validated canonical Tenant/Principal.
+
+### RuntimeComposition
+
+One exact `CompositionPlan` is bound to one active product Runtime. Different live whole-plan identities on the same root fail rather than silently mixing Deployment/Tenant/Principal/Operation recipes.
+
+### Principal Credentials
+
+`principalCredentials` is a replaceable Principal-scoped low-level credential capability. `InMemoryPrincipalCredentials` is reference/test infrastructure only.
+
+### Tenant MCP + Agent integration
+
+`tenantMcpConfig` is Tenant-scoped. `createMcpAgentIntegration(principal)` captures Tenant MCP config + Principal credentials once, checks Session ownership and creates/resumes a Principal-owned long-lived DSH Agent.
+
+The package uses the compatible DSH installation's official `@deepseek-ai/dsh-mcp-client`; it does not vendor or fork MCP.
+
+## Architecture
+
+```text
+trusted subject
+  -> Product Ingress
+  -> RuntimeComposition
+  -> Tenant / Principal
+  -> one-shot create/resume Operation
+  -> Principal-owned DSH Agent
+  -> official MCP client
+  -> native Agent-scoped MCP Tools
 ```
-
-This is required by the pinned official MCP client's root-wide `serverName` reservation while preserving Agent-scoped ToolRuntime registration. It is stable across resume of the same Session.
-
-M5 supports official MCP **Tools** only. It does not implement a parallel MCP stack and does not bridge Resources/Prompts that the pinned Harness does not consume.
-
-### One-shot work vs live Agent lifetime
-
-The integration internally starts one Principal-owned Operation to capture `TenantMcpConfig` + `PrincipalCredentials` and authorize create/resume exactly once. That Operation is short-lived; the resulting DSH Agent is Principal-owned and long-lived.
-
-## Low-level Runtime
-
-The v0.2 APIs remain available under `dsh-multi-tenant/runtime`, `operation` and `composition` for framework/integration code. Product code should prefer `runtime-composition` so Deployment/Tenant/Principal/Operation recipes cannot be accidentally mixed across Plans.
-
-## Guarantees
-
-- claim-once immutable Session ownership and fail-closed access;
-- canonical Tenant/Principal publication and quiescent teardown;
-- typed capability scope/dependency validation;
-- scope-local canonical fingerprints;
-- exact whole-plan RuntimeComposition attestation;
-- trusted ingress -> canonical Principal;
-- Principal Credentials isolation/replacement;
-- Tenant MCP configuration isolation;
-- cross-Principal resume denied before DSH resume;
-- one-shot Operation semantics with Principal-owned long-lived Agents;
-- official DSH MCP client initial discovery before Agent publication;
-- Agent-scoped native MCP Tools and deterministic per-Session runtime namespaces;
-- pinned real-DSH/MCP executable evidence;
-- clean installed-artifact smoke from the packed npm candidate.
 
 ## Public subpaths
 
@@ -156,24 +107,14 @@ dsh-multi-tenant/store
 dsh-multi-tenant/testing
 ```
 
-## Runtime requirement for MCP
-
-`dsh-multi-tenant/mcp` composes the official `@deepseek-ai/dsh-mcp-client` supplied by the compatible DSH installation at runtime. `0.3.0-rc.1` release checks install the **packed `dsh-multi-tenant` artifact + `@deepseek-ai/dsh@0.1.1-rc.2` into a clean consumer and trigger the packaged M5 path**, proving that this resolution works in the supported installation layout. The integration does not vendor or fork the MCP protocol implementation.
-
 ## Security boundary
 
-Cordis Context is trusted same-process isolation/composition, not a hostile-code sandbox. M5 reduces normal-path credential exposure by resolving bindings inside Agent setup, but malicious code sharing the process remains outside the guarantee. Strong filesystem/process/network/shell/secret isolation belongs to container/Pod/sidecar/remote deployment architecture.
+Cordis Context provides trusted same-process composition/lifecycle separation, not hostile-code isolation. Strong secret/process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote deployment boundaries.
 
-Long-term authority-capability direction is documented in the repository at `docs/vision/authority-capabilities.md`; it is not part of the current npm API contract.
+## Compatibility
 
-## Install
+- Node: `^22.19.0 || >=24.0.0`
+- Cordis: `>=4.0.1 <5`
+- DSH baseline: `0.1.1-rc.2`
 
-```sh
-dsh plugin --profile <profile> add dsh-multi-tenant
-```
-
-## Verify
-
-```sh
-pnpm release:check
-```
+The repository release gate verifies the packed artifact in a clean consumer beside the pinned DSH installation and repeats the same contract after npm publication.
