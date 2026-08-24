@@ -40,6 +40,14 @@ jobs:
           CONSUMER="$RUNNER_TEMP/rc-consumer"
           mkdir -p "$CONSUMER"
           printf '{"name":"rc-consumer","private":true,"type":"module"}\n' > "$CONSUMER/package.json"
+          cat > "$CONSUMER/pnpm-workspace.yaml" <<'YAML'
+          allowBuilds:
+            '@deepseek-ai/dsh-subprocess-local': true
+            '@google/genai': true
+            koffi: true
+            node-pty: true
+            protobufjs: true
+          YAML
           cd "$CONSUMER"
           pnpm add '@deepseek-ai/dsh@0.1.1-rc.2' "$RC_TARBALL"
 
