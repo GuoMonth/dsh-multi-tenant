@@ -13,7 +13,7 @@
     "probe:saas-core": "node scripts/saas-core-vertical-slice-probe.mjs",
     "probe:mcp": "node scripts/m5-mcp-agent-integration-probe.mjs",
     "probe:platform": "pnpm probe:dsh && pnpm probe:cordis && pnpm probe:saas-core && pnpm probe:mcp",
-    "smoke": "node scripts/package-smoke.mjs",
+    "smoke": "node scripts/package-smoke.mjs && node scripts/artifact-consumer-smoke.mjs --local",
     "release:preflight": "node scripts/release-preflight.mjs",
     "release:registry-preflight": "node scripts/registry-preflight.mjs",
     "release:registry-smoke": "node scripts/registry-smoke.mjs",
