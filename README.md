@@ -35,8 +35,8 @@ A SaaS product is not. The moment the same runtime serves multiple organizations
 Imagine a hosted ERP assistant:
 
 ```text
-Acme / Alice  -> Acme ERP MCP + Alice credential
-Acme / Bob    -> Acme ERP MCP + Bob credential
+Acme / Alice   -> Acme ERP MCP + Alice credential
+Acme / Bob     -> Acme ERP MCP + Bob credential
 Globex / Alice -> Globex ERP MCP + Globex/Alice credential
 ```
 
