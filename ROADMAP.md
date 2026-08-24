@@ -45,61 +45,72 @@ Historical Web/ApiProxy/global-admission research remains in Git history instead
 
 # v0.3 — SaaS Framework Core
 
-## Definition of Value
+## Updated Definition of Value
 
-v0.3 moves the project from **a safe Multi-Tenant Runtime** to **an executable SaaS Framework Core**.
+MR-A changed how we understand the Framework boundary. v0.3 is not merely:
 
 ```text
-SaaSDefinition
-      ↓ compile / validate
-immutable CompositionPlan
-      ↓ materialize
-canonical Tenant / Principal
-      ↓
-Principal-owned one-shot Operation
-      ↓ capability snapshot
-DSH Agent create / resume / drive
-      ↓
-deterministic teardown
+SaaSDefinition -> Providers -> Agent
 ```
 
-v0.3 is not complete because many features exist. It is complete when this path is strongly typed, fail-fast, lifecycle-safe, replaceable and executable as a real multi-tenant DSH vertical slice.
+The more accurate north star is:
 
-The final framework must guarantee:
+```text
+Product / Transport
+      ↓ product-owned authentication
+Trusted Subject
+      ↓ identity resolution
+Product Ingress Boundary
+      ↓
+TenantPrincipal
+      ↓
+canonical Tenant / Principal
+      ↓
+Typed Runtime Capabilities
+      ↓
+Principal-owned one-shot Operation
+      ↓ immutable capability snapshot
+Agent Integration
+      ↓ DSH-native Agent setup / plugin composition
+DeepSeek Harness
+```
 
-- invalid composition fails before user traffic;
-- Tenant and Principal capability state remains isolated;
-- canonical Runtime nodes cannot silently adopt structurally different compositions;
-- one user-visible action maps to one semantic Operation;
-- provider churn cannot silently duplicate Operation work;
-- Principal teardown drains its Operations;
-- DSH create/resume receives the correct caller-bound Tenant/Principal/Operation context;
-- provider implementation can be replaced without rewriting the core;
-- critical DSH/Cordis assumptions remain executable CI evidence.
+This separates concerns that were previously described too flatly:
+
+- **Product Ingress** selects trusted Runtime identity;
+- **Runtime Capabilities** live under explicit Deployment/Tenant/Principal/Operation ownership;
+- **Operation** is one semantic execution boundary;
+- **Agent Integration** translates trusted Runtime state into native DSH Agent/Preset/plugin composition.
+
+See [`docs/specs/saas-boundaries.md`](./docs/specs/saas-boundaries.md).
+
+v0.3 is complete when this path is strongly typed, fail-fast, lifecycle-safe, replaceable and executable as a realistic multi-tenant DSH vertical slice.
 
 ## Architecture target
 
 ```text
-                         SaaS Framework Core
-                                │
-                       Composition Compiler
-                                │
-                        CompositionPlan
-                                │
-             ┌──────────────────┼──────────────────┐
-             │                  │                  │
-           Tenant            Principal          Operation
-             │                  │                  │
-             └──────── Capability Contracts ──────┘
-                                │
-                     Replaceable Providers
-                                │
-                       dsh-multi-tenant
-                                │
-                         Cordis + DSH
+Product / Transport
+        │
+        ▼
+Trusted Identity Resolution
+        │
+        ▼
+Tenant / Principal Runtime
+        │
+        ▼
+Typed Capability Composition
+        │
+        ▼
+One-shot Operation
+        │
+        ▼
+Agent Integration
+        │
+        ▼
+Cordis / DeepSeek Harness
 ```
 
-Auth, Credentials, MCP, Transport, Audit and Usage are capability responsibilities, **not pre-approved package names**.
+Auth, Credentials, MCP, Transport, Audit and Usage remain responsibility names, **not pre-approved package names**.
 
 ## Engineering laws
 
@@ -115,13 +126,15 @@ Spec
 
 Additional rules:
 
-- `SaaSDefinition` is intent; Runtime does not repeatedly interpret it.
+- `SaaSDefinition` is mutable intent; Runtime does not repeatedly reinterpret it.
 - `CompositionPlan` is normalized, deterministic and immutable.
-- scope names must correspond to real lifecycle/authority boundaries.
+- scope names represent real lifecycle/authority boundaries.
+- capability key, value type and scope belong to one semantic token.
 - Cordis remains the DI/service/lifecycle substrate.
 - Operation is Principal-owned and one-shot in semantic effect.
+- Product Ingress and Agent Integration are explicit boundaries, not hidden Provider conventions.
 - public API may not depend on an open blocking assumption.
-- provider compatibility is an executable contract.
+- provider/integration compatibility is executable evidence.
 - package topology follows proven architecture.
 - prerelease compatibility is disposable when it obstructs the better model.
 
@@ -129,232 +142,209 @@ Additional rules:
 
 # Milestone status
 
-## M0 — P0 Spec / Assumption Foundation — ✅ complete
+## M0 — Spec / Assumption Foundation — ✅ complete
 
-Delivered:
-
-- bilingual live specs for SaaS Composition and Operation lifecycle;
-- machine-readable Assumption Ledger;
-- DSH/Cordis executable probes;
-- Node 22.19 / Node 24 platform-assumption lanes;
-- promotion rule: blocking open assumptions cannot support public API.
+Delivered bilingual live specs, machine-readable assumptions, DSH/Cordis probes, Node 22.19/24 platform lanes and promotion gates.
 
 ## M1 — Composition Compiler — ✅ complete
 
-Delivered:
+MR-A delivered:
 
-```text
-SaaSDefinition
-      ↓
-compileSaaSDefinition()
-      ↓
-immutable CompositionPlan
-```
-
-The compiler now provides:
-
-- stable capability key;
-- `deployment | tenant | principal | operation` ownership vocabulary;
-- required/optional capability;
-- deterministic provider selection;
-- provider dependency graph;
+- required/optional capabilities;
+- provider selection;
+- dependency graph and visibility rules;
 - deterministic topological bootstrap order;
 - immutable normalized Plan;
-- deterministic structural fingerprint.
-
-It fails before bootstrap for duplicate/unknown/missing/ambiguous provider states, scope mismatch, false-scoped ambient providers, dependency visibility violations and dependency cycles.
-
-### Scope is authority, not metadata
-
-Ambient external providers are deployment-only. Tenant/Principal/Operation providers must actually materialize inside their declared Cordis scope.
-
-### Canonical Plan drift
-
-Plan fingerprint participates in Runtime definition identity:
-
-```text
-saas:tenant:<plan fingerprint>
-saas:principal:<plan fingerprint>
-```
-
-Equivalent Plans can join the same canonical Runtime node. Structurally different Plans fail with `RuntimeDefinitionConflictError` instead of silently sharing it.
-
-v0.3 deliberately does not define hot mutation from one Plan to another.
+- semantic error taxonomy;
+- real scope authority rather than metadata;
+- full-plan structural fingerprint.
 
 ## M2 — Principal Operation Kernel + A6 — ✅ complete
 
-The final A6 design is **not** reactive `ctx.inject()` business work.
+MR-A proved the final Operation primitive is not reactive `ctx.inject()` business work.
 
 ```text
 Principal
   └─ non-reactive Operation Fiber
-       ├─ operation-local provider setup
+       ├─ Operation-local setup
        ├─ one-shot capability snapshot
        ├─ execute exactly once
        └─ quiescent teardown
 ```
 
-Delivered:
+`A6` is proven on Node 22.19 and Node 24.
 
-- Principal-owned Operation registry;
-- explicit semantic lifecycle states;
-- one-shot required capability snapshot;
-- no re-entry on provider churn;
-- explicit cancellation signal;
-- Principal teardown closes admission and drains Operations;
-- idempotent/quiescent cancel and dispose;
-- causal downstream errors;
-- semantic Operation error taxonomy.
+## M3 — Multi-tenant real-DSH Core Vertical Slice — ✅ complete
 
-`A6` is now **proven**. Cordis reactive injection remains useful for plugin lifecycle but is not the semantic transaction primitive.
+The pinned public `@deepseek-ai/dsh-agent` AgentRegistry is exercised from the Operation boundary for concurrent create, resume and failure paths across multiple Tenant/Principal identities.
 
-## M3 — Multi-tenant DSH Core Vertical Slice — ✅ complete
+Packed npm consumer smoke executes the same contract.
 
-The real pinned public `@deepseek-ai/dsh-agent` AgentRegistry is exercised from the new Operation boundary.
+### M3 package-boundary gate — keep one package
 
-The executable proof covers concurrent:
-
-```text
-Acme / Alice  -> create
-Acme / Bob    -> create
-Globex / Alice -> create
-Acme / Alice  -> resume
-Acme / Alice  -> create failure
-```
-
-It proves:
-
-- correct Tenant/Principal identity at DSH factory `ownerCtx`;
-- correct Tenant, Principal and Operation-local capability visibility;
-- one semantic execution per Operation;
-- Agent setup before returned handle use;
-- create/resume caller binding;
-- downstream create failure preserves causal error;
-- failed Operation leaves no live registry entry;
-- Tenant teardown does not affect another Tenant;
-- successful handles are drained.
-
-The same contract is exercised from the **packed npm tarball** in a clean consumer, not only from workspace source.
-
-### M3 package-boundary gate — decision: keep one package
-
-We do **not** create `dsh-saas` after M3.
-
-Composition + Operation currently extend the same Runtime ownership/lifecycle contract and have not demonstrated enough independent versioning/distribution value to justify a second workspace package.
-
-They remain public subpaths of `dsh-multi-tenant`:
-
-```text
-dsh-multi-tenant/runtime
-dsh-multi-tenant/operation
-dsh-multi-tenant/composition
-dsh-multi-tenant/testing
-```
-
-This decision is intentionally revisitable after M4/M5, when real SaaS capability contracts provide stronger evidence.
+No `dsh-saas` package yet. Runtime, typed composition and Operation still form one coherent lifecycle contract.
 
 ---
 
-# Current main line: M4 + M5
+## M3.5 — Post-MR-A Architecture Hardening — current
 
-MR-B should prove the **capability ecosystem**, not maximize provider count.
+MR-A intentionally optimized for a complete vertical slice. The slice exposed two structural debts that are cheaper to remove before product-facing capabilities arrive.
 
-## M4 — Minimal SaaS capability contracts
+### 1. Typed Capability Tokens
 
-Priority contracts:
+The old shape allowed:
 
-### 1. Authenticated Identity Boundary
+```ts
+capabilities.require<MyType>('credentials')
+```
+
+which let the caller assert any type and duplicated scope metadata across definitions.
+
+The hardened shape uses:
+
+```ts
+CapabilityToken<T, Scope>
+```
+
+binding stable service key + semantic value type + authority scope.
+
+Thin helpers may type Cordis `get/provide`, but Cordis remains the only resolver/registry.
+
+### 2. Scope-local composition identity
+
+MR-A initially used one whole-plan fingerprint for canonical Tenant/Principal definition identity. This was safe but over-coupled: an Operation-only change could falsely invalidate an unrelated Tenant.
+
+The hardened Plan keeps:
 
 ```text
-trusted external authenticated subject
+fingerprint                  exact whole-plan identity
+scopeFingerprints[scope]     scope provider dependency closure
+```
+
+Canonical Tenant/Principal definitions use their scope-local closure identity.
+
+**M3.5 exit gate:**
+
+- Operation-only drift does not invalidate unrelated Principal/Tenant nodes;
+- Principal-only drift does not invalidate unrelated Tenant nodes;
+- ancestor changes actually used by a scope do change that scope identity;
+- typed capability consumption is proven from source and packed artifact;
+- docs/roadmap clearly separate Product Ingress, Runtime Capability and Agent Integration planes.
+
+---
+
+# Next product-facing stage
+
+The earlier Roadmap grouped Authenticated Identity, Credentials and MCP as three parallel capability contracts. MR-A showed this is not structurally accurate, so M4/M5 are revised.
+
+## M4 — Product Ingress + Principal Capability Contracts
+
+M4 proves two different boundaries together because they meet at canonical Principal selection.
+
+### A. Trusted Product Ingress
+
+```text
+authenticated product subject
+        ↓
+identity resolver
         ↓
 TenantPrincipal
         ↓
 canonical Tenant / Principal
 ```
 
-The framework should not own JWT/OAuth/SAML parsing. It owns the semantic boundary after authentication has established trusted identity.
+The Framework does **not** own JWT/OAuth/OIDC/SAML parsing. It owns only the semantic boundary after the product has established trusted identity.
 
-### 2. Credentials Capability
+The first reference adapter should be simple/callback based and exist only to prove the contract.
 
-A Principal-owned credential capability must preserve:
+### B. Principal Credentials Capability
+
+Credentials become the first real product-facing typed Runtime capability.
+
+It must prove:
 
 - Tenant isolation;
 - Principal sibling isolation;
 - lifecycle ownership;
-- explicit consumer boundary;
-- replaceability without Framework Core edits.
+- typed consumption;
+- replacement without Framework Core edits;
+- no secret state leaking into deployment/root authority by accident.
 
-### 3. MCP Capability
+**M4 exit gate:** Product Ingress selects the correct canonical Principal and that Principal consumes a replaceable typed Credentials capability without vendor-specific auth logic entering the Core.
 
-MCP is the strongest reference capability because it naturally exercises:
+## M5 — Agent Integration Reference Path + Minimal Defaults
+
+MCP moves from “parallel Runtime capability” to the strongest reference **Agent Integration** path.
+
+The target path is:
 
 ```text
-Tenant configuration
-      +
-Principal credential
-      +
-Operation consumption
-      +
-DSH Agent composition
+Tenant MCP configuration
+        +
+Principal credentials
+        +
+Operation snapshot
+        ↓
+Agent integration
+        ↓
+DSH Agent setup
+        ↓
+@deepseek-ai/dsh-mcp-client
+        ↓
+native DSH MCP tools
 ```
 
-The contract should use DSH/MCP native seams where they are stable instead of building a parallel protocol stack.
+At the current pinned DSH baseline, MCP Tools are the supported Harness bridge. Resources and Prompts are not bridged by the Harness, so v0.3 does not build a parallel compatibility protocol to simulate them.
 
-**M4 exit gate:** these contracts are minimal, replaceable and explainable without vendor-specific assumptions leaking into the Framework Core.
+M5 should include only enough defaults to make this path real:
 
-## M5 — Minimal reference providers
+- one simple identity adapter from M4;
+- one in-memory/reference Credentials implementation;
+- one real MCP Tools integration path;
+- replacement proof for at least one implementation.
 
-Provide only enough real/default implementations to prove the contracts are genuinely usable.
+**M5 exit gate:** one realistic Product Ingress -> Tenant/Principal -> Credentials -> Operation -> DSH-native MCP Tool path works end to end, and replacing a conforming implementation does not require Core changes.
 
-Likely scope:
-
-- simple/callback authenticated identity adapter;
-- in-memory/reference credential provider;
-- one real MCP integration path;
-- existing reference durable ownership store where relevant.
-
-Do **not** turn M5 into Auth0/Okta/Vault/Redis/Postgres/vendor breadth.
-
-**M5 exit gate:** replacing a reference provider with another conforming implementation requires no Framework Core change, and one realistic Auth -> Principal -> Credentials -> MCP -> Operation -> DSH Agent path works end to end.
-
-At the end of M5 we reevaluate whether a separate SaaS/package boundary has actually emerged.
+At the end of M5, package boundaries are reevaluated from evidence.
 
 ---
 
-## M6 — Diagnostics and explainability
+## M6 — Diagnostics and Explainability
 
 A Composition Framework must explain itself.
 
-The framework should be able to answer:
+It should answer:
 
 - which provider was selected and why;
-- which scope owns it;
-- what it depends on;
-- why a definition/provider was rejected;
+- which typed capability/scope owns it;
+- what its dependency closure is;
+- why a Definition/provider/integration was rejected;
+- which scope fingerprint controls canonical identity;
 - where bootstrap failed;
-- what the normalized Plan/fingerprint is;
-- which canonical Runtime definition is active.
+- what the normalized Plan contains.
 
-The exact API may evolve, but semantic diagnostics are part of v0.3 because unclear diagnostics usually indicate an unclear model.
+Diagnostics may begin naturally during M3.5/M4/M5, but M6 hardens them into a deliberate framework contract.
 
-## M7 — Conformance and compatibility hardening
+## M7 — Conformance and Compatibility Hardening
 
 Expand executable evidence across:
 
+- typed capability identity;
 - Composition validation and determinism;
-- Plan/canonical drift;
-- Tenant/Principal isolation;
+- scope-local canonical drift;
+- Tenant/Principal isolation and recreation;
 - Operation prepare/active/cancel/failure/teardown/provider churn;
-- DSH create/resume/setup/publication/failure;
-- provider replacement/failure;
-- Node 22.19 and Node 24;
+- Product Ingress identity mapping;
+- Credentials replacement/failure;
+- Agent Integration create/resume/setup/failure;
+- DSH-native MCP Tools behavior;
+- Node 22.19 / Node 24;
 - pinned DSH/Cordis assumptions;
 - packed consumer behavior.
 
 GitHub Actions remains upstream truth detector, architecture gate and regression firewall.
 
-## M8 — v0.3 release convergence
+## M8 — v0.3 Release Convergence
 
 No new architecture should be invented here.
 
@@ -363,51 +353,51 @@ Release convergence means:
 - remove research/intermediate surfaces that did not become architecture;
 - freeze only earned public/package boundaries;
 - align README/spec/reference docs with actual code;
-- publish a clear compatibility/security boundary;
+- publish explicit compatibility/security boundaries;
 - run packed and registry consumer smoke;
-- keep install/distribution mechanics minimal unless the contract truly needs more.
+- keep install/distribution mechanics minimal unless the released contract truly needs more.
 
 ---
 
 # v0.3 Golden Test
 
-The final release acceptance must resemble a real SaaS composition:
+The final acceptance should resemble a real SaaS product flow:
 
 ```text
-Tenant Acme
-├─ Alice
-│  ├─ Credentials A
-│  └─ MCP A
-└─ Bob
-   ├─ Credentials B
-   └─ MCP A
-
-Tenant Globex
-└─ Alice
-   ├─ Credentials C
-   └─ MCP B
+Trusted Product Request
+        ↓
+Tenant Acme / Alice
+│       ├─ Credentials A
+│       └─ Tenant MCP config A
+│
+├─ Tenant Acme / Bob
+│       ├─ Credentials B
+│       └─ Tenant MCP config A
+│
+└─ Tenant Globex / Alice
+        ├─ Credentials C
+        └─ Tenant MCP config B
 ```
 
-Concurrent Operations must prove each DSH Agent sees only the correct Tenant capability, Principal credential and MCP composition. Dispose/failure/recreation must preserve sibling and cross-Tenant isolation.
+Concurrent Operations must prove each DSH Agent/integration sees only the correct identity, Tenant config and Principal credential; disposing/failing/recreating one scope must not affect siblings or other Tenants.
 
-The same suite must feed invalid Definition states and prove they fail before user traffic.
+The same acceptance suite must feed invalid definitions and prove they fail before user traffic.
 
 # v0.3 Definition of Done
 
 v0.3 is complete only when all are true:
 
-1. `SaaSDefinition -> CompositionPlan` is deterministic, strongly typed and fail-fast. ✅
-2. one user-visible action has one semantic Operation boundary; A6 is proven. ✅
-3. Principal -> Operation -> real DSH create/resume/failure is executable CI evidence. ✅
-4. Tenant/Principal capability isolation survives concurrency, failure, teardown and recreation.
-5. minimal Authenticated Identity / Credentials / MCP contracts prove replacement without vendor products entering Core.
-6. at least one reference composition is genuinely usable end to end.
-7. semantic diagnostics explain Plan selection and failures.
-8. platform assumptions/provider contracts are executable on supported baselines.
-9. package boundaries reflect proven independent value rather than speculative names. ✅ for M3: one package retained.
-10. current docs/install instructions describe the artifact users actually receive.
-
-Items 4–10 are completed progressively by M4–M8; checked items already have MR-A evidence.
+1. typed `SaaSDefinition -> CompositionPlan` is deterministic and fail-fast. ✅ after M3.5
+2. canonical identity is scope-local rather than falsely coupled to unrelated descendants. ✅ after M3.5
+3. one user-visible action has one semantic Operation boundary; A6 is proven. ✅
+4. Principal -> Operation -> real DSH create/resume/failure is executable CI evidence. ✅
+5. Product Ingress maps trusted identity to canonical Runtime without vendor auth entering Core.
+6. a Principal-owned typed Credentials contract proves replacement/isolation.
+7. at least one DSH-native Agent Integration path is genuinely usable end to end.
+8. semantic diagnostics explain Plan selection/locality and failures.
+9. platform assumptions/provider/integration contracts are executable on supported baselines.
+10. package boundaries reflect proven independent value rather than speculative names.
+11. current docs/install instructions describe the artifact users actually receive.
 
 # Explicit v0.3 non-goals
 
@@ -415,7 +405,8 @@ Not required for v0.3:
 
 - broad OAuth/OIDC/SAML vendor integrations;
 - production Vault/Redis/Postgres credential ecosystems;
-- complete MCP Apps/Resources product UX;
+- a parallel MCP protocol stack;
+- compatibility shims for MCP Resources/Prompts that DSH does not currently consume;
 - billing/audit/usage products;
 - Web admin UI;
 - Marketplace/discoverability work;
@@ -424,26 +415,15 @@ Not required for v0.3:
 - arbitrary dynamic provider hot reconfiguration;
 - a large migration/provider ecosystem.
 
-These concerns must not delay the Framework Core.
-
 ---
 
 # v0.4 preview — Production Provider Ecosystem & Productization
 
-v0.4 turns stable v0.3 contracts into a broader production-ready SaaS ecosystem.
+v0.4 turns stable v0.3 boundary contracts into a broader production-ready SaaS ecosystem.
 
-Expected direction includes:
+Expected direction includes production identity integrations, durable credentials/secrets, richer MCP capabilities as DSH exposes stable consumers, operational providers, durable stores/migrations, stronger deployment profiles and improved Distribution/install experience.
 
-- production authentication/identity integrations;
-- durable credential/secret providers;
-- richer MCP/MCP Apps/Resources integrations where DSH exposes stable seams;
-- audit, usage, observability and operational providers;
-- durable stores/migrations/compatibility tooling;
-- stronger process/container/Pod deployment profiles;
-- improved out-of-box Distribution/install experience;
-- ecosystem provider documentation/conformance certification.
-
-This is intentionally a **preview, not a detailed v0.4 roadmap**. Exact scope will come from v0.3 architecture and real usage evidence.
+This remains a **preview, not a detailed v0.4 roadmap**. Exact scope comes from v0.3 architecture and real usage evidence.
 
 ---
 

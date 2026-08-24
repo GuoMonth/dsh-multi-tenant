@@ -26,7 +26,7 @@ Future upgrades are manual and explicit; blocking CI does not auto-follow npm `l
 
 ## Evidence model
 
-Compatibility is proven from two independent directions.
+Compatibility is proven from several independent directions. A baseline is accepted only when the evidence for the **current live architecture** passes; historical seams do not remain blocking merely because older versions once depended on them.
 
 ### Exact upstream source identity
 
@@ -35,38 +35,74 @@ GitHub Actions checks out the pinned upstream repository at the exact release co
 - checkout HEAD equals `DSH_TARGET.commit`;
 - upstream root `package.json.version` equals `DSH_TARGET.version`.
 
-### Exact published-package behavior
+### DSH publication and owner-context behavior
 
-`pnpm probe:dsh` installs exact published DSH packages into clean temporary consumers and executes only the seams the current architecture depends on:
+`pnpm probe:dsh` installs exact published DSH packages into clean temporary consumers and proves:
 
-- **session genesis proof** — publication visibility and rollback semantics;
-- **Agent owner/composition proof** — a Principal-derived integration fiber reaches DSH Agent creation as caller-bound `ownerCtx` while preserving tenant/principal identity and capability resolution.
+- **Session genesis** — setup/publication visibility and rollback behavior;
+- **caller-bound Agent owner context** — DSH Agent creation preserves trusted Tenant/Principal caller metadata and capability resolution.
 
-Historical Web/ApiProxy and global admission-decorator experiments are intentionally not blocking compatibility evidence. They remain available in Git history and can be re-investigated if a future v0.3 design actually depends on those seams.
+This is upstream seam evidence, not the semantic definition of a user Operation.
+
+### Cordis lifecycle behavior
+
+`pnpm probe:cordis` proves the external lifecycle assumptions the Runtime uses:
+
+- child Fiber ownership/cleanup follows parent lifetime;
+- `ctx.inject()` is dependency-reactive and may rerun after provider loss/recovery.
+
+The second fact is precisely why user-visible work uses a non-reactive Principal Operation rather than a raw inject callback.
+
+### SaaS Core vertical compatibility
+
+`pnpm probe:saas-core` exercises the complete active DSH-facing path against the pinned public AgentRegistry:
+
+```text
+Typed CompositionPlan
+  -> Tenant / Principal
+  -> Principal-owned one-shot Operation
+  -> typed capability snapshot
+  -> real DSH Agent create / resume / failure
+```
+
+The proof covers multiple Tenants/Principals, caller-bound identity/capability visibility, exact-once semantic execution, create/resume, downstream failure and quiescent cleanup.
+
+This is the primary integration evidence for the current v0.3 Core.
+
+### Packed artifact behavior
+
+`pnpm smoke` builds and packs the npm artifact, installs it into a clean external consumer and executes the public Runtime/Composition/Operation contract, including typed capability snapshots and scope-local composition identity.
+
+Source tests alone are not sufficient evidence for a release artifact.
+
+## Historical evidence is not a permanent gate
+
+Historical Web/ApiProxy, global admission-decorator and raw reactive-integration-fiber experiments remain in Git history rather than live blocking compatibility suites.
+
+If a future architecture genuinely depends on one of those seams again, reintroduce a focused proof from current requirements instead of reviving the old surface by default.
 
 ## Manual baseline refresh
 
-When we intentionally move DSH forward:
+When intentionally moving DSH/Cordis forward:
 
-1. select the explicit DSH version and release commit;
-2. update `scripts/dsh-target.mjs`;
-3. update any currently active DSH-facing pins that exist at that time;
-4. regenerate `pnpm-lock.yaml` from the real npm registry when the workspace graph changes;
-5. rerun source-identity verification and the executable compatibility probes;
-6. fix contract failures structurally rather than weakening evidence;
-7. update current docs to describe the selected baseline.
-
-Historical release notes keep the versions they actually proved.
+1. select explicit versions and, for DSH, the release commit;
+2. update `scripts/dsh-target.mjs` and active dependency pins;
+3. regenerate `pnpm-lock.yaml` from the real registry when the workspace graph changes;
+4. verify exact upstream source identity;
+5. run `pnpm probe:platform` so DSH + Cordis + SaaS Core assumptions are exercised together;
+6. run quality/packed-consumer gates;
+7. fix failures structurally rather than weakening evidence;
+8. update live docs to the new baseline and keep historical release notes unchanged.
 
 ## Compatibility philosophy
 
-This project is in rapid prerelease development. We do not preserve early API shapes or old investigation surfaces merely because they are technically correct.
+This project is in rapid prerelease development. We do not preserve early API shapes, test harnesses or investigation surfaces merely because they were once correct.
 
 Compatibility work follows three rules:
 
 - where this repository owns a boundary, enforce it;
-- where DSH/provider ecosystems own a seam that the current architecture actually depends on, prove or standardize it;
-- when an old seam no longer serves the product direction, remove it from the live tree instead of maintaining compatibility theater.
+- where DSH/Cordis/provider/integration ecosystems own a seam the live architecture depends on, prove or standardize it;
+- when a seam no longer serves the product direction, remove it from the live tree instead of maintaining compatibility theater.
 
 ## CI gates
 
@@ -80,8 +116,12 @@ Pull requests and `main` require:
 - unit and contract tests;
 - build;
 - packed external-consumer smoke;
-- exact-version DSH runtime probes on Node 22.19 and Node 24.
+- DSH + Cordis + SaaS Core platform probes on Node 22.19 and Node 24.
 
-## Runtime invariant
+## Runtime/core dependency invariant
 
-The public runtime package depends on Cordis only. Transport/vendor implementations such as JWT, databases, HTTP, MCP or Redis do not belong in the core Runtime Contract. Provider families and SaaS composition are layered above it only when those package boundaries become real.
+The current publishable package keeps runtime dependencies minimal and uses Cordis/DSH native seams rather than embedding vendor implementations into the Core.
+
+Product authentication protocols, durable secret stores, databases, HTTP/WebSocket servers and concrete vendor integrations belong outside the Core unless a future proven boundary explicitly requires otherwise.
+
+MCP is treated according to the DSH-native integration seam available at the selected baseline; v0.3 does not add a parallel protocol stack merely for compatibility breadth.

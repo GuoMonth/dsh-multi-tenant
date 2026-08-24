@@ -1,5 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import { defineCapability, provideCapability } from '../src/capability.ts'
 import { InMemoryTenantSessionStore } from '../src/store.ts'
 import { MultiTenantService } from '../src/service.ts'
 import { TenantRuntimeService } from '../src/runtime.ts'
@@ -16,11 +17,14 @@ async function createRuntime(): Promise<{ ctx: Context; runtime: TenantRuntimeSe
   return { ctx, runtime: ctx.tenantRuntime }
 }
 
+const volatileCapability = defineCapability<string, 'deployment'>('volatileCapability', 'deployment')
+const missingCapability = defineCapability<string, 'principal'>('missingCapability', 'principal')
+
 describe('Principal-owned one-shot Operations', () => {
-  it('captures required capabilities once and never re-executes work after provider churn', async () => {
+  it('captures typed required capabilities once and never re-executes work after provider churn', async () => {
     const { ctx, runtime } = await createRuntime()
     const providerOne = ctx.plugin(function providerOne(providerCtx: Context) {
-      providerCtx.provide('volatileCapability', 'v1')
+      provideCapability(providerCtx, volatileCapability, 'v1')
     })
     await providerOne
 
@@ -31,10 +35,13 @@ describe('Principal-owned one-shot Operations', () => {
     let executions = 0
 
     const operation = alice.operations.start({
-      requires: ['volatileCapability'],
+      requires: [volatileCapability],
       async execute({ capabilities }) {
         executions += 1
-        const captured = capabilities.require<string>('volatileCapability')
+        const captured = capabilities.require(volatileCapability)
+        expectTypeOf(captured).toEqualTypeOf<string>()
+        expect(capabilities.keys).toEqual(['volatileCapability'])
+        expect(capabilities.capabilities).toEqual([volatileCapability])
         started.resolve()
         await release.promise
         return captured
@@ -44,7 +51,7 @@ describe('Principal-owned one-shot Operations', () => {
     await started.promise
     await providerOne.dispose()
     const providerTwo = ctx.plugin(function providerTwo(providerCtx: Context) {
-      providerCtx.provide('volatileCapability', 'v2')
+      provideCapability(providerCtx, volatileCapability, 'v2')
     })
     await providerTwo
     release.resolve()
@@ -67,7 +74,7 @@ describe('Principal-owned one-shot Operations', () => {
     let executions = 0
 
     const operation = alice.operations.start({
-      requires: ['missingCapability'],
+      requires: [missingCapability],
       execute() {
         executions += 1
       },

@@ -22,40 +22,57 @@ Only then implement the smallest coherent structure. Do not accumulate local pat
 Classify every guarantee:
 
 1. **Controlled by this repository -> enforce it.** Own the reliable boundary, make it fail closed where appropriate, and prove it.
-2. **Owned by the ecosystem -> standardize it.** Define or consume the smallest reusable DSH/provider seam and executable conformance contract.
+2. **Owned by the ecosystem -> standardize it.** Define or consume the smallest reusable DSH/provider/integration seam and executable conformance contract.
 3. **Not reliably enforceable -> bound it.** State the support/security boundary rather than hiding it behind a parallel registry or local fork.
 
 ## Runtime structural rules
 
-The v0.2 runtime is a canonical ownership tree:
+The live v0.3 topology is:
 
 ```text
-Root -> Tenant -> Principal -> derived integration fibers -> DSH operations
+Product authentication
+  -> trusted identity resolution
+  -> TenantPrincipal
+  -> canonical Tenant
+  -> canonical Principal
+  -> typed Runtime capabilities
+  -> Principal-owned one-shot Operation
+  -> Agent Integration
+  -> native DSH Agent/Preset/plugin composition
 ```
 
-Contributions must preserve these semantics:
+Contributions must preserve these semantics unless new executable evidence justifies a deliberate architectural revision:
 
-- Tenant and Principal share canonical registry semantics;
+- authentication protocol handling happens before the trusted Product Ingress boundary;
+- Tenant and Principal share canonical registry/publication semantics;
 - Principal identity is structurally nested under Tenant;
-- asynchronous creation is unpublished until setup/commit succeeds;
+- asynchronous canonical creation is unpublished until setup/commit succeeds;
 - preparing creation is cancellable lifecycle state, not only a Promise;
 - registry teardown closes admission, cancels preparing transactions, then drains published scopes;
-- Principal Context is a capability root; operations derive fibers and explicitly inject dependencies;
-- DSH Agent/Preset registration scope remains separate from Cordis Tenant/Principal service isolation;
+- capability key, value type and authority scope are represented by one `CapabilityToken<T, Scope>`;
+- declared scope must correspond to real Cordis lifecycle/authority ownership;
+- canonical Tenant/Principal definition identity is scope-local dependency closure, not unrelated whole-plan descendant state;
+- Principal owns ephemeral non-reactive Operations;
+- one Operation captures its required typed capabilities once and executes semantic work once;
+- Cordis reactive `ctx.inject()` is not the user-transaction primitive;
+- Agent Integration is explicit and uses DSH-native Agent/Preset/plugin seams;
+- DSH Agent/Preset registration remains separate from Runtime service isolation;
 - the v0.1 ownership kernel remains shared and is not replaced by Context metadata.
 
-If a proposed feature requires repeated exceptions to these rules, revisit the abstraction before adding exceptions.
+If a feature requires repeated exceptions to these rules, revisit the data model before adding exceptions.
 
 ## Strong types and semantics
 
-Prefer TypeScript types/generics that carry meaning:
+Prefer TypeScript structures that carry meaning:
 
 - use distinct identity/state/definition types instead of generic dictionaries;
-- normalize optional input into explicit internal data shapes;
+- bind capability key + value type + scope in `CapabilityToken` rather than repeating loose strings;
+- normalize optional input into explicit immutable internal data shapes;
 - make parent-child structure encode invariants where possible;
 - expose only lifecycle states consumers can actually observe;
+- distinguish whole-plan diagnostics identity from scope-local canonical creation identity;
 - avoid APIs that force upper layers to know lower-layer creation recipes;
-- keep one source of truth for package version, DSH baseline and other identities.
+- keep one source of truth for package version, DSH baseline and other durable identities.
 
 Compiler failures such as `exactOptionalPropertyTypes` violations are design feedback; fix the data shape rather than weakening compiler settings.
 
@@ -74,7 +91,7 @@ A DSH refresh must:
 2. update every active DSH-facing pin consistently;
 3. regenerate the lockfile from the real registry when the workspace graph changes;
 4. verify the exact upstream source identity in GitHub Actions;
-5. rerun the exact-version runtime probes the current architecture actually depends on;
+5. rerun the exact-version runtime/integration probes the current architecture actually depends on;
 6. fix failures structurally rather than weakening evidence;
 7. update current docs while preserving historical release evidence.
 
@@ -82,55 +99,71 @@ See `docs/reference/compatibility.md`.
 
 ## v0.3 assumption-first discipline
 
-P0 development is spec-driven and test-driven, but it also treats external framework behavior as an explicit assumption until proven.
-
-The required order is:
+Development is spec-driven and test-driven, and external framework behavior remains an explicit assumption until proven.
 
 ```text
 Spec -> Assumption Ledger -> executable probe/contract -> strong types/state -> failing behavior test -> implementation
 ```
 
-`docs/specs/v0.3-assumptions.json` is the machine-readable ledger. A blocking assumption may be `open` while design is still exploratory, but then it must name the public/design gate it blocks. A blocking assumption may be marked `proven` only when its proof artifact and root proof command exist and run in CI.
+`docs/specs/v0.3-assumptions.json` is the machine-readable ledger. A blocking assumption may be `open` during exploration, but then it must name the public/design gate it blocks. A blocking assumption becomes `proven` only when its repository proof artifact and command execute in CI.
 
-Source reading can explain *why* a behavior probably exists; it does not replace the executable proof for a boundary our public architecture will depend on.
+Source reading can explain *why* a behavior probably exists; it does not replace executable proof.
 
-In particular, do not freeze a public P0 API on top of a blocking `open` assumption. Resolve the assumption first or redesign so the API no longer depends on it.
+The sequence is iterative: a later vertical slice may expose an over-coupled earlier abstraction. Refactor the live model and Spec instead of preserving prerelease compatibility around disproven structure.
 
 ## Package conventions
 
 **Do not create a package because a directory seems useful. Create it only when an independent boundary is real.**
 
-A package must justify at least one of these independently meaningful properties:
+A package must justify at least one independently meaningful property:
 
 - consumer-facing contract/API;
-- replaceable provider capability;
+- replaceable provider or integration capability;
 - independent lifecycle/composition boundary;
 - independent versioning/release boundary;
-- product distribution boundary.
+- product Distribution boundary.
 
-Research, compatibility exploration and one-off evidence should normally live in focused tests/scripts/docs or Git history, not as a long-lived workspace package. Promote research into a package only when the resulting boundary becomes part of the current architecture.
+Research, compatibility exploration and one-off evidence should normally live in focused tests/scripts/docs or Git history, not as long-lived workspace packages.
 
 General rules:
 
-- One package = one independently composable/replaceable capability, one integration boundary, or one indivisible security invariant.
-- Prefer native DSH/Cordis Service, Context, Fiber, scope and typed protocol seams.
-- Contract and default implementation may co-locate early; split only when replacement/lifecycle/versioning value is real.
-- Do not scaffold speculative packages or names for future v0.3 capabilities.
-- The SaaS Framework should be an opinionated Distribution assembled from a Plugin Family, not a monolithic implementation package.
+- One package = one independently valuable boundary, not one buzzword/capability name.
+- Prefer native DSH/Cordis Service, Context, Fiber, Agent/Preset scope and typed protocol seams.
+- Contract/default implementation may co-locate early; split only when replacement/lifecycle/versioning value is real.
+- Do not scaffold speculative `saas`, Auth, Credentials, MCP or Transport packages.
+- A future product Distribution may provide opinionated defaults, but Distribution concerns must not dictate Core topology prematurely.
 
-## Dependency direction
+## Dependency and boundary direction
+
+Do not flatten all SaaS concerns into one provider layer. The current semantic direction is:
 
 ```text
-Runtime/kernel primitives <- capability contracts <- providers <- SaaS distribution
+Product / Transport authentication
+        ↓
+Trusted Product Ingress
+        ↓
+Tenant / Principal Runtime
+        ↓
+Typed Runtime capabilities
+        ↓
+One-shot Operation
+        ↓
+Agent Integration
+        ↓
+Native DSH / Cordis
 ```
 
-The runtime package keeps transport/vendor implementations out of core. Auth products, databases, HTTP/WebSocket transport, MCP product integration, audit/usage implementations and deployment profiles compose above the Runtime Contract only when their boundaries become concrete.
+Credentials are a natural Principal-owned Runtime capability. MCP is currently expected to prove Agent Integration by consuming Tenant config + Principal credentials + Operation state and composing the native DSH MCP Tools plugin.
+
+Do not build a parallel protocol stack merely to make every product concern look like a Runtime Provider.
 
 ## Tests: contract vs conformance
 
-- **Provider contract suites** prove a replaceable seam (for example `TenantSessionStore` or Runtime Capability Provider Contract).
-- **Conformance/invariant suites** prove cross-component properties such as tenant isolation, publication ordering and lifecycle ownership.
-- **Compatibility probes** prove assumptions about exact external DSH/Cordis behavior that the active architecture relies on.
+- **Provider contract suites** prove replaceable Runtime seams (for example `TenantSessionStore` or Runtime Capability Provider Contract).
+- **Ingress contract suites** prove trusted product identity maps to the correct canonical Runtime identity without vendor auth leaking into Core.
+- **Integration contract suites** prove Runtime state composes into DSH-native Agent behavior without cross-Tenant/Principal leakage.
+- **Conformance/invariant suites** prove cross-component properties such as isolation, publication ordering, locality and lifecycle ownership.
+- **Compatibility probes** prove assumptions about exact external DSH/Cordis behavior.
 - **Packed/registry smoke** proves the artifact users actually install, not only workspace source.
 
 ## Definition of done
@@ -139,9 +172,10 @@ The runtime package keeps transport/vendor implementations out of core. Auth pro
 - the change is demonstrably relevant to the current product direction;
 - current docs/ADR/spec updated where behavior is decided;
 - blocking external assumptions are proven or explicitly gate unfinished API design;
-- upstream/boundary ownership is explicit;
+- boundary ownership is explicit: Product Ingress vs Runtime capability vs Operation vs Agent Integration;
 - exact DSH/Cordis compatibility evidence is green when relevant;
 - `pnpm release:check` is green;
-- no transport/vendor implementation leaks into the runtime kernel;
+- no transport/vendor implementation leaks into the Runtime Core;
+- no parallel registry/protocol layer is introduced when a DSH/Cordis native seam exists;
 - no speculative package/scaffold is introduced without a real boundary;
 - no compatibility shim is added solely to preserve an obsolete prerelease abstraction.

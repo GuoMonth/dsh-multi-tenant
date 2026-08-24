@@ -2,18 +2,18 @@
 
 # Spec —— SaaS Composition Model
 
-> Status：**v0.3 M1 / M3 已实现**。当前模型由 deterministic compiler test、canonical Runtime drift test、packed-consumer smoke 与 pinned DSH vertical proof 持续保护。
+> Status：**v0.3 M1–M3 之后已实现并完成 hardening**。Live model 由 compiler test、scope-local canonical drift test、packed-consumer smoke 与 pinned DSH vertical proof 持续保护。
 
 ## 目标
 
 v0.2 负责 canonical Tenant / Principal lifecycle。v0.3 只增加 SaaS 真正需要的语义层，用来回答：
 
-- 这套 SaaS composition 包含哪些 capability；
-- 每个 capability 最终选中哪个 provider；
-- 它真正属于哪个 Runtime scope；
-- 它依赖哪些 capability；
+- 一套 composition 由哪些 typed capability 构成；
+- 每个 capability 选中哪个 provider；
+- capability 真正属于哪个 Runtime scope；
+- selected provider 依赖哪些 capability；
 - 用户流量进入前整张 graph 是否合法；
-- 一个 canonical Runtime node 是否已经运行着另一套 composition。
+- canonical Runtime node 是否已经运行着冲突的 **local creation slice**。
 
 它刻意**不是**第二套 DI Container。Service resolution、provider lifetime、Context isolation 与 Fiber cleanup 仍然属于 Cordis。
 
@@ -30,79 +30,82 @@ Runtime Composition
   native Cordis providers in Deployment/Tenant/Principal/Operation scopes
 ```
 
-### SaaSDefinition
+## Typed Capability Identity
 
-Definition 是无序的 consumer / distribution intent，可以声明 required / optional capability、provider candidate、explicit/default selection 和 dependency edge。
+Capability 不再由彼此独立的 string / scope 字段表示。
 
-Runtime 不会反复解释这个 mutable shape。
-
-### CompositionPlan
-
-Compiler 在 Runtime bootstrap 前消除所有歧义。Plan 包含：
-
-- normalized capability binding；
-- selected provider definition；
-- deterministic topological bootstrap order；
-- deterministic structural `fingerprint`。
-
-Fingerprint 不包含 JavaScript callback object identity。因此，当 provider config 会改变 semantic creation recipe 时，provider author 必须通过稳定 provider id 加可选 `definitionKey` 表达身份。两个语义不同的 creation recipe 不能复用同一身份。
-
-### Runtime Composition
-
-Plan 直接 materialize 到已有 ownership graph：
-
-```text
-Deployment
-   ↓
-Tenant
-   ↓
-Principal
-   ↓
-Operation
+```ts
+const credentials = defineCapability<Credentials, 'principal'>(
+  'credentials',
+  'principal',
+)
 ```
 
-不存在平行 `ProviderContainer`、`ServiceRegistry` 或本地 dependency resolver。
+`CapabilityToken<T, Scope>` 把三件不能独立漂移的事实绑定起来：
 
-## Scope 必须是真实 Authority
+```text
+stable service key
++ semantic TypeScript value type
++ lifecycle / authority scope
+```
 
-四种 scope 名字是 lifecycle / authority 语义，不是标签：
+Token 只是 Cordis service key 之上的 typed identity。`provideCapability()` / `getCapability()` 只是 `ctx.provide()` / `ctx.get()` 的薄 typed facade，不拥有 storage 或 resolution。
 
-- `deployment` —— application / process 级 capability；
-- `tenant` —— 归属于一个 canonical Tenant；
-- `principal` —— 归属于一个 canonical Principal；
-- `operation` —— 归属于一个 ephemeral Principal Operation。
+这样可以从数据结构层面消除两类错误：
 
-非 deployment provider 必须真的在它声明的 scope 内 materialize。因此：
+- 同一 capability 在一个地方声明 tenant scope，另一个地方又声明 principal scope；
+- consumer 通过 `require<MyType>('credentials')` 自己声称返回类型是什么。
 
-- deployment provider 可以是 **ambient**（没有 `setup`），表示 capability 已经由外部 DSH/Cordis 提供；
-- deployment provider 也可以由 Plan 自己管理；
-- Tenant / Principal / Operation provider 必须提供 scoped `setup` materializer。
+## SaaSDefinition
 
-这样可以从类型和 compiler 层面阻止“声明 principal-scoped credentials，实际却继承 root service”这种假隔离。
-
-## P0 Provider Shape
-
-P0 contract 刻意保持小：
+Definition 使用 capability token、provider candidate、可选 selection 与 dependency edge：
 
 ```ts
 interface CapabilityDefinition {
-  key: string
-  scope: CapabilityScope
+  capability: CapabilityToken
   required?: boolean
   defaultProvider?: string
 }
 
-interface ProviderBase {
+interface CapabilityProviderDefinition {
   id: string
-  capability: string
-  requires?: readonly string[]
+  capability: CapabilityToken
+  requires?: readonly CapabilityToken[]
   definitionKey?: string
+  setup?: CapabilityProviderSetup
 }
 ```
 
-Provider setup 只拿真实 Cordis Context、semantic scope 与 cancellation signal，并可选返回同步 publication commit。
+Runtime 不会反复解释 mutable Definition。
 
-没有真实 vertical-slice 需求以前，不引入 priority、policy DSL、任意 hook graph 或 dynamic selection language。
+## CompositionPlan
+
+Compiler 在 Runtime bootstrap 前消除所有歧义。Plan 包含：
+
+- normalized typed capability binding；
+- selected provider definition；
+- deterministic topological bootstrap order；
+- global structural `fingerprint`，用于精确 whole-plan comparison / diagnostics；
+- Deployment / Tenant / Principal / Operation 的 `scopeFingerprints`。
+
+Fingerprint 不包含 JavaScript callback object identity。当 config 会改变 semantic creation recipe 时，provider author 使用稳定 provider id 加可选 `definitionKey` 表达身份。
+
+## Scope 必须是真实 Authority
+
+Scope 是 lifecycle / authority 语义：
+
+```text
+deployment -> tenant -> principal -> operation
+```
+
+- deployment —— application / process 级 capability；
+- tenant —— 归属于一个 canonical Tenant；
+- principal —— 归属于一个 canonical Principal；
+- operation —— 归属于一个 ephemeral Principal Operation。
+
+非 deployment provider 必须真的在声明 scope 内 materialize。外部已经挂载好的 ambient capability 只能是 deployment scope。
+
+这样可以阻止“声明 principal credentials，实际上却继承 root service”这种假隔离。
 
 ## Compile-time Invariant
 
@@ -110,100 +113,126 @@ Provider setup 只拿真实 Cordis Context、semantic scope 与 cancellation sig
 
 - duplicate capability declaration；
 - duplicate provider id；
-- provider 指向 unknown capability；
+- unknown provider / dependency / selection capability；
+- 同一 key 的 capability token scope 不一致；
 - required capability 没有 provider；
 - provider selection 有歧义；
 - explicit/default selection 非法；
-- provider / capability scope 不一致；
 - ambient provider 假装拥有 Tenant / Principal / Operation scope；
-- provider dependency unknown / unbound；
+- unbound dependency；
 - dependency visibility violation；
 - dependency cycle。
 
-Error 都具有语义并可机器区分。
+Error 保持语义化并可机器区分。
 
 ## Dependency Visibility
+
+Provider 只能依赖其 Context 中真实可见的 capability：
 
 ```text
 deployment -> tenant -> principal -> operation
 ```
 
-Child scope 可以依赖可见 ancestor capability。Parent 不能依赖 descendant capability，Principal sibling 也不能互相依赖。
+Child 可以消费 ancestor；parent 不能消费 descendant；Principal sibling 不能互相依赖。
 
-Compiler 在构造 Plan 时就拒绝不可能成立的 graph，而不是等生产环境 `ctx.get()` 才报错。
+## Global Identity 与 Canonical Local Identity
 
-## Determinism 与 Canonical Drift
+MR-A 初版直接把整个 Plan fingerprint 用作 Tenant / Principal canonical definition identity。这个方案安全，但粒度过粗：只改一个无关 Operation provider，也可能错误地让 Tenant 发生 definition conflict。
 
-等价的无序 Definition 会得到同一个 normalized Plan、bootstrap order 与 fingerprint。
-
-Plan 创建 canonical Tenant / Principal 时，生成的 Runtime definition 会携带：
+Hardening 后明确拆成：
 
 ```text
-saas:<scope>:<plan fingerprint>
+CompositionPlan.fingerprint
+  = exact whole-plan structural identity
+
+CompositionPlan.scopeFingerprints[scope]
+  = 该 scope 自己拥有的 provider
+    + 它们真正依赖到的 selected ancestor provider closure
 ```
 
-因此 v0.2 canonical definition contract 被扩展成：
+例如：
 
-- consumer 仍然可以只调用 `ensure(identity)`，不需要知道 creation recipe；
-- equivalent Plan 可以显式 join 已存在 node；
-- structurally different Plan 不能仅仅因为 isolated service name 一样，就悄悄复用已经 active 的 Tenant / Principal。
+```text
+只改 Operation provider
+  -> global fingerprint 变化
+  -> Operation fingerprint 变化
+  -> Principal fingerprint 不变
+  -> Tenant fingerprint 不变
 
-这种 drift 会直接抛出 `RuntimeDefinitionConflictError`。
+只改 Principal provider
+  -> Principal fingerprint 变化
+  -> Tenant fingerprint 不变
 
-v0.3 不定义 hot-adopt 新 Plan。Reconfiguration semantics 仍然是 non-goal；需要新结构时应该 recreate 相关 canonical graph，而不是模糊地原地变更。
+Tenant 真正依赖的 Deployment provider 变化
+  -> Tenant fingerprint 变化
+```
+
+Canonical Tenant / Principal Runtime definition 使用自己的 **scope fingerprint**，而不是 whole Plan fingerprint。
+
+这样同时保持：
+
+- 真实 creation drift 仍然通过 `RuntimeDefinitionConflictError` 明确失败；
+- 无关 descendant 演进不会制造 false parent conflict。
+
+v0.3 仍然不定义 active canonical node 的 hot mutation。需要改变 creation recipe 时，应该 recreate 受影响的 slice，而不是模糊地原地切换。
 
 ## Materialization Transaction
-
-Managed scope 的流程：
 
 ```text
 validated CompositionPlan
       ↓
-isolate capability service names
+isolate owned capability service names
       ↓
-按 deterministic dependency order prepare provider
+按 dependency order prepare selected provider
       ↓
-验证 required dependency
+验证 dependency visibility
       ↓
-await provider setup
+await setup
       ↓
-验证 target capability 确实可见
+验证 capability 确实 materialize
       ↓
-optional synchronous commits
+optional synchronous commit
       ↓
 publish canonical scope / activate Operation
 ```
 
-Tenant / Principal setup 继续使用现有 unpublished Runtime transaction，因此 provider failure 不会暴露 partially prepared canonical node。
+Tenant / Principal 继续使用现有 unpublished Runtime transaction。Deployment 与 Operation 各自由显式 Cordis owner Fiber 承担 lifecycle。
 
-Deployment composition 由一个显式 Cordis child Fiber 拥有；Operation composition 由 one-shot Operation Fiber 拥有。
+## Operation Consumption
 
-## Provider Compatibility 仍然必须 Executable
+Operation 直接消费 typed token：
 
-能调用 `ctx.provide()` 不代表 SaaS compatible。仓库证据继续保护：
+```ts
+const operation = principal.operations.start({
+  requires: [agents, credentials],
+  execute({ capabilities }) {
+    const dshAgents = capabilities.require(agents)
+    const credential = capabilities.require(credentials)
+  },
+})
+```
 
-- Tenant A/B isolation；
-- Principal sibling isolation；
-- ancestor inheritance；
-- parent/root 不泄漏；
-- teardown isolation；
-- clean recreation；
-- unpublished setup ownership；
-- Operation one-shot semantics。
+返回类型由 token 决定。Operation 仍然只在 semantic execution 前一次性 capture value。
 
-M4/M5 的具体 Auth / Credentials / MCP contract 应该在这套模型上自然生长，而不是重新改变 dependency / lifecycle substrate。
+## Boundary Planes
 
-## Package Boundary Gate
+Composition 只是 Framework 的一个 plane。Product identity ingress 与 Agent integration 是独立语义边界，参见 [`saas-boundaries.zh-CN.md`](./saas-boundaries.zh-CN.md)。
 
-M3 **不创建** `dsh-saas` package。
+特别是，下一阶段不能继续把 Authenticated Identity、Credentials、MCP 当成三个等价 Provider slot：
 
-Composition + Operation 当前仍然是在扩展同一套 Runtime ownership contract，还没有证明足够独立的 versioning / distribution value，因此继续作为 `dsh-multi-tenant` 的 public subpath 导出。
+- Identity 在 canonical Runtime selection 之前进入；
+- Credentials 是 Principal-owned Runtime capability；
+- MCP 更适合首先作为 Agent Integration 来验证：消费多个 Runtime capability，再进入 DSH-native seam。
 
-Package decision 延后到 M4/M5。只有真实 capability contract 形成独立 consumer API、replacement/lifecycle boundary 或 distribution boundary 时，新 package 才应该从证据中自然长出来，而不是由 Roadmap 提前预测。
+## Package Boundary
+
+本次 hardening 仍然不创建 `dsh-saas`。Typed capability、Composition、Runtime、Operation 目前仍然属于一套紧密的 lifecycle contract，继续留在 `dsh-multi-tenant` 内最轻。
+
+只有未来出现真实独立 consumer/lifecycle/release boundary 时，package topology 才重新评估。
 
 ## Executable Evidence
 
-- `packages/multi-tenant/tests/composition.test.ts` —— normalization、validation、scope truth、fingerprint、canonical drift；
-- `packages/multi-tenant/tests/operation.test.ts` —— one-shot Operation lifecycle；
-- `scripts/saas-core-vertical-slice-probe.mjs` —— multi-tenant Plan -> Operation -> 真实 DSH AgentRegistry create / resume / failure；
-- `scripts/package-smoke.mjs` —— packed npm artifact 真实暴露并执行同一 Composition / Operation contract。
+- `packages/multi-tenant/tests/composition.test.ts` —— typed normalization、validation、scope authority、dependency-closure fingerprint、canonical locality；
+- `packages/multi-tenant/tests/operation.test.ts` —— typed one-shot Operation snapshot 与 lifecycle；
+- `scripts/saas-core-vertical-slice-probe.mjs` —— typed multi-tenant Plan -> Operation -> 真实 DSH AgentRegistry create / resume / failure；
+- `scripts/package-smoke.mjs` —— packed npm artifact 证明同一 typed/locality contract。

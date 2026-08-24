@@ -2,18 +2,18 @@
 
 # Spec — SaaS Composition Model
 
-> Status: **implemented for v0.3 M1/M3**. The current model is protected by deterministic compiler tests, canonical Runtime drift tests, packed-consumer smoke and the pinned-DSH vertical proof.
+> Status: **implemented and hardened after v0.3 M1–M3**. The live model is protected by compiler tests, scope-local canonical-drift tests, packed-consumer smoke and the pinned-DSH vertical proof.
 
 ## Purpose
 
-v0.2 owns canonical Tenant/Principal lifecycle. v0.3 adds only the SaaS semantics needed to answer:
+v0.2 owns canonical Tenant/Principal lifecycle. v0.3 adds the smallest SaaS semantics needed to answer:
 
-- which capabilities constitute this composition;
+- which typed capabilities constitute a composition;
 - which provider is selected for each capability;
-- which Runtime scope owns it;
-- which capabilities it depends on;
-- whether the complete graph is valid before traffic;
-- whether a canonical Runtime node is already running a different composition.
+- which Runtime scope owns the capability;
+- which selected capabilities it depends on;
+- whether the graph is valid before traffic;
+- whether a canonical Runtime node is already running a conflicting **local creation slice**.
 
 It is deliberately **not** another DI container. Cordis continues to own service resolution, provider lifetime, Context isolation and Fiber cleanup.
 
@@ -30,79 +30,79 @@ Runtime Composition
   native Cordis providers in Deployment/Tenant/Principal/Operation scopes
 ```
 
-### SaaSDefinition
+## Typed capability identity
 
-The definition is unordered consumer/distribution intent. It may declare required/optional capabilities, provider candidates, explicit/default selection and dependency edges.
+A capability is no longer represented by independent string/scope fields.
 
-Runtime code never repeatedly interprets this mutable shape.
-
-### CompositionPlan
-
-The compiler resolves all ambiguity before Runtime bootstrap. A Plan contains:
-
-- normalized capability bindings;
-- selected provider definitions;
-- deterministic topological bootstrap order;
-- a deterministic structural `fingerprint`.
-
-The fingerprint excludes JavaScript callback object identity. Provider authors therefore use stable provider IDs plus optional `definitionKey` when configuration changes the semantic creation recipe. Two semantically different recipes must not reuse the same identity.
-
-### Runtime Composition
-
-The Plan materializes directly onto the existing ownership graph:
-
-```text
-Deployment
-   ↓
-Tenant
-   ↓
-Principal
-   ↓
-Operation
+```ts
+const credentials = defineCapability<Credentials, 'principal'>(
+  'credentials',
+  'principal',
+)
 ```
 
-No parallel `ProviderContainer`, `ServiceRegistry` or local dependency resolver exists.
+`CapabilityToken<T, Scope>` binds:
 
-## Scope means real authority
+```text
+stable service key
++ semantic TypeScript value type
++ lifecycle / authority scope
+```
 
-The four scope names are lifecycle/authority semantics, not labels:
+The token is a typed identity over a Cordis service key. `provideCapability()` and `getCapability()` are thin typed facades over Cordis `ctx.provide()` / `ctx.get()`; they do not own storage or resolution.
 
-- `deployment` — application/process-wide capability;
-- `tenant` — owned by one canonical Tenant;
-- `principal` — owned by one canonical Principal;
-- `operation` — owned by one ephemeral Principal Operation.
+This removes invalid states such as declaring the same capability as Tenant-scoped in one place and Principal-scoped in another, and removes consumer-side type assertions such as `require<MyType>('credentials')`.
 
-A non-deployment provider must actually materialize inside its declared scope. Therefore:
+## SaaSDefinition
 
-- a deployment provider may be **ambient** (`setup` absent) when an external DSH/Cordis capability already exists;
-- a deployment provider may also be managed by the Plan;
-- Tenant/Principal/Operation providers require a scoped `setup` materializer.
-
-This prevents a declaration such as “principal-scoped credentials” from secretly resolving an inherited root service.
-
-## P0 provider shape
-
-The P0 contract intentionally stays small:
+Definitions contain capability tokens, provider candidates, optional selection and dependency edges:
 
 ```ts
 interface CapabilityDefinition {
-  key: string
-  scope: CapabilityScope
+  capability: CapabilityToken
   required?: boolean
   defaultProvider?: string
 }
 
-interface ProviderBase {
+interface CapabilityProviderDefinition {
   id: string
-  capability: string
-  requires?: readonly string[]
+  capability: CapabilityToken
+  requires?: readonly CapabilityToken[]
   definitionKey?: string
+  setup?: CapabilityProviderSetup
 }
 ```
 
-Provider setup receives only the real Cordis Context, semantic scope and cancellation signal. It may optionally return a synchronous publication commit.
+Runtime code never repeatedly interprets the mutable Definition.
 
-No priorities, policy DSL, arbitrary hook graph or dynamic selection language is introduced without a real vertical-slice need.
+## CompositionPlan
+
+The compiler resolves ambiguity before Runtime bootstrap. A Plan contains:
+
+- normalized typed capability bindings;
+- selected provider definitions;
+- deterministic topological bootstrap order;
+- a global structural `fingerprint` for exact whole-plan comparison and diagnostics;
+- `scopeFingerprints` for Deployment/Tenant/Principal/Operation dependency closures.
+
+Fingerprints exclude JavaScript callback object identity. Provider authors use stable provider IDs plus optional `definitionKey` when configuration changes the semantic creation recipe.
+
+## Scope means real authority
+
+Scopes are lifecycle/authority semantics:
+
+```text
+deployment -> tenant -> principal -> operation
+```
+
+- deployment — application/process-wide capability;
+- tenant — owned by one canonical Tenant;
+- principal — owned by one canonical Principal;
+- operation — owned by one ephemeral Principal Operation.
+
+A non-deployment provider must materialize inside its declared scope. Ambient externally mounted capabilities are deployment-only.
+
+This prevents a declaration such as “principal credentials” from secretly resolving an inherited root service.
 
 ## Compile-time invariants
 
@@ -110,100 +110,126 @@ No priorities, policy DSL, arbitrary hook graph or dynamic selection language is
 
 - duplicate capability declarations;
 - duplicate provider IDs;
-- unknown provider target capability;
+- unknown provider/dependency/selection capability;
+- capability-token scope disagreement for the same key;
 - missing required capability provider;
 - ambiguous provider selection;
 - invalid explicit/default provider selection;
-- provider/capability scope mismatch;
 - ambient provider pretending to own Tenant/Principal/Operation scope;
-- unknown or unbound provider dependency;
+- unbound dependency;
 - dependency visibility violation;
 - dependency cycle.
 
-Errors are semantic and machine-distinguishable.
+Errors remain semantic and machine-distinguishable.
 
 ## Dependency visibility
+
+A provider may depend only on capabilities visible from its Context:
 
 ```text
 deployment -> tenant -> principal -> operation
 ```
 
-A child scope may depend on a visible ancestor capability. A parent cannot depend on a descendant capability, and Principal siblings cannot depend on each other.
+A child may consume an ancestor. A parent cannot consume a descendant. Principal siblings cannot depend on one another.
 
-The compiler rejects impossible graph shapes rather than waiting for `ctx.get()` to fail in production.
+## Global identity vs canonical local identity
 
-## Determinism and canonical drift
+MR-A initially used the entire Plan fingerprint as the Tenant and Principal canonical definition identity. That was safe but too coarse: changing an unrelated Operation provider could falsely invalidate an otherwise identical Tenant.
 
-Equivalent unordered definitions compile to the same normalized plan, bootstrap order and fingerprint.
-
-When a Plan creates canonical Tenant/Principal nodes, the generated Runtime definition carries:
+The hardened model separates:
 
 ```text
-saas:<scope>:<plan fingerprint>
+CompositionPlan.fingerprint
+  = exact whole-plan structural identity
+
+CompositionPlan.scopeFingerprints[scope]
+  = providers owned by that scope
+    + selected ancestor providers in their dependency closure
 ```
 
-This extends the v0.2 canonical definition contract:
+Examples:
 
-- a consumer calling `ensure(identity)` can still join without knowing the recipe;
-- an equivalent Plan can explicitly join the existing node;
-- a structurally different Plan cannot silently reuse an active canonical Tenant/Principal merely because it isolates the same service names.
+```text
+Operation-only provider change
+  -> global fingerprint changes
+  -> Operation scope fingerprint changes
+  -> Principal fingerprint stays stable
+  -> Tenant fingerprint stays stable
 
-Such drift fails with `RuntimeDefinitionConflictError`.
+Principal provider change
+  -> Principal fingerprint changes
+  -> Tenant fingerprint stays stable
 
-v0.3 does not define hot adoption of a different Plan. Reconfiguration semantics remain out of scope; recreate the relevant canonical graph instead of mutating it ambiguously.
+Deployment provider used by Tenant changes
+  -> Tenant fingerprint changes because it belongs to Tenant's dependency closure
+```
+
+Canonical Tenant/Principal Runtime definitions use their **scope fingerprint**, not the whole Plan fingerprint.
+
+This preserves two guarantees simultaneously:
+
+- true creation drift still fails with `RuntimeDefinitionConflictError`;
+- unrelated descendant evolution does not create false parent conflicts.
+
+v0.3 still does not define hot mutation of an active canonical node. Recreate the affected slice rather than ambiguously changing its creation recipe in place.
 
 ## Materialization transaction
-
-For managed scopes:
 
 ```text
 validated CompositionPlan
       ↓
-isolate capability service names
+isolate owned capability service names
       ↓
-prepare providers in deterministic dependency order
+prepare selected providers in dependency order
       ↓
-verify required dependencies
+verify dependency visibility
       ↓
-await provider setup
+await setup
       ↓
-verify provided capability is actually visible
+verify the capability is materially visible
       ↓
-optional synchronous commits
+optional synchronous commit
       ↓
 publish canonical scope / activate Operation
 ```
 
-Tenant/Principal setup uses the existing unpublished Runtime transaction, so provider failure cannot expose a partially prepared canonical node.
+Tenant/Principal use the existing unpublished Runtime transaction. Deployment and Operation each have explicit Cordis owner Fibers.
 
-Deployment composition is owned by one explicit Cordis child Fiber. Operation composition is owned by the one-shot Operation Fiber.
+## Operation consumption
 
-## Provider compatibility remains executable
+Operations consume typed tokens:
 
-Calling `ctx.provide()` is not enough to claim SaaS compatibility. Repository evidence continues to protect:
+```ts
+const operation = principal.operations.start({
+  requires: [agents, credentials],
+  execute({ capabilities }) {
+    const dshAgents = capabilities.require(agents)
+    const credential = capabilities.require(credentials)
+  },
+})
+```
 
-- Tenant A/B isolation;
-- Principal sibling isolation;
-- ancestor inheritance;
-- parent/root non-leakage;
-- teardown isolation;
-- clean recreation;
-- unpublished setup ownership;
-- Operation one-shot semantics.
+The token determines the return type. Operation still captures values exactly once before semantic execution.
 
-Concrete Auth/Credentials/MCP contracts in M4/M5 will build on this model rather than change its dependency/lifecycle substrate.
+## Boundary planes
 
-## Package-boundary gate
+Composition is only one plane in the Framework. Product identity ingress and Agent integration are separate semantic boundaries. See [`saas-boundaries.md`](./saas-boundaries.md).
 
-M3 does **not** create a `dsh-saas` package.
+In particular, the next stage must not assume Authenticated Identity, Credentials and MCP are three equivalent Provider slots:
 
-Composition + Operation currently extend the same Runtime ownership contract and do not yet demonstrate enough independent versioning/distribution value to justify a new workspace package. They remain exported subpaths of `dsh-multi-tenant`.
+- identity enters before canonical Runtime selection;
+- credentials are a Principal-owned Runtime capability;
+- MCP is expected to be exercised first as an Agent integration consuming multiple Runtime capabilities and DSH-native seams.
 
-The decision is intentionally deferred to M4/M5. If real capability contracts create an independent consumer API, replacement/lifecycle boundary or distribution boundary, a package may then emerge from evidence rather than roadmap prediction.
+## Package boundary
+
+No new `dsh-saas` package is justified by this hardening pass. Typed capability, Composition, Runtime and Operation still form one tightly related lifecycle contract inside `dsh-multi-tenant`.
+
+Package topology remains revisitable only when a real independent consumer/lifecycle/release boundary appears.
 
 ## Executable evidence
 
-- `packages/multi-tenant/tests/composition.test.ts` — normalization, validation, scope truth, fingerprint and canonical drift;
-- `packages/multi-tenant/tests/operation.test.ts` — one-shot Operation lifecycle;
-- `scripts/saas-core-vertical-slice-probe.mjs` — multi-tenant Plan -> Operation -> real DSH AgentRegistry create/resume/failure;
-- `scripts/package-smoke.mjs` — the packed npm artifact exposes and executes the same Composition/Operation contract.
+- `packages/multi-tenant/tests/composition.test.ts` — typed normalization, validation, scope authority, dependency-closure fingerprints and canonical locality;
+- `packages/multi-tenant/tests/operation.test.ts` — typed one-shot Operation snapshots and lifecycle;
+- `scripts/saas-core-vertical-slice-probe.mjs` — typed multi-tenant Plan -> Operation -> real DSH AgentRegistry create/resume/failure;
+- `scripts/package-smoke.mjs` — the packed npm artifact proves the same typed/locality contract.

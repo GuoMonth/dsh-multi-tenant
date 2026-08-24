@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 /**
- * v0.3 M1-M3 vertical proof against the pinned public DSH Agent package.
+ * v0.3 Core vertical proof against the pinned public DSH Agent package.
  *
- * One CompositionPlan materializes Tenant/Principal/Operation providers,
- * Operations acquire one-shot capability snapshots, and the captured `agents`
- * capability must still bind DSH create/resume to the correct Operation/Principal
- * caller context.
+ * One CompositionPlan materializes typed Tenant/Principal/Operation
+ * capabilities, Operations capture a one-shot typed snapshot, and DSH
+ * create/resume must preserve the correct Operation/Principal caller context.
  */
 import { execFileSync } from 'node:child_process'
 import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -19,8 +18,6 @@ const tmp = mkdtempSync(join(tmpdir(), 'dsh-mt-saas-core-'))
 const src = join(tmp, 'src')
 
 try {
-  // Treat the module as one refactorable source unit. Evidence should verify
-  // behavior, not pin an internal file list that becomes architectural drag.
   cpSync(join(root, 'packages', 'multi-tenant', 'src'), src, { recursive: true })
 
   writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'saas-core-probe', private: true, type: 'module' }))
@@ -47,6 +44,7 @@ try {
   writeFileSync(join(tmp, 'probe.ts'), `
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
+import { defineCapability, getCapability, provideCapability } from './src/capability.ts'
 import { InMemoryTenantSessionStore } from './src/store.ts'
 import { MultiTenantService } from './src/service.ts'
 import { TenantRuntimeService, principalOf, tenantIdOf } from './src/runtime.ts'
@@ -57,6 +55,11 @@ import {
   principalDefinitionFromPlan,
   tenantDefinitionFromPlan,
 } from './src/composition.ts'
+
+const agentsCapability = defineCapability<any, 'deployment'>('agents', 'deployment')
+const tenantConfig = defineCapability<string, 'tenant'>('tenantConfig', 'tenant')
+const credentials = defineCapability<string, 'principal'>('credentials', 'principal')
+const requestMarker = defineCapability<string, 'operation'>('requestMarker', 'operation')
 
 const assert = (condition, message) => { if (!condition) throw new Error('ASSERT FAILED: ' + message) }
 const root = new Context()
@@ -99,9 +102,9 @@ root.agents.setFactory({
       sessionId: options.sessionId,
       tenantId: tenantIdOf(ownerCtx),
       principal: principalOf(ownerCtx),
-      tenantConfig: ownerCtx.get('tenantConfig'),
-      credential: ownerCtx.get('credentials'),
-      requestMarker: ownerCtx.get('requestMarker'),
+      tenantConfig: getCapability(ownerCtx, tenantConfig),
+      credential: getCapability(ownerCtx, credentials),
+      requestMarker: getCapability(ownerCtx, requestMarker),
     })
     if (options.sessionId === 'acme-alice-fail') {
       throw new Error('synthetic DSH create failure')
@@ -114,9 +117,9 @@ root.agents.setFactory({
       sessionId: options.resumeSessionId,
       tenantId: tenantIdOf(ownerCtx),
       principal: principalOf(ownerCtx),
-      tenantConfig: ownerCtx.get('tenantConfig'),
-      credential: ownerCtx.get('credentials'),
-      requestMarker: ownerCtx.get('requestMarker'),
+      tenantConfig: getCapability(ownerCtx, tenantConfig),
+      credential: getCapability(ownerCtx, credentials),
+      requestMarker: getCapability(ownerCtx, requestMarker),
     })
     return makeHandle(ownerCtx, options.resumeSessionId, options.setup)
   },
@@ -124,39 +127,36 @@ root.agents.setFactory({
 
 const plan = compileSaaSDefinition({
   capabilities: [
-    { key: 'agents', scope: 'deployment', required: true },
-    { key: 'tenantConfig', scope: 'tenant', required: true },
-    { key: 'credentials', scope: 'principal', required: true },
-    { key: 'requestMarker', scope: 'operation', required: true },
+    { capability: agentsCapability, required: true },
+    { capability: tenantConfig, required: true },
+    { capability: credentials, required: true },
+    { capability: requestMarker, required: true },
   ],
   providers: [
-    { id: 'dsh-agents', capability: 'agents', scope: 'deployment' },
+    { id: 'dsh-agents', capability: agentsCapability },
     {
       id: 'tenant-config',
-      capability: 'tenantConfig',
-      scope: 'tenant',
+      capability: tenantConfig,
       setup({ ctx }) {
-        ctx.provide('tenantConfig', 'tenant:' + tenantIdOf(ctx))
+        provideCapability(ctx, tenantConfig, 'tenant:' + tenantIdOf(ctx))
       },
     },
     {
       id: 'principal-credentials',
-      capability: 'credentials',
-      scope: 'principal',
-      requires: ['tenantConfig'],
+      capability: credentials,
+      requires: [tenantConfig],
       setup({ ctx }) {
         const principal = principalOf(ctx)
-        ctx.provide('credentials', 'credential:' + principal?.tenantId + '/' + principal?.userId)
+        provideCapability(ctx, credentials, 'credential:' + principal?.tenantId + '/' + principal?.userId)
       },
     },
     {
       id: 'operation-marker',
-      capability: 'requestMarker',
-      scope: 'operation',
-      requires: ['agents', 'credentials'],
+      capability: requestMarker,
+      requires: [agentsCapability, credentials],
       setup({ ctx }) {
         const principal = principalOf(ctx)
-        ctx.provide('requestMarker', 'operation:' + principal?.tenantId + '/' + principal?.userId)
+        provideCapability(ctx, requestMarker, 'operation:' + principal?.tenantId + '/' + principal?.userId)
       },
     },
   ],
@@ -174,16 +174,16 @@ let semanticExecutions = 0
 async function createFrom(principalScope, sessionId) {
   const operation = principalScope.operations.start({
     ...operationScope,
-    requires: ['agents', 'tenantConfig', 'credentials', 'requestMarker'],
+    requires: [agentsCapability, tenantConfig, credentials, requestMarker],
     async execute({ capabilities }) {
       semanticExecutions += 1
-      const agents = capabilities.require<any>('agents')
+      const agents = capabilities.require(agentsCapability)
       const expectedTenant = 'tenant:' + principalScope.identity.tenantId
       const expectedCredential = 'credential:' + principalScope.identity.tenantId + '/' + principalScope.identity.userId
       const expectedMarker = 'operation:' + principalScope.identity.tenantId + '/' + principalScope.identity.userId
-      assert(capabilities.require('tenantConfig') === expectedTenant, 'Operation snapshot tenant mismatch')
-      assert(capabilities.require('credentials') === expectedCredential, 'Operation snapshot credential mismatch')
-      assert(capabilities.require('requestMarker') === expectedMarker, 'Operation snapshot marker mismatch')
+      assert(capabilities.require(tenantConfig) === expectedTenant, 'Operation snapshot tenant mismatch')
+      assert(capabilities.require(credentials) === expectedCredential, 'Operation snapshot credential mismatch')
+      assert(capabilities.require(requestMarker) === expectedMarker, 'Operation snapshot marker mismatch')
       const handle = await agents.create({
         sessionId,
         setup(agentCtx) {
@@ -207,10 +207,10 @@ await Promise.all([
 
 const resumeOperation = acmeAlice.operations.start({
   ...operationScope,
-  requires: ['agents', 'tenantConfig', 'credentials', 'requestMarker'],
+  requires: [agentsCapability, tenantConfig, credentials, requestMarker],
   async execute({ capabilities }) {
     semanticExecutions += 1
-    const agents = capabilities.require<any>('agents')
+    const agents = capabilities.require(agentsCapability)
     const handle = await agents.resume({ resumeSessionId: 'acme-alice-persisted' })
     await handle.dispose()
   },
@@ -219,10 +219,10 @@ await resumeOperation.result
 
 const failedOperation = acmeAlice.operations.start({
   ...operationScope,
-  requires: ['agents', 'tenantConfig', 'credentials', 'requestMarker'],
+  requires: [agentsCapability, tenantConfig, credentials, requestMarker],
   async execute({ capabilities }) {
     semanticExecutions += 1
-    const agents = capabilities.require<any>('agents')
+    const agents = capabilities.require(agentsCapability)
     await agents.create({ sessionId: 'acme-alice-fail' })
   },
 })

@@ -73,13 +73,17 @@ if (!runtime) {
     if (!(required in exports)) errors.push(`${expectedPackageName}: exports must include ${required}`)
   }
 
+  // Guard the current public narrative, not historical section names. If the
+  // Framework model evolves, this list should evolve with the live contract
+  // instead of forcing docs to preserve obsolete release-era structure.
   const readme = readFileSync(join(dir, 'README.md'), 'utf8')
   for (const heading of [
     '## Runtime model',
     '## Supported guarantee',
-    '## Canonical publication',
+    '## Typed CapabilityToken',
     '## SaaS Composition',
     '## One-shot Operation boundary',
+    '## Framework boundary planes',
     '## Explicit boundaries',
   ]) {
     if (!readme.includes(heading)) errors.push(`${expectedPackageName}: README missing ${heading}`)
@@ -111,6 +115,8 @@ for (const requiredPath of [
   'docs/releases/v0.2.0-rc.1.md',
   'docs/releases/v0.1.0-rc.2.md',
   'docs/specs/v0.3-assumptions.json',
+  'docs/specs/saas-composition.md',
+  'docs/specs/saas-boundaries.md',
   'scripts/session-genesis-probe.mjs',
   'scripts/agent-owner-context-probe.mjs',
   'scripts/cordis-operation-lifecycle-probe.mjs',
@@ -127,4 +133,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; single-package Runtime/Framework graph; OIDC-only publishing`)
+console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; single-package typed Runtime/Framework graph; OIDC-only publishing`)
