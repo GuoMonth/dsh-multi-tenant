@@ -38,6 +38,18 @@
       "types": "./dist/composition.d.mts",
       "import": "./dist/composition.mjs"
     },
+    "./runtime-composition": {
+      "types": "./dist/runtime-composition.d.mts",
+      "import": "./dist/runtime-composition.mjs"
+    },
+    "./ingress": {
+      "types": "./dist/ingress.d.mts",
+      "import": "./dist/ingress.mjs"
+    },
+    "./credentials": {
+      "types": "./dist/credentials.d.mts",
+      "import": "./dist/credentials.mjs"
+    },
     "./store": {
       "types": "./dist/store.d.mts",
       "import": "./dist/store.mjs"
