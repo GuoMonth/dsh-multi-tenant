@@ -1,28 +1,40 @@
 # dsh-multi-tenant
 
-**Multi-tenant SaaS runtime primitives for DeepSeek Harness.**
+**Run DeepSeek Harness safely behind a multi-tenant SaaS product.**
 
-Use this package when one DSH-based product must safely serve many organizations and users without mixing Tenant configuration, Principal credentials, Session ownership or Agent-scoped MCP Tools.
+Use this package when one DSH runtime must serve many organizations and users without mixing Tenant configuration, Principal credentials, Session ownership or Agent-scoped MCP Tools.
 
-> Package candidate: **`dsh-multi-tenant@0.3.0-rc.1`**
->
-> Compatible DSH baseline: `0.1.1-rc.2`.
+> **`dsh-multi-tenant@0.3.0-rc.1`** · compatible DSH baseline: `0.1.1-rc.2`
 
-## Why you would install it
+## The problem
 
-A product developer usually does not want to hand-build all of this every time:
+A single-user Agent looks like this:
 
 ```text
-trusted user
-  -> Tenant / Principal
-  -> Tenant-specific MCP config
-  -> Principal-specific credentials
-  -> safe Session ownership
-  -> DSH Agent create/resume
-  -> native MCP Tools
+request -> Agent -> MCP -> backend
 ```
 
-This package provides the reusable Runtime/composition layer for that flow while leaving authentication, databases, secret stores and vendor business logic in your product or plugins.
+A SaaS Agent runtime has to keep this safe instead:
+
+```text
+Acme / Alice   -> Acme MCP + Alice credential + Alice Sessions
+Acme / Bob     -> Acme MCP + Bob credential   + Bob Sessions
+Globex / Alice -> Globex MCP + Globex/Alice credential + Globex Sessions
+```
+
+Without a reusable runtime boundary, every product ends up hand-building Tenant lookup, credential plumbing, MCP setup, Session authorization and Agent lifecycle rules.
+
+`dsh-multi-tenant` turns that into one product flow:
+
+```text
+trusted subject
+  -> Tenant / Principal
+  -> Tenant MCP config
+  -> Principal credentials
+  -> fail-closed Session ownership
+  -> Principal-bound Agent create/resume
+  -> native DSH MCP Tools
+```
 
 ## Install
 
@@ -38,7 +50,11 @@ Or from framework code that already owns the compatible DSH installation:
 pnpm add dsh-multi-tenant
 ```
 
+The MCP path reuses the official `@deepseek-ai/dsh-mcp-client` supplied by that DSH installation. This package does not vendor or fork MCP.
+
 ## Quick start
+
+Your product owns authentication. After a request is trusted, resolve it to a Tenant/Principal and let the runtime compose the rest.
 
 ```ts
 const plan = compileSaaSDefinition({
@@ -57,32 +73,25 @@ const agents = createMcpAgentIntegration(principal)
 const handle = await agents.create({ sessionId })
 ```
 
-When `create()` resolves, the official DSH MCP client has completed initial discovery and the returned Agent owns its native Agent-scoped MCP Tools.
+When `create()` resolves, the official DSH MCP client has completed initial discovery and the Agent already owns its native Agent-scoped MCP Tools. `resume()` checks Session ownership before DSH persistence/setup runs.
 
-## Core product contracts
+## What 0.3 provides
 
-### Product Ingress
-
-The framework starts after authentication. `createProductIngress()` maps an already trusted product subject into a validated canonical Tenant/Principal.
-
-### RuntimeComposition
-
-One exact `CompositionPlan` is bound to one active product Runtime. Different live whole-plan identities on the same root fail rather than silently mixing Deployment/Tenant/Principal/Operation recipes.
-
-### Principal Credentials
-
-`principalCredentials` is a replaceable Principal-scoped low-level credential capability. `InMemoryPrincipalCredentials` is reference/test infrastructure only.
-
-### Tenant MCP + Agent integration
-
-`tenantMcpConfig` is Tenant-scoped. `createMcpAgentIntegration(principal)` captures Tenant MCP config + Principal credentials once, checks Session ownership and creates/resumes a Principal-owned long-lived DSH Agent.
-
-The package uses the compatible DSH installation's official `@deepseek-ai/dsh-mcp-client`; it does not vendor or fork MCP.
+- canonical Tenant / Principal resolution from trusted product identity;
+- exact `CompositionPlan -> RuntimeComposition` binding;
+- Principal-scoped replaceable credentials;
+- Tenant-scoped MCP configuration;
+- Principal-bound Agent `create()` / `resume()`;
+- immutable, fail-closed Session ownership;
+- deterministic per-Session MCP namespaces;
+- Principal-owned long-lived Agents;
+- official DSH MCP Tools integration;
+- clean installed-artifact and post-publication registry verification.
 
 ## Architecture
 
 ```text
-trusted subject
+Product authentication
   -> Product Ingress
   -> RuntimeComposition
   -> Tenant / Principal
@@ -91,6 +100,26 @@ trusted subject
   -> official MCP client
   -> native Agent-scoped MCP Tools
 ```
+
+The important boundaries are simple:
+
+- Product owns authentication.
+- Core owns identity, composition and lifecycle.
+- Operation owns one short semantic decision, not the Agent lifetime.
+- Principal owns long-lived Agents.
+- DSH owns MCP wire behavior.
+
+## Security boundary
+
+Cordis Context provides trusted same-process identity/lifecycle separation, not hostile-code isolation. Strong secret/process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote deployment boundaries.
+
+## Compatibility
+
+- Node: `^22.19.0 || >=24.0.0`
+- Cordis: `>=4.0.1 <5`
+- DSH: `0.1.1-rc.2`
+
+The release gate verifies the packed artifact in a clean consumer beside the pinned DSH installation, and repeats the same consumer contract against the exact npm artifact after publication.
 
 ## Public subpaths
 
@@ -106,15 +135,3 @@ dsh-multi-tenant/mcp
 dsh-multi-tenant/store
 dsh-multi-tenant/testing
 ```
-
-## Security boundary
-
-Cordis Context provides trusted same-process composition/lifecycle separation, not hostile-code isolation. Strong secret/process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote deployment boundaries.
-
-## Compatibility
-
-- Node: `^22.19.0 || >=24.0.0`
-- Cordis: `>=4.0.1 <5`
-- DSH baseline: `0.1.1-rc.2`
-
-The repository release gate verifies the packed artifact in a clean consumer beside the pinned DSH installation and repeats the same contract after npm publication.
