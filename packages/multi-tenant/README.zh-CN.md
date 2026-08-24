@@ -2,7 +2,9 @@
 
 面向 DeepSeek Harness 的 context-native Multi-Tenant Runtime 与 v0.3 SaaS Framework Core primitives。
 
-> npm 已发布基础：`0.2.0-rc.3`。仓库 v0.3 主线正在收敛为真正可用的 DSH-native MCP Tools Agent 路径。
+> Package release identity：**`dsh-multi-tenant@0.3.0-rc.1`**。
+>
+> Compatible DSH baseline：`0.1.1-rc.2` @ `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`。
 
 ## Product-facing Path
 
@@ -136,7 +138,8 @@ v0.2 API 仍通过 `runtime` / `operation` / `composition` subpath 提供给 fra
 - one-shot Operation + Principal-owned long-lived Agent；
 - 官方 DSH MCP client 在 Agent publication 前完成 initial discovery；
 - Agent-scoped native MCP Tools + deterministic per-Session runtime namespace；
-- pinned real DSH / MCP executable evidence。
+- pinned real DSH / MCP executable evidence；
+- clean installed-artifact smoke 验证 packed npm candidate。
 
 ## Public Subpaths
 
@@ -155,7 +158,7 @@ dsh-multi-tenant/testing
 
 ## MCP Runtime Requirement
 
-`dsh-multi-tenant/mcp` 在运行时组合 compatible DSH installation 中的官方 `@deepseek-ai/dsh-mcp-client`。M5 compatibility probe 会安装并验证 exact pinned public package；本项目不 vendor / fork MCP protocol implementation。
+`dsh-multi-tenant/mcp` 在运行时组合 compatible DSH installation 提供的官方 `@deepseek-ai/dsh-mcp-client`。`0.3.0-rc.1` release gate 会把**打包后的 `dsh-multi-tenant` artifact 与 `@deepseek-ai/dsh@0.1.1-rc.2` 安装到干净 consumer，并真正触发已打包 M5 路径**，证明这个解析关系在支持的安装布局下成立。本项目不 vendor / fork MCP protocol implementation。
 
 ## Security Boundary
 
