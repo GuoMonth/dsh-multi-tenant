@@ -25,6 +25,8 @@ RuntimeComposition
    └─ bound one-shot Operations
 ```
 
+The exact `plan.fingerprint` is the **whole-plan attestation** boundary for one active product Runtime.
+
 One root Context has at most one active exact RuntimeComposition:
 
 - same `plan.fingerprint` joins/single-flights;
