@@ -75,12 +75,13 @@ if (!runtime) {
 
   const readme = readFileSync(join(dir, 'README.md'), 'utf8')
   for (const marker of [
-    '## Why you would install it',
+    '## The problem',
     '## Install',
     '## Quick start',
+    '## What 0.3 provides',
     'RuntimeComposition',
-    'Principal Credentials',
-    'Tenant MCP + Agent integration',
+    'Principal-scoped replaceable credentials',
+    'Tenant-scoped MCP configuration',
     '## Architecture',
     '## Security boundary',
   ]) {
