@@ -1,0 +1,134 @@
+name: Release candidate install audit
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  clean-dsh-install:
+    if: github.head_ref == 'release/v0.3.0-rc.1-convergence'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+
+      - name: Install project dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pack candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter dsh-multi-tenant build
+          mkdir -p "$RUNNER_TEMP/rc-pack"
+          pnpm --filter dsh-multi-tenant pack --pack-destination "$RUNNER_TEMP/rc-pack"
+          echo "RC_TARBALL=$(find "$RUNNER_TEMP/rc-pack" -name '*.tgz' -print -quit)" >> "$GITHUB_ENV"
+
+      - name: Install only DSH + candidate into clean consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONSUMER="$RUNNER_TEMP/rc-consumer"
+          mkdir -p "$CONSUMER"
+          printf '{"name":"rc-consumer","private":true,"type":"module"}\n' > "$CONSUMER/package.json"
+          cd "$CONSUMER"
+          pnpm add '@deepseek-ai/dsh@0.1.1-rc.2' "$RC_TARBALL"
+
+      - name: Prove candidate can resolve the DSH MCP client from a real DSH install
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONSUMER="$RUNNER_TEMP/rc-consumer"
+          cd "$CONSUMER"
+          node --input-type=module <<'NODE'
+          import {
+            createMcpAgentIntegration,
+            tenantMcpConfig,
+          } from 'dsh-multi-tenant/mcp'
+          import {
+            InMemoryPrincipalCredentials,
+            principalCredentials,
+          } from 'dsh-multi-tenant/credentials'
+
+          let resolvedPlugin
+          const fakeAgentCtx = {
+            async plugin(plugin) {
+              resolvedPlugin = plugin
+            },
+          }
+          const credentials = new InMemoryPrincipalCredentials({ token: 'rc-token' })
+          const config = {
+            servers: [{
+              transport: 'stdio',
+              serverName: 'rc',
+              command: 'true',
+              credentialEnv: { TOKEN: { credential: 'token' } },
+            }],
+          }
+          const capabilityValues = new Map([
+            [tenantMcpConfig.key, config],
+            [principalCredentials.key, credentials],
+          ])
+          const principal = {
+            identity: { tenantId: 'rc-tenant', userId: 'rc-user' },
+            ctx: {
+              get(name) {
+                if (name === 'multiTenant') {
+                  return {
+                    claimSession: async () => {},
+                    assertSessionAccess: async () => {},
+                  }
+                }
+                if (name === 'agents') {
+                  return {
+                    async create(options) {
+                      await options.setup(fakeAgentCtx)
+                      return {
+                        agent: { id: options.sessionId, ctx: fakeAgentCtx },
+                        dispose: async () => {},
+                      }
+                    },
+                    async resume(options) {
+                      await options.setup(fakeAgentCtx)
+                      return {
+                        agent: { id: options.resumeSessionId, ctx: fakeAgentCtx },
+                        dispose: async () => {},
+                      }
+                    },
+                  }
+                }
+              },
+            },
+            operations: {
+              start(definition) {
+                return {
+                  result: Promise.resolve(definition.execute({
+                    signal: new AbortController().signal,
+                    capabilities: {
+                      require(capability) {
+                        const value = capabilityValues.get(capability.key)
+                        if (value === undefined) throw new Error('missing capability ' + capability.key)
+                        return value
+                      },
+                    },
+                  })),
+                }
+              },
+            },
+          }
+
+          const integration = createMcpAgentIntegration(principal)
+          await integration.create({ sessionId: 'rc-session' })
+          if (!resolvedPlugin || typeof resolvedPlugin.apply !== 'function') {
+            throw new Error('candidate did not resolve the compatible @deepseek-ai/dsh-mcp-client plugin')
+          }
+          console.log('clean DSH install resolved MCP client through packaged dsh-multi-tenant')
+          NODE
