@@ -55,6 +55,8 @@ const provider = definePrincipalCredentialsProvider({
 
 `principalCredentials` 是 canonical `CapabilityToken<PrincipalCredentials, 'principal'>`，随 Principal lifecycle 隔离，可以替换 provider 而不用改 Core。`InMemoryPrincipalCredentials` 只用于 reference / test，不是 production secret store。
 
+`PrincipalCredentials` 被明确定位成**当前阶段的 low-level primitive**，不是“长期推荐让 Agent 直接拿 raw token”的承诺。长期方向是让 service-specific Integration Plugin 提供 typed client / transport，并让 authority / credential Broker plugin 把 secret 留在更窄的边界后面。这个方向当前不冻结 API，也不能阻塞 M5 的真实 MCP Tools vertical slice。
+
 ### 4. One-shot Work
 
 ```ts
@@ -101,7 +103,9 @@ dsh-multi-tenant/testing
 
 ## Security Boundary
 
-Cordis Context 是 trusted same-process isolation / composition，不是 hostile-code sandbox。Filesystem / process / network / shell strong isolation 属于 container / Pod deployment architecture。
+Cordis Context 是 trusted same-process isolation / composition，不是 hostile-code sandbox。未来 same-process Broker 可以减少正常路径上的 secret 暴露，但不能防御共享进程的恶意代码。Filesystem / process / network / shell / secret strong isolation 属于 container / Pod / sidecar / remote deployment architecture。
+
+长期 authority-capability 方向记录在仓库 `docs/vision/authority-capabilities.zh-CN.md`，不属于当前 npm API contract。
 
 ## Install
 
