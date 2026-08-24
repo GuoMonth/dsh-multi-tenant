@@ -9,7 +9,8 @@
 ```text
 v0.1  Security Kernel                         已冻结
 v0.2  Multi-Tenant Runtime Contract           已发布基础
-v0.3  SaaS Framework Core                     M5 已完成；下一步只做 release convergence
+v0.3  SaaS Framework Core                     M5 已完成
+0.3.0-rc.1                                    release candidate
 ```
 
 当前 v0.3 已经证明：
@@ -25,29 +26,32 @@ v0.3  SaaS Framework Core                     M5 已完成；下一步只做 rel
 - 官方 `@deepseek-ai/dsh-mcp-client` 在 Agent publication 前完成 initial discovery；
 - 真正 Agent-scoped MCP Tools 通过 DSH ToolRuntime 执行；
 - Acme/Alice、Acme/Bob、Globex/Alice 并发隔离；
-- Node 22.19 / Node 24 上的 create / resume / startup-failure / teardown executable evidence。
+- Node 22.19 / Node 24 上的 create / resume / startup-failure / teardown executable evidence；
+- packed M5 artifact 与 pinned DSH CLI 在 clean consumer 中的真实解析与调用链验证。
 
-## 下一步且唯一短期目标：v0.3.0-rc.1 Release Convergence
+## 唯一短期目标：发布并验证 0.3.0-rc.1
 
-第一个真正可用的 v0.3 prerelease 之前，不再开启新的架构 Milestone。
-
-下一 PR 应该非常小，只围绕发布：
+这个 candidate 发布并进入真实使用之前，不再开启新的架构 Milestone。
 
 ```text
-M5 green on main
-  -> package version = 0.3.0-rc.1
-  -> 收敛 README / release note
-  -> registry smoke 升级到 v0.3 产品路径
-  -> pnpm release:check
-  -> publish exact artifact
-  -> 验证 npm latest + Git tag + GitHub Release
+0.3.0-rc.1 manifest + docs 对齐
+  -> 永久 tarball installed-consumer smoke
+  -> v0.3 registry smoke
+  -> 完整 pnpm release:check
+  -> release convergence merge 到 main
+  -> 手动 dispatch release.yml
+  -> OIDC / provenance 发布 exact artifact
+  -> 验证 npm latest + exact installed artifact
+  -> 创建 Git tag + prerelease GitHub Release
 ```
 
-发版标准也很简单：产品开发者只提供 trusted identity resolution、Tenant MCP config、Principal credentials，就能 create/resume 一个真正 multi-tenant 的 DSH Agent，并直接得到 native MCP Tools，而不用自己手工拼 DSH / MCP composition path。
+发版标准很具体：产品开发者只提供 trusted identity resolution、Tenant MCP config、Principal credentials，就能 create/resume 一个真正 multi-tenant 的 DSH Agent，并直接得到 native MCP Tools，而不用自己手工拼 DSH / MCP composition path。
+
+发布后下一步从 `0.3.0-rc.1` 的真实使用证据决定，不预写 speculative M6 list。
 
 ## 长期方向：Credential-as-Data -> Capability-as-Authority
 
-`PrincipalCredentials` 继续是当前 low-level primitive。它对 v0.3 / M5 很有用，但不代表 raw credential 是最终 Agent / application-facing abstraction。
+`PrincipalCredentials` 继续是当前 low-level primitive。它对 v0.3 很有用，但不代表 raw credential 是最终 Agent / application-facing abstraction。
 
 长期更偏向：
 
@@ -63,7 +67,7 @@ Typed Client / Transport capability
 Operation
 ```
 
-这仍然是 Vision，不进入本次 release scope。证据路径保持：
+这仍然是 Vision，不进入 `0.3.0-rc.1` release scope。证据路径保持：
 
 ```text
 真实 MCP integration（M5）       ✅
