@@ -8,9 +8,11 @@
 
 - [README](../README.zh-CN.md) —— 当前产品/Runtime 概览
 - [CONTRIBUTING](../CONTRIBUTING.zh-CN.md) —— engineering / assumption-first policy
-- [Direction](../ROADMAP.zh-CN.md) —— 只保留当前状态与 M5 目标，不再维护详细 milestone Roadmap
+- [Direction](../ROADMAP.zh-CN.md) —— 当前 M5 焦点 + 长期演进方向，不再维护详细 milestone Roadmap
 
 ## Live Architecture
+
+下面这些文档描述**已经实现或当前 release line 依赖的 contract**：
 
 - [Architecture](./specs/architecture.zh-CN.md) —— topology 与 security boundary 权威文档
 - [SaaS Boundaries](./specs/saas-boundaries.zh-CN.md) —— Product Ingress、Runtime Capability、Agent Integration planes
@@ -19,6 +21,12 @@
 - [M4 Product Ingress + Credentials](./specs/m4-product-ingress-credentials.zh-CN.md) —— trusted identity mapping 与 Principal credential contract
 - [Principal Operation Lifecycle](./specs/operation-lifecycle.zh-CN.md) —— Principal-owned one-shot semantic work
 - [Session / Agent Publication](./adr/session-genesis.zh-CN.md) —— DSH setup / publication decision
+
+## Long-term Vision
+
+Vision 记录方向，**不是当前 API contract，也不进入 release gate**：
+
+- [Authority-Oriented Capabilities](./vision/authority-capabilities.zh-CN.md) —— 从 `Credential-as-Data` 演进到 `Capability-as-Authority`；Broker / Integration plugin 的长期职责拆分，以及为什么当前仍先用 M4 primitive 完成 M5。
 
 ## Evidence
 
