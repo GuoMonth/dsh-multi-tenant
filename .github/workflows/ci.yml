@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   dsh-source:
-    name: DSH source baseline
+    name: Pinned DSH source identity
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -54,10 +54,10 @@ jobs:
           ACTUAL_VERSION=$(node -p "require('./.upstream/deepseek-harness/package.json').version")
           test "$ACTUAL_COMMIT" = "${{ steps.target.outputs.commit }}"
           test "$ACTUAL_VERSION" = "${{ steps.target.outputs.version }}"
-          echo "DSH source baseline verified: $ACTUAL_VERSION @ $ACTUAL_COMMIT"
+          echo "DSH source identity verified: $ACTUAL_VERSION @ $ACTUAL_COMMIT"
 
   quality:
-    name: quality (Node ${{ matrix.node }})
+    name: Package contract (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -75,10 +75,10 @@ jobs:
       - name: Install dependencies (frozen)
         run: pnpm install --frozen-lockfile
 
-      - name: Verify package, architecture and v0.3 foundation invariants
+      - name: Verify current package and architecture contract
         run: pnpm verify
 
-      - name: Verify release manifest
+      - name: Verify release tree
         run: pnpm release:preflight
 
       - name: Typecheck
@@ -90,11 +90,11 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Packed consumer smoke
+      - name: Installed artifact smoke
         run: pnpm smoke
 
   platform-compat:
-    name: Platform assumptions (Node ${{ matrix.node }})
+    name: Real DSH integration (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -109,5 +109,5 @@ jobs:
           runtime: node@${{ matrix.node }}
           install: false
 
-      - name: Run executable DSH + Cordis assumption proofs
+      - name: Run DSH, Cordis and MCP executable proofs
         run: pnpm probe:platform
