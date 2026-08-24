@@ -2,7 +2,7 @@
 
 # Architecture
 
-> 当前 `dsh-multi-tenant` Runtime / SaaS Core 的 live authority。
+> 当前 `0.3` Runtime / SaaS Agent foundation 的 live authority。
 
 ## Topology
 
@@ -17,30 +17,33 @@ RuntimeComposition
 TenantRuntimeService
   └─ canonical Tenant
        └─ canonical Principal
-            └─ Principal-owned Operation
-                 └─ Agent Integration
-                      └─ DeepSeek Harness
+            ├─ typed Runtime capabilities
+            ├─ one-shot Operation
+            └─ Principal-owned DSH Agent
+                 └─ native DSH integrations / MCP Tools
 ```
 
-当前架构刻意拆开五个 plane：
+当前架构拆开五类 concern：
 
 1. **Persistent authorization** —— `TenantSessionStore` + `MultiTenantService` 拥有 immutable Session ownership；
-2. **Product Ingress Boundary** —— 把 already trusted subject 映射成 `TenantPrincipal`，不解析 authentication protocol；
-3. **Runtime composition** —— `RuntimeComposition` 把一张精确 `CompositionPlan` 绑定成一个 materialized product Runtime；
-4. **Runtime capability / Operation** —— Cordis Context / Fiber 拥有 Deployment / Tenant / Principal / Operation capability 与生命周期；
-5. **Agent Integration** —— 把可信 Operation view 转换成 DSH-native Agent / Preset / plugin composition。
+2. **Product Ingress** —— 把已经可信的 product subject 映射成 `TenantPrincipal`；authentication protocol 留在 Core 外；
+3. **Runtime composition** —— `RuntimeComposition` 把一张精确 `CompositionPlan` 绑定成一个 active materialized product Runtime；
+4. **Runtime capability / Operation** —— Cordis Context / Fiber 拥有 Deployment / Tenant / Principal / Operation capability lifecycle；
+5. **Agent Integration** —— 把可信 Runtime state 组合成 DSH-native Agent / plugin。
 
-Hostile-code strong isolation 继续属于 process / container / Pod。
+Hostile-code strong isolation 属于 deployment boundary。
 
 ## Canonical Runtime Ownership
 
-v0.2 的结构 invariant 不变：
+当前结构 invariant：
 
 ```text
-Root -> Tenant -> Principal -> Operation
+Root -> Tenant -> Principal
+                   ├-> Operation
+                   └-> DSH Agent
 ```
 
-Tenant / Principal 是 canonical node。Creation 是 transaction：
+Tenant / Principal 是 canonical node。Canonical creation 是 transaction：
 
 ```text
 reserve
@@ -50,9 +53,9 @@ reserve
   -> publish
 ```
 
-Preparing creation 是 cancellable state。Registry teardown 先关闭 admission、取消 preparing transaction、drain 已发布 child，最后 dispose owner Fiber。
+Preparing creation 可取消。Teardown 先 close admission、取消 preparing work、drain published descendant，最后 dispose owner Fiber。
 
-v0.1 ownership kernel 在整棵树中保持 shared。Context identity 只是 composition metadata，不是 durable authorization。
+Durable Session ownership 是 shared authorization state；Context identity 只是 composition metadata，不是 authorization record 本身。
 
 ## Typed Capability Authority
 
@@ -70,9 +73,9 @@ Scope：
 deployment -> tenant -> principal -> operation
 ```
 
-Scope 是真实 authority，不是 metadata。非 deployment provider 必须在对应 Cordis scope 中 materialize capability；parent-scoped provider 不能依赖 descendant capability。
+Scope 是真实 ownership，不是 label。非 deployment provider 在声明的 Cordis scope materialize，parent-scoped provider 不能依赖 descendant authority。
 
-Cordis 仍然是唯一 service resolver / registry。`CapabilityToken`、`provideCapability()`、`getCapability()` 只是 Cordis 之上的 typed semantics，不建立第二套 DI。
+Cordis 仍然是唯一 service resolver / registry。`CapabilityToken`、`provideCapability()`、`getCapability()` 只增加 typed semantics，不建立第二套 DI。
 
 ## Composition Identity
 
@@ -86,30 +89,26 @@ scopeFingerprints[scope]
   某 authority scope 的 selected provider dependency closure
 ```
 
-`scopeFingerprints[scope]` 避免无关 descendant change 错误 invalid parent canonical node。Operation-only provider revision 不应该改变 Tenant / Principal creation identity。
-
-`RuntimeComposition` 解决另一个问题：一个 active product Runtime 不能混用 whole Plan。完全相同的 Plan join；同一 root 上 active whole-plan fingerprint 不同直接失败。
-
-因此：
+Scope-local fingerprint 防止无关 descendant evolution 错误 invalid canonical parent。Whole-plan attestation 解决另一件事：一个 active product Runtime 不能静默混用不同 Plan。
 
 - scope-local fingerprint = canonical creation drift；
 - whole-plan attestation = product Runtime composition integrity。
 
 ## One-shot Operation
 
-Cordis `ctx.inject()` 是 dependency-reactive；dependency 消失/恢复时 callback 可能重跑。这适合 plugin lifecycle，不适合一次 user transaction。
+Cordis `ctx.inject()` 是 dependency-reactive，dependency 消失 / 恢复时 callback 可能重跑。这适合 plugin lifecycle，不适合一次 user transaction。
 
 Principal-owned Operation：
 
 1. 创建 ephemeral child Fiber；
-2. 按 bound Plan materialize Operation-scoped provider；
+2. 从 bound Plan materialize Operation-scoped provider；
 3. required typed capability 只 capture 一次；
 4. semantic `execute()` 只调用一次；
-5. deterministic drain Fiber。
+5. deterministic drain。
 
-Bound product Operation 只能请求其 `RuntimeComposition` Plan 已声明的 capability。
+Bound Operation 只能请求其 `RuntimeComposition` Plan 已声明的 capability。
 
-Capability snapshot 固定的是 selection，不是任意对象内部的 deep immutability。如果 capability value 是 mutable client/resource，它自身的 lifetime contract 仍由 provider 负责。v0.3 不承诺 arbitrary provider hot reconfiguration。
+Snapshot 固定 capability selection，不承诺任意 mutable object internals 的 deep immutability；provider-owned client / resource 仍拥有自己的 lifetime contract。
 
 ## Product Ingress / Credentials
 
@@ -119,26 +118,38 @@ Capability snapshot 固定的是 selection，不是任意对象内部的 deep im
 trusted subject -> resolver -> TenantPrincipal -> RuntimeComposition.principal()
 ```
 
-第一个具体 product-facing capability 是 `principalCredentials`：Principal-scoped `CapabilityToken<PrincipalCredentials, 'principal'>`。Provider 随 Principal lifecycle recreation / isolation，并通过同一套 Operation snapshot 消费。
+`principalCredentials` 是 Principal-scoped low-level capability。Production authentication 与 secret-store implementation 属于产品 / provider 层。
 
-Vendor authentication 与 production secret-store implementation 不进入 Core。
+## MCP Agent Boundary
 
-## Agent Boundary
-
-Runtime capability 不会自动变成 Agent state。Agent Integration 必须显式：
+当前 DSH-native integration 是显式的：
 
 ```text
-Operation snapshot
-  -> integration recipe
-  -> ownerCtx.agents.create/resume
+TenantMcpConfig + PrincipalCredentials
+  -> one-shot create/resume Operation
+  -> Session authorization
+  -> Principal Context
   -> DSH Agent setup(agentCtx)
-  -> DSH-native tools/plugins/listeners
+  -> 官方 @deepseek-ai/dsh-mcp-client
+  -> Agent-scoped native MCP Tools
 ```
 
-不要复制 Cordis private isolation map 到 `Agent.ctx`，不要创建平行 Agent tenant registry。
+短生命周期 Operation 拥有 decision / snapshot；long-lived Agent 属于 Principal，并由 Principal teardown 回收。
+
+不要把 Cordis private isolation map 复制进 `Agent.ctx`，也不要创建平行 Agent / MCP registry。
 
 ## Security Boundary
 
-本包保证：durable Session ownership、可信同进程且 conforming provider 下的 Tenant / Principal capability isolation、deterministic lifecycle/composition check。
+对 conforming trusted same-process code，当前保证：
 
-本包不保证：process memory、filesystem、shell、network isolation，也不能防恶意同进程 plugin。Strong isolation 属于 deployment architecture。
+- durable Session ownership check；
+- Tenant / Principal capability separation；
+- deterministic composition / publication / teardown check。
+
+不保证：
+
+- process-memory isolation；
+- filesystem / shell / network isolation；
+- hostile same-process plugin protection。
+
+Threat model 需要更强隔离时，使用 process / container / Pod / sidecar / remote boundary。
