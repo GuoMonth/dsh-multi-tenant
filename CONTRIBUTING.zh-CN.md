@@ -111,6 +111,22 @@ Spec -> Assumption Ledger -> executable probe / contract -> 强类型 / 状态 -
 
 这条流程也是迭代式的：后续 vertical slice 如果暴露早期 abstraction 过度耦合，应直接重构 live model 与 Spec，而不是围绕已被证据推翻的结构保 prerelease compatibility。
 
+## Vision 不是 Contract
+
+长期方向可以记录在 `docs/vision/*`，但 Vision 和 Spec 的状态必须明确区分：
+
+- `docs/specs/*` 描述已经实现 / 当前 release line 依赖的 contract；
+- `docs/vision/*` 只记录 non-binding architecture direction；
+- Vision 不进入 release gate；
+- Vision 不能提前批准 package name、public API、Provider Family；
+- Vision 只有经过真实 vertical-slice evidence，才允许升级成 Spec。
+
+当前 authority-capability Vision 长期更偏向 `Capability-as-Authority`，而不是让 Agent/application 永久直接拿 raw credential。未来 Broker 可能成为 replaceable plugin capability，不同 ERP / MCP / GitHub 等 integration 可能提供 typed client / transport。
+
+但这**不是再次 redesign M4、也不是用 universal Broker API 阻塞 M5 的理由**。推荐证据顺序是：先跑通真实 MCP integration，再做第二个真实 integration（例如 ERP），比较重复出现的 authority / refresh / injection / audit 语义，然后才决定是否存在值得提炼的最小 public Broker contract。
+
+见 `docs/vision/authority-capabilities.zh-CN.md`。
+
 ## Package Conventions
 
 **不要因为一个目录看起来有用就创建 package。只有独立边界真实存在时，package 才应该存在。**
@@ -130,7 +146,7 @@ Research、compatibility exploration、一次性 evidence 默认放在 test / sc
 - 一个 package = 一个 independently valuable boundary，不是一个 buzzword / capability 名称；
 - 优先使用 DSH / Cordis 原生 Service、Context、Fiber、Agent/Preset scope 与 typed protocol seam；
 - 早期 contract / default implementation 可以 co-locate；只有 replacement / lifecycle / versioning 价值真实出现再拆；
-- 不提前 scaffold `saas`、Auth、Credentials、MCP、Transport package；
+- 不提前 scaffold `saas`、Auth、Credentials、MCP、Broker、ERP、Transport package；
 - 未来 Product Distribution 可以提供 opinionated defaults，但 Distribution concern 不能提前决定 Core topology。
 
 ## Dependency & Boundary Direction
@@ -153,7 +169,9 @@ Agent Integration
 Native DSH / Cordis
 ```
 
-Credentials 是自然的 Principal-owned Runtime capability。MCP 当前更适合作为 Agent Integration proof：消费 Tenant config + Principal credentials + Operation state，再组合官方 DSH MCP Tools plugin。
+Credentials 在当前 v0.3 contract 中是自然的 Principal-owned Runtime capability。M5 当前更适合作为 Agent Integration proof：消费 Tenant config + Principal credentials + Operation state，再组合官方 DSH MCP Tools plugin。
+
+长期可以让 service-specific typed client / transport 建立在 Broker / authority plugin 之上，让 Operation 消费能力而不是 raw credential；但多个真实 integration 证明共同 boundary 之前，这仍然只是 Vision。
 
 不要为了让所有 product concern 看起来都像 Runtime Provider，就重造平行 protocol stack。
 
@@ -171,6 +189,7 @@ Credentials 是自然的 Principal-owned Runtime capability。MCP 当前更适�
 - 从 architecture / data / state / type 维度完成全局审查；
 - 变更与当前产品方向存在明确相关性；
 - 行为决策涉及的 current docs / ADR / spec 已同步；
+- Vision 不能在缺乏真实 evidence 的情况下静默升级成 public contract；
 - blocking external assumption 已证明，或显式阻塞尚未完成的 API design；
 - boundary ownership 明确：Product Ingress vs Runtime capability vs Operation vs Agent Integration；
 - 相关精确 DSH / Cordis compatibility evidence 全绿；
