@@ -4,11 +4,11 @@
 
 Make DeepSeek Harness (DSH) a real **Multi-Tenant Runtime** and provide a composable **SaaS Framework Core** without replacing Cordis/DSH lifecycle semantics.
 
-> Published foundation: `dsh-multi-tenant@0.2.0-rc.3`.
->
-> Current v0.3 line: **M5 real DSH-native MCP Tools Agent Integration is implemented and executable; the next step is only `0.3.0-rc.1` release convergence.**
+> Release candidate: **`dsh-multi-tenant@0.3.0-rc.1`**. M5 is complete; this line is release convergence only.
 >
 > Pinned DSH baseline: `0.1.1-rc.2` at `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`; CI never follows floating `latest`/`master`.
+>
+> npm publication is performed only from `main` after the full release proof; registry state is verified rather than hard-coded here.
 
 ## Product path
 
@@ -88,7 +88,7 @@ When `create()` resolves, official MCP startup + initial `tools/list` has comple
 
 See `docs/specs/m5-mcp-agent-integration.md` and `packages/multi-tenant/README.md` for the complete contract/quick start.
 
-## Executable evidence
+## Release evidence
 
 GitHub Actions proves on Node 22.19 and Node 24:
 
@@ -103,13 +103,19 @@ GitHub Actions proves on Node 22.19 and Node 24:
 - cross-Principal resume denial before DSH factory invocation;
 - failed MCP startup with no half-published Agent and a fail-closed ownership reservation;
 - Agent/Principal teardown of MCP tools/connections;
-- typecheck, unit/contract tests, build and packed external-consumer smoke.
+- typecheck, unit/contract tests and build;
+- tarball export smoke;
+- a **clean installed-artifact smoke** that installs the packed candidate beside `@deepseek-ai/dsh@0.1.1-rc.2` and triggers the packaged M5 path, including dynamic resolution of the official MCP client.
 
-## Next: v0.3.0-rc.1
+The same installed-consumer contract is reused after npm publication by `scripts/registry-smoke.mjs`.
 
-No new architecture milestone should start before the first usable v0.3 prerelease. The next change is release convergence only: version bump, release note, v0.3 registry smoke, `pnpm release:check`, then exact npm/tag/release verification.
+## Release: v0.3.0-rc.1
 
-See [Direction](./ROADMAP.md).
+No new architecture milestone is part of this candidate. Release convergence consists only of exact version identity, release notes, package/document alignment, permanent artifact/registry smoke and the existing full release proof.
+
+Publication remains an explicit manual action from `main` through `.github/workflows/release.yml`. The workflow runs `pnpm release:check`, publishes via npm Trusted Publishing/OIDC, verifies the exact registry artifact and `latest`, then creates the matching Git tag and prerelease GitHub Release.
+
+See [Direction](./ROADMAP.md) and [Release contract](./docs/reference/release.md).
 
 ## Long-term principle
 
