@@ -50,6 +50,10 @@
       "types": "./dist/credentials.d.mts",
       "import": "./dist/credentials.mjs"
     },
+    "./mcp": {
+      "types": "./dist/mcp.d.mts",
+      "import": "./dist/mcp.mjs"
+    },
     "./store": {
       "types": "./dist/store.d.mts",
       "import": "./dist/store.mjs"
