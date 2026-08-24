@@ -7,7 +7,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "verify": "node scripts/verify-packages.mjs && node scripts/verify-v03-foundation.mjs",
+    "verify": "node scripts/verify-packages.mjs && node scripts/verify-v03.mjs",
     "probe:dsh": "node scripts/session-genesis-probe.mjs && node scripts/agent-owner-context-probe.mjs",
     "probe:cordis": "node scripts/cordis-operation-lifecycle-probe.mjs",
     "probe:mcp": "node scripts/mcp-agent-integration-probe.mjs",
