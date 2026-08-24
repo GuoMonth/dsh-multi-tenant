@@ -6,138 +6,110 @@
 
 > 已发布基础：`dsh-multi-tenant@0.2.0-rc.3`。
 >
-> 当前 v0.3 开发线：CompositionPlan binding/attestation、Product Ingress、Principal Credentials 已进入 Core contract；**下一步只聚焦 M5 真实 MCP Tools Agent Integration**。
+> 当前 v0.3 主线：**M5 真实 DSH-native MCP Tools Agent Integration 已实现并有 executable evidence；下一步只做 `0.3.0-rc.1` release convergence。**
 >
 > 当前 pinned DSH baseline：`0.1.1-rc.2` / `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`；CI 不追 floating `latest` / `master`。
 
-## 架构
+## Product Path
 
 ```text
 Product / Transport authentication
-        ↓ 已经可信的 subject
-Product Ingress Boundary
+        ↓ already trusted subject
+Product Ingress
         ↓ TenantPrincipal
 RuntimeComposition                 exact whole-plan attestation
         ↓
-canonical Tenant                   scope-local identity
+canonical Tenant                   Tenant MCP config
         ↓
 canonical Principal                Principal Credentials
         ↓
-Principal-owned Operation          one-shot typed snapshot
+one-shot create/resume Operation   authorization + immutable snapshot
         ↓
-Agent Integration
+Principal-owned DSH Agent          long-lived
+        ↓ setup before publication
+官方 @deepseek-ai/dsh-mcp-client
         ↓
-DeepSeek Harness
+native Agent-scoped MCP Tools
 ```
 
-关键边界保持分离：
+边界保持明确：
 
-- 产品/Transport 自己负责 authentication；
-- Product Ingress 只把 trusted subject 映射成 `TenantPrincipal`；
-- `RuntimeComposition` 把一张精确 `CompositionPlan` 绑定到一个 active materialized product Runtime；
-- Tenant / Principal canonical identity 继续使用 scope-local dependency-closure fingerprint；
-- Runtime capability 仍然是 Cordis service，不建立第二套 DI container；
-- Operation 是一次 semantic work，不使用 reactive `ctx.inject()` 直接承载用户 transaction；
-- Agent Integration 把可信 Runtime state 转成 DSH-native Agent / Preset / plugin composition；
-- hostile-code strong isolation 属于 process / container / Pod boundary。
+- 产品自己负责 authentication；
+- Product Ingress 只解析 trusted identity；
+- RuntimeComposition 防止 Plan 混搭；
+- Tenant / Principal 通过 Cordis 持有 typed Runtime capabilities；
+- Operation 只拥有一次 create/resume decision，不拥有 Agent 长生命周期；
+- live Agent 由 Principal 持有，并随 Principal teardown 回收；
+- MCP transport / protocol 交给官方 DSH MCP client；
+- hostile-code strong isolation 仍属于 process / container / Pod boundary。
 
-## Bound RuntimeComposition
+## M4 Foundation
 
-v0.2 的 low-level Runtime API 仍然保留，但 SaaS 产品代码应该先 materialize 一张 Plan，再通过 bound view 使用 Runtime，而不是手工把 Plan A/B/C 的 definition 拼起来：
+M4 已经建立：
+
+- exact `CompositionPlan <-> RuntimeComposition` binding / attestation；
+- trusted Product Ingress -> canonical Principal；
+- `PrincipalCredentials` 作为可替换的 Principal-scoped low-level capability。
+
+`PrincipalCredentials` 对当前 v0.3 很有用，但不代表 raw credential 是最终 Agent-facing abstraction。详见 `docs/specs/m4-product-ingress-credentials.zh-CN.md` 与非绑定 Vision `docs/vision/authority-capabilities.zh-CN.md`。
+
+## M5：真实 MCP Agent Integration
+
+M5 新增：
+
+- `tenantMcpConfig: CapabilityToken<TenantMcpConfig, 'tenant'>`；
+- `defineTenantMcpConfigProvider()`，支持 per-Tenant stdio / Streamable HTTP MCP config；
+- credential binding 只在 Agent setup 中从 Principal Credentials 注入 MCP env / header；
+- `createMcpAgentIntegration(principal)` 负责安全 create / resume；
+- per Principal Session deterministic physical MCP namespace，兼容 pinned 官方 client 的 root-wide `serverName` reservation；
+- Agent-scoped native DSH MCP Tools；
+- create / resume 的 fail-closed Session ownership。
+
+产品使用路径刻意很短：
 
 ```ts
-const plan = compileSaaSDefinition(definition)
+const plan = compileSaaSDefinition({
+  capabilities: [
+    { capability: tenantMcpConfig, required: true },
+    { capability: principalCredentials, required: true },
+  ],
+  providers: [mcpProvider, credentialsProvider],
+})
+
 const app = await materializeRuntimeComposition(ctx, plan)
+const ingress = createProductIngress(app, resolveTrustedSubject)
+const principal = await ingress.resolve(subject)
+const mcp = createMcpAgentIntegration(principal)
 
-const acme = await app.tenants.ensure('acme')
-const alice = await acme.principals.ensure('alice')
-
-const operation = alice.operations.start({
-  requires: [someCapability],
-  execute({ capabilities }) {
-    return capabilities.require(someCapability)
-  },
-})
+const handle = await mcp.create({ sessionId })
 ```
 
-同一个 Plan 的 materialization 会 join / single-flight；同一个 root 上出现不同 whole-plan fingerprint 会直接抛 `RuntimeCompositionConflictError`。Composed Tenant / Principal 都携带同一份 attestation；`scopeFingerprints` 仍然只负责 canonical creation drift。
+`create()` 返回时，官方 MCP startup + 第一次 `tools/list` 已在 DSH Agent setup 内完成，因此 Agent 已经拥有 native MCP Tools。`resume()` 会在调用 DSH resume 前验证 durable Session ownership。
 
-`RuntimeComposition.dispose()` 会先关闭产品侧 admission，drain 它触达过的 Tenant（因此也包括 Principal / Operation），最后释放 deployment composition。
+完整 contract / quick start 见 `docs/specs/m5-mcp-agent-integration.zh-CN.md` 和 `packages/multi-tenant/README.zh-CN.md`。
 
-详见 `docs/specs/runtime-composition.zh-CN.md`。
+## Executable Evidence
 
-## M4：Product Ingress + Principal Credentials
+GitHub Actions 在 Node 22.19 与 Node 24 上证明：
 
-Authentication protocol parsing 明确不进入 Core：
+- exact pinned DSH source identity；
+- Cordis lifecycle / one-shot Operation assumptions；
+- 真实 DSH Agent caller ownership；
+- 官方 MCP client root-wide namespace 行为；
+- 使用 MCP SDK 的真实 stdio MCP server；
+- 通过官方 `@deepseek-ai/dsh-mcp-client` 的真实 `tools/list`；
+- 通过 DSH `ToolRuntime.execute()` 的真实 MCP Tool 调用；
+- Acme/Alice、Acme/Bob、Globex/Alice 并发 config / credential isolation；
+- cross-Principal resume 在 DSH factory 调用前拒绝；
+- MCP startup failure 不留下 half-published Agent，但保留 fail-closed ownership reservation；
+- Agent / Principal teardown 清理 MCP tools / connection；
+- typecheck、unit / contract tests、build 与 packed external-consumer smoke。
 
-```ts
-const ingress = createProductIngress(app, trustedSubject => ({
-  tenantId: trustedSubject.organization,
-  userId: trustedSubject.account,
-}))
+## 下一步：v0.3.0-rc.1
 
-const principal = await ingress.resolve(trustedSubject)
-```
+第一个真正可用的 v0.3 prerelease 之前，不再开启新的架构 Milestone。下一步只做 release convergence：version bump、release note、v0.3 registry smoke、`pnpm release:check`，然后验证 exact npm artifact / Git tag / GitHub Release。
 
-第一个真实 product-facing Runtime capability 是 canonical Principal Credentials：
-
-```ts
-const provider = definePrincipalCredentialsProvider({
-  id: 'credentials',
-  definitionKey: 'v1',
-  create({ principal }) {
-    return new InMemoryPrincipalCredentials({
-      erpApiToken: loadTokenFor(principal),
-    })
-  },
-})
-
-const definition = {
-  capabilities: [{ capability: principalCredentials, required: true }],
-  providers: [provider],
-}
-```
-
-`principalCredentials` 是 Principal-scoped：不同 sibling / Tenant 隔离；provider 可以替换而不改 Core；消费发生在 one-shot Operation snapshot 中。In-memory 实现只用于 reference / test，不是 production secret store，并且刻意不提供枚举 secret 的 API。
-
-**定位说明：** `PrincipalCredentials` 是当前阶段的 low-level credential primitive，用来把真实产品链路跑起来；它不代表长期推荐让 Agent / Operation 直接接触 raw token。长期更希望 Integration Plugin 提供 `ErpClient` / `McpTransport` 这类 typed ability，把 secret 留在可替换的 authority / broker boundary 后面。这个长期方向不改变当前 M4 contract，也不阻塞 M5。
-
-详见 `docs/specs/m4-product-ingress-credentials.zh-CN.md`；长期非绑定方向见 `docs/vision/authority-capabilities.zh-CN.md`。
-
-## 当前 Core Guarantees
-
-现有 executable evidence 覆盖：
-
-- immutable claim-once Session ownership 与 fail-closed authorization；
-- canonical Tenant / Principal publication、rollback、single-flight、teardown；
-- typed `CapabilityToken<T, Scope>` composition 与 fail-fast dependency validation；
-- global Plan fingerprint + scope-local canonical fingerprint；
-- 每个 root Context 只能有一张精确 active `RuntimeComposition`，whole-plan 混搭会失败；
-- bound Operation 不能读取 Plan 之外的 capability；
-- trusted subject -> canonical Tenant / Principal；
-- Principal Credentials sibling / Tenant isolation、missing secret failure、provider replacement；
-- Principal-owned Operation 在 provider churn 下仍只执行一次 semantic work；
-- pinned DSH Agent create / resume / failure owner-context evidence；
-- Node 22.19 / Node 24 与 packed external consumer。
-
-## M5 预告
-
-下一目标刻意保持很小，**不再 redesign M4，也不提前冻结 universal Broker API**：
-
-```text
-Product Ingress
-  -> RuntimeComposition
-  -> Tenant MCP config + Principal Credentials
-  -> Operation snapshot
-  -> Agent Integration
-  -> DSH Agent setup
-  -> @deepseek-ai/dsh-mcp-client
-  -> native MCP Tools
-```
-
-先使用现有 Credentials primitive 跑通真实 DSH MCP Tools vertical slice；如果实现中自然出现 brokered helper，先保持 private。只有 MCP + 第二个真实 integration（例如 ERP）证明了共享的 authority / refresh / injection / audit 语义以后，才考虑在后续 prerelease 做 breaking change，提炼正式 Broker contract。
-
-不造平行 MCP protocol stack；DSH 没有稳定 native consumer seam 前不桥接 Resources / Prompts。`ROADMAP.zh-CN.md` 只保留当前焦点和长期方向，不恢复长篇 milestone list。
+见 [Direction](./ROADMAP.zh-CN.md)。
 
 ## 长期原则
 
@@ -155,7 +127,7 @@ Operation
 
 > **Core 管身份和生命周期；Broker 管授权与 secret；Integration 管厂商协议；Operation 消费 typed ability；Secret 在可行时留在 authority boundary 后面。**
 
-不同 ERP / MCP / GitHub 等接入应该通过可组合 Integration Plugin 生长，Broker 也应是可替换 plugin capability，而不是 Core 里的上帝对象。详细原则见 `docs/vision/authority-capabilities.zh-CN.md`。
+这仍然是 Vision，不进入本次 release scope。正式 public Broker contract 必须由第二个真实 integration（例如 ERP）挣出来。
 
 ## Public Subpaths
 
@@ -167,13 +139,14 @@ dsh-multi-tenant/composition
 dsh-multi-tenant/runtime-composition
 dsh-multi-tenant/ingress
 dsh-multi-tenant/credentials
+dsh-multi-tenant/mcp
 dsh-multi-tenant/store
 dsh-multi-tenant/testing
 ```
 
 ## Security Boundary
 
-Cordis Context 是 trusted same-process composition / lifecycle boundary，不隔离 process memory、filesystem、shell、network、environment variable 或恶意同进程插件。Same-process Broker 未来可以显著减少正常路径上的 secret 暴露，但不能把恶意同进程代码变成安全的；Strong isolation 仍属于 process / container / Pod / sidecar / remote authority boundary。
+Cordis Context 是 trusted same-process composition / lifecycle boundary，不是 hostile-code sandbox。M5 会减少正常路径中的 credential 暴露，但不能防御共享进程的恶意代码。Filesystem / process / network / shell / secret strong isolation 属于 container / Pod / sidecar / remote authority deployment profile。
 
 ## 安装
 

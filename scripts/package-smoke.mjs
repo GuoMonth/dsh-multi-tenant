@@ -3,8 +3,8 @@
  * Packed-consumer smoke for the contract users actually install.
  *
  * Build -> pack -> verify public export targets -> install in a clean consumer
- * -> exercise ownership kernel + bound RuntimeComposition + M4 ingress and
- * Principal Credentials through package subpaths/root exports.
+ * -> exercise ownership kernel + bound RuntimeComposition + M4 ingress/
+ * credentials + M5 Tenant MCP public contracts through package subpaths.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -53,6 +53,7 @@ try {
     'dist/runtime-composition.mjs',
     'dist/ingress.mjs',
     'dist/credentials.mjs',
+    'dist/mcp.mjs',
     'dist/store.mjs',
     'dist/testing.mjs',
     'cordis.patch.yml',
@@ -85,18 +86,28 @@ import Service, {
   compileSaaSDefinition,
   createProductIngress,
   definePrincipalCredentialsProvider,
+  defineTenantMcpConfigProvider,
   materializeRuntimeComposition,
+  normalizeTenantMcpConfig,
   principalCredentials,
+  runtimeMcpServerName,
+  tenantMcpConfig,
 } from 'dsh-multi-tenant'
 import Store from 'dsh-multi-tenant/store'
 import Runtime from 'dsh-multi-tenant/runtime'
 import { materializeRuntimeComposition as materializeFromSubpath } from 'dsh-multi-tenant/runtime-composition'
 import { createProductIngress as ingressFromSubpath } from 'dsh-multi-tenant/ingress'
 import { principalCredentials as credentialsFromSubpath } from 'dsh-multi-tenant/credentials'
+import {
+  tenantMcpConfig as mcpFromSubpath,
+  runtimeMcpServerName as runtimeNameFromSubpath,
+} from 'dsh-multi-tenant/mcp'
 
 if (materializeFromSubpath !== materializeRuntimeComposition) throw new Error('runtime-composition subpath mismatch')
 if (ingressFromSubpath !== createProductIngress) throw new Error('ingress subpath mismatch')
 if (credentialsFromSubpath !== principalCredentials) throw new Error('credentials subpath mismatch')
+if (mcpFromSubpath !== tenantMcpConfig) throw new Error('mcp subpath token mismatch')
+if (runtimeNameFromSubpath !== runtimeMcpServerName) throw new Error('mcp subpath runtime-name mismatch')
 
 const ctx = new Context()
 await ctx.plugin(Store)
@@ -113,16 +124,38 @@ if (await ctx.multiTenant.canAccessSession({ tenantId: 'globex', userId: 'alice'
 }
 
 const makePlan = revision => compileSaaSDefinition({
-  capabilities: [{ capability: principalCredentials, required: true }],
-  providers: [definePrincipalCredentialsProvider({
-    id: 'credentials-' + revision,
-    definitionKey: revision,
-    create({ principal }) {
-      return new InMemoryPrincipalCredentials({
-        erpToken: revision + ':' + principal.tenantId + '/' + principal.userId,
-      })
-    },
-  })],
+  capabilities: [
+    { capability: tenantMcpConfig, required: true },
+    { capability: principalCredentials, required: true },
+  ],
+  providers: [
+    defineTenantMcpConfigProvider({
+      id: 'mcp-' + revision,
+      definitionKey: revision,
+      load({ tenantId }) {
+        return {
+          servers: [{
+            transport: 'streamable-http',
+            serverName: 'erp',
+            url: 'https://mcp.example/' + tenantId,
+            headers: { 'X-Tenant': tenantId },
+            credentialHeaders: {
+              Authorization: { credential: 'erpToken', prefix: 'Bearer ' },
+            },
+          }],
+        }
+      },
+    }),
+    definePrincipalCredentialsProvider({
+      id: 'credentials-' + revision,
+      definitionKey: revision,
+      create({ principal }) {
+        return new InMemoryPrincipalCredentials({
+          erpToken: revision + ':' + principal.tenantId + '/' + principal.userId,
+        })
+      },
+    }),
+  ],
 })
 
 const v1 = makePlan('v1')
@@ -142,13 +175,29 @@ const ingress = createProductIngress(app, subject => ({
   userId: subject.user,
 }))
 const alice = await ingress.resolve({ org: 'acme', user: 'alice' })
-const tokenOperation = alice.operations.start({
-  requires: [principalCredentials],
+const contractOperation = alice.operations.start({
+  requires: [tenantMcpConfig, principalCredentials],
   async execute({ capabilities }) {
-    return capabilities.require(principalCredentials).require('erpToken')
+    const mcp = capabilities.require(tenantMcpConfig)
+    const credentials = capabilities.require(principalCredentials)
+    return {
+      mcp,
+      token: await credentials.require('erpToken'),
+    }
   },
 })
-if ((await tokenOperation.result) !== 'v1:acme/alice') throw new Error('M4 credential path returned wrong value')
+const contract = await contractOperation.result
+if (contract.token !== 'v1:acme/alice') throw new Error('M5 credential path returned wrong value')
+if (contract.mcp.servers[0]?.serverName !== 'erp') throw new Error('M5 Tenant MCP config did not materialize')
+if (contract.mcp.servers[0]?.url !== 'https://mcp.example/acme') throw new Error('M5 Tenant MCP config used wrong Tenant')
+
+const normalized = normalizeTenantMcpConfig(contract.mcp)
+if (!Object.isFrozen(normalized) || !Object.isFrozen(normalized.servers)) throw new Error('M5 MCP config is not immutable')
+const runtimeName = runtimeMcpServerName('erp', alice.identity, 'smoke-mcp-session')
+if (runtimeName !== runtimeMcpServerName('erp', alice.identity, 'smoke-mcp-session')) {
+  throw new Error('M5 runtime MCP namespace is not deterministic')
+}
+if (!/^[A-Za-z0-9_-]{1,32}$/.test(runtimeName)) throw new Error('M5 runtime MCP namespace violates DSH MCP serverName contract')
 
 const missingOperation = alice.operations.start({
   requires: [principalCredentials],
@@ -175,12 +224,17 @@ const replacementIngress = createProductIngress(replacement, subject => ({
 }))
 const replacementAlice = await replacementIngress.resolve({ org: 'acme', user: 'alice' })
 const replacementOperation = replacementAlice.operations.start({
-  requires: [principalCredentials],
+  requires: [tenantMcpConfig, principalCredentials],
   async execute({ capabilities }) {
-    return capabilities.require(principalCredentials).require('erpToken')
+    return {
+      token: await capabilities.require(principalCredentials).require('erpToken'),
+      endpoint: capabilities.require(tenantMcpConfig).servers[0]?.url,
+    }
   },
 })
-if ((await replacementOperation.result) !== 'v2:acme/alice') throw new Error('provider replacement failed')
+const replacementValue = await replacementOperation.result
+if (replacementValue.token !== 'v2:acme/alice') throw new Error('provider replacement failed')
+if (replacementValue.endpoint !== 'https://mcp.example/acme') throw new Error('MCP provider recreation failed')
 
 await replacement.dispose()
 await ctx.fiber.dispose()

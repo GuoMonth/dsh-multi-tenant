@@ -140,6 +140,37 @@ export type {
   PrincipalCredentialsProviderOptions,
 } from './credentials.ts'
 
+export {
+  tenantMcpConfig,
+  normalizeTenantMcpConfig,
+  defineTenantMcpConfigProvider,
+  runtimeMcpServerName,
+  createMcpAgentIntegration,
+  McpIntegrationError,
+  McpIntegrationDependencyError,
+  McpAgentServiceUnavailableError,
+} from './mcp.ts'
+export type {
+  McpCredentialBinding,
+  McpReconnectConfig,
+  TenantMcpStdioServer,
+  TenantMcpHttpServer,
+  TenantMcpServer,
+  TenantMcpConfig,
+  TenantMcpConfigFactoryPreparation,
+  TenantMcpConfigProviderOptions,
+  McpAgentOptions,
+  McpAgentCreateMeta,
+  McpAgentSetupCommit,
+  McpAgentSetup,
+  McpAgentCreateOptions,
+  McpAgentResumeOptions,
+  McpRuntimeServer,
+  McpAgentLike,
+  McpAgentHandle,
+  McpAgentIntegration,
+} from './mcp.ts'
+
 export { TenantSessionStore, InMemoryTenantSessionStore } from './store.ts'
 export type { TenantPrincipal, SessionOwner, ClaimResult } from './types.ts'
 export {

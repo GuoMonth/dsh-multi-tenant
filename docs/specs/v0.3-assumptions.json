@@ -77,6 +77,18 @@
         "path": "scripts/saas-core-vertical-slice-probe.mjs",
         "command": "pnpm probe:saas-core"
       }
+    },
+    {
+      "id": "A7",
+      "owner": "dsh-mcp",
+      "claim": "Pinned DSH Agent scopes share the application Cordis root while ToolRuntime registrations remain scope-aware, and the official dsh-mcp-client reserves serverName root-wide; M5 therefore needs a deterministic per-Principal-Session physical namespace for concurrent Agent-local MCP instances.",
+      "status": "proven",
+      "blocking": true,
+      "proof": {
+        "kind": "probe",
+        "path": "scripts/m5-mcp-agent-integration-probe.mjs",
+        "command": "pnpm probe:mcp"
+      }
     }
   ]
 }

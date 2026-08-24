@@ -69,6 +69,7 @@ if (!runtime) {
     './runtime-composition',
     './ingress',
     './credentials',
+    './mcp',
     './store',
     './testing',
     './cordis.patch.yml',
@@ -76,14 +77,13 @@ if (!runtime) {
     if (!(required in exports)) errors.push(`${expectedPackageName}: exports must include ${required}`)
   }
 
-  // Guard the current product-facing public narrative. These markers should
-  // move with the live contract instead of forcing obsolete README topology.
   const readme = readFileSync(join(dir, 'README.md'), 'utf8')
   for (const marker of [
     '## Product-facing path',
     'RuntimeComposition',
     'Product Ingress',
     'Principal Credentials',
+    'MCP Agent integration',
     'One-shot work',
     '## Low-level Runtime',
     '## Security boundary',
@@ -121,10 +121,13 @@ for (const requiredPath of [
   'docs/specs/saas-boundaries.md',
   'docs/specs/runtime-composition.md',
   'docs/specs/m4-product-ingress-credentials.md',
+  'docs/specs/m5-mcp-agent-integration.md',
   'scripts/session-genesis-probe.mjs',
   'scripts/agent-owner-context-probe.mjs',
   'scripts/cordis-operation-lifecycle-probe.mjs',
   'scripts/saas-core-vertical-slice-probe.mjs',
+  'scripts/m5-mcp-agent-integration-probe.mjs',
+  'scripts/fixtures/mcp-identity-server.mjs',
   'scripts/package-smoke.mjs',
   'scripts/registry-preflight.mjs',
   'scripts/registry-smoke.mjs',
@@ -137,4 +140,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; bound RuntimeComposition + M4 public surface; OIDC-only publishing`)
+console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; M5 DSH-native MCP Agent surface; OIDC-only publishing`)
