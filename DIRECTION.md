@@ -2,7 +2,7 @@
 
 # Direction
 
-`0.3` is the current product baseline. We do not maintain a long milestone roadmap or preserve prerelease history in the live tree just because it once existed.
+`0.3` is the current product baseline. We do not maintain a long milestone roadmap or preserve prerelease archaeology in the live tree just because it once existed.
 
 ## Current baseline
 
@@ -18,13 +18,13 @@ trusted product subject
   -> native MCP Tools
 ```
 
-The immediate goal is to release and use `0.3.0-rc.1`, collect evidence from real integrations, and keep the tree small enough to change quickly.
+The immediate goal is not another milestone. It is to release `0.3.0-rc.1`, use it in real products, and keep the tree small enough to evolve quickly from actual friction.
 
 ## Next evidence, not next milestone
 
-The next architectural decision should come from a second real integration (for example ERP), not from another speculative milestone list.
+The next architectural decision should come from a second real integration (for example ERP), not from another speculative roadmap.
 
-The main question is whether repeated authority/refresh/injection/audit behavior justifies promoting the current low-level credential primitive into a reusable Broker/authority plugin contract.
+The question worth answering is whether authority / refresh / injection / audit behavior repeats across integrations strongly enough to justify a reusable Broker / authority plugin contract.
 
 ```text
 real MCP integration        ✅
@@ -35,8 +35,15 @@ compare repeated semantics
         ↓
 extract only proven abstractions
         ↓
-allow prerelease breaking changes when justified
+make prerelease breaking changes when justified
 ```
+
+## Live tree policy
+
+- Keep current code, current contracts and current evidence.
+- Delete superseded milestone names, old release notes and one-shot probes/workflows.
+- Let Git history and tags preserve archaeology instead of charging the active tree for it.
+- Add packages/abstractions only after real vertical slices prove independent value.
 
 ## Long-term principle
 
