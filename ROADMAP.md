@@ -9,7 +9,8 @@ The project does not maintain a long milestone roadmap. Current contracts live i
 ```text
 v0.1  Security Kernel                         frozen
 v0.2  Multi-Tenant Runtime Contract           published foundation
-v0.3  SaaS Framework Core                     M5 complete; release convergence next
+v0.3  SaaS Framework Core                     M5 complete
+0.3.0-rc.1                                    release candidate
 ```
 
 The v0.3 line now proves:
@@ -25,29 +26,32 @@ The v0.3 line now proves:
 - official `@deepseek-ai/dsh-mcp-client` initial discovery before Agent publication;
 - real Agent-scoped MCP Tools executed through DSH ToolRuntime;
 - concurrent Acme/Alice, Acme/Bob and Globex/Alice isolation;
-- create/resume/startup-failure/teardown evidence on Node 22.19 and Node 24.
+- create/resume/startup-failure/teardown evidence on Node 22.19 and Node 24;
+- clean installed-artifact resolution of the packaged M5 path beside the pinned DSH CLI.
 
-## Next and only short-term target: v0.3.0-rc.1 release convergence
+## Only short-term target: publish and verify 0.3.0-rc.1
 
-Do not open another architecture milestone before the first usable v0.3 prerelease.
-
-The next PR should be small and release-focused:
+Do not open another architecture milestone before this candidate is published and used.
 
 ```text
-M5 green on main
-  -> bump package to 0.3.0-rc.1
-  -> finalize README / release notes
-  -> upgrade registry smoke to the v0.3 product path
-  -> pnpm release:check
-  -> publish exact artifact
-  -> verify npm latest + Git tag + GitHub Release
+0.3.0-rc.1 manifest + docs aligned
+  -> permanent tarball installed-consumer smoke
+  -> v0.3 registry smoke
+  -> full pnpm release:check
+  -> merge release convergence to main
+  -> manually dispatch release.yml
+  -> publish exact artifact via OIDC/provenance
+  -> verify npm latest + exact installed artifact
+  -> create Git tag + prerelease GitHub Release
 ```
 
-The release bar is simple: a product developer can supply trusted identity resolution, Tenant MCP configuration and Principal credentials, then create/resume a real multi-tenant DSH Agent with native MCP Tools without hand-building the DSH/MCP composition path.
+The release bar is concrete: a product developer supplies trusted identity resolution, Tenant MCP configuration and Principal credentials, then creates/resumes a real multi-tenant DSH Agent with native MCP Tools without hand-building the DSH/MCP composition path.
+
+After publication, the next priorities come from actual `0.3.0-rc.1` usage evidence rather than a speculative M6 list.
 
 ## Long-term direction: Credential-as-Data -> Capability-as-Authority
 
-`PrincipalCredentials` remains the current low-level primitive. It is useful for v0.3 and M5, but it is not a promise that raw credentials are the final Agent/application-facing abstraction.
+`PrincipalCredentials` remains the current low-level primitive. It is useful for v0.3, but it is not a promise that raw credentials are the final Agent/application-facing abstraction.
 
 Preferred long-term direction:
 
@@ -63,7 +67,7 @@ Typed Client / Transport capability
 Operation
 ```
 
-This remains Vision, not release scope. The evidence sequence stays:
+This remains Vision, not `0.3.0-rc.1` release scope. The evidence sequence stays:
 
 ```text
 real MCP integration (M5)       ✅
