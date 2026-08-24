@@ -1,85 +1,62 @@
 # dsh-multi-tenant
 
-Context-native multi-tenant Runtime and v0.3 SaaS Framework Core primitives for DeepSeek Harness.
+**Run DeepSeek Harness safely behind a multi-tenant SaaS product.**
 
-> Published npm foundation: `0.2.0-rc.3`. The repository v0.3 line now converges on a usable DSH-native MCP Tools Agent path.
+Use this package when one DSH runtime must serve many organizations and users without mixing Tenant configuration, Principal credentials, Session ownership or Agent-scoped MCP Tools.
 
-## Product-facing path
+> **`dsh-multi-tenant@0.3.0-rc.1`** · compatible DSH baseline: `0.1.1-rc.2`
+
+## The problem
+
+A single-user Agent looks like this:
 
 ```text
-trusted product subject
-  -> Product Ingress
-  -> RuntimeComposition
-  -> canonical Tenant / Principal
-  -> Tenant MCP Config + Principal Credentials
-  -> one-shot create/resume Operation
-  -> Principal-owned DSH Agent
-  -> official DSH MCP client
-  -> native Agent-scoped MCP Tools
+request -> Agent -> MCP -> backend
 ```
 
-### 1. Compile and bind one Plan
+A SaaS Agent runtime has to keep this safe instead:
 
-```ts
-const plan = compileSaaSDefinition(definition)
-const app = await materializeRuntimeComposition(ctx, plan)
+```text
+Acme / Alice   -> Acme MCP + Alice credential + Alice Sessions
+Acme / Bob     -> Acme MCP + Bob credential   + Bob Sessions
+Globex / Alice -> Globex MCP + Globex/Alice credential + Globex Sessions
 ```
 
-`RuntimeComposition` owns exact whole-plan attestation. The same Plan joins; a different active Plan on the same root throws `RuntimeCompositionConflictError`. Canonical Tenant/Principal drift still uses scope-local fingerprints.
+Without a reusable runtime boundary, every product ends up hand-building Tenant lookup, credential plumbing, MCP setup, Session authorization and Agent lifecycle rules.
 
-### 2. Resolve a trusted product subject
+`dsh-multi-tenant` turns that into one product flow:
 
-```ts
-const ingress = createProductIngress(app, subject => ({
-  tenantId: subject.organization,
-  userId: subject.account,
-}))
-
-const principal = await ingress.resolve(subject)
+```text
+trusted subject
+  -> Tenant / Principal
+  -> Tenant MCP config
+  -> Principal credentials
+  -> fail-closed Session ownership
+  -> Principal-bound Agent create/resume
+  -> native DSH MCP Tools
 ```
 
-Authentication is outside Core. The resolver receives a subject the product already trusts.
+## Install
 
-### 3. Principal Credentials
+Inside a compatible DSH profile:
 
-```ts
-const credentialsProvider = definePrincipalCredentialsProvider({
-  id: 'credentials',
-  definitionKey: 'v1',
-  create({ principal }) {
-    return new InMemoryPrincipalCredentials({
-      erpApiToken: loadTokenFor(principal),
-    })
-  },
-})
+```sh
+dsh plugin --profile <profile> add dsh-multi-tenant
 ```
 
-`principalCredentials` is a canonical `CapabilityToken<PrincipalCredentials, 'principal'>`. It is isolated by Principal lifecycle and can be replaced without changing Framework Core. `InMemoryPrincipalCredentials` is reference/test infrastructure, not a production secret store.
+Or from framework code that already owns the compatible DSH installation:
 
-`PrincipalCredentials` is intentionally a **low-level current primitive**, not a promise that raw tokens are the long-term recommended Agent-facing abstraction. The long-term direction is for service-specific Integration Plugins to provide typed clients/transports while authority/credential Broker plugins keep secrets behind a narrower boundary. That direction is non-binding today.
+```sh
+pnpm add dsh-multi-tenant
+```
 
-## MCP Agent integration
+The MCP path reuses the official `@deepseek-ai/dsh-mcp-client` supplied by that DSH installation. This package does not vendor or fork MCP.
 
-M5 adds a real Tenant MCP capability and a Principal-bound DSH Agent integration.
+## Quick start
+
+Your product owns authentication. After a request is trusted, resolve it to a Tenant/Principal and let the runtime compose the rest.
 
 ```ts
-const mcpProvider = defineTenantMcpConfigProvider({
-  id: 'tenant-mcp',
-  definitionKey: 'v1',
-  load({ tenantId }) {
-    return {
-      servers: [{
-        transport: 'streamable-http',
-        serverName: 'erp',
-        url: endpointFor(tenantId),
-        credentialHeaders: {
-          Authorization: { credential: 'erpApiToken', prefix: 'Bearer ' },
-        },
-      }],
-    }
-  },
-})
-
 const plan = compileSaaSDefinition({
   capabilities: [
     { capability: tenantMcpConfig, required: true },
@@ -89,54 +66,60 @@ const plan = compileSaaSDefinition({
 })
 
 const app = await materializeRuntimeComposition(ctx, plan)
-const ingress = createProductIngress(app, subject => ({
-  tenantId: subject.organization,
-  userId: subject.account,
-}))
+const ingress = createProductIngress(app, resolveTrustedSubject)
 const principal = await ingress.resolve(subject)
-const mcp = createMcpAgentIntegration(principal)
 
-const handle = await mcp.create({ sessionId })
+const agents = createMcpAgentIntegration(principal)
+const handle = await agents.create({ sessionId })
 ```
 
-`create()` reserves Session ownership before entering DSH setup. `resume()` checks Session ownership before DSH persistence/setup. The integration mounts the compatible official `@deepseek-ai/dsh-mcp-client` during Agent setup with startup failure treated as fatal, so the returned Agent already has its initial MCP Tools.
+When `create()` resolves, the official DSH MCP client has completed initial discovery and the Agent already owns its native Agent-scoped MCP Tools. `resume()` checks Session ownership before DSH persistence/setup runs.
 
-The long-lived Agent is created through the canonical Principal Context rather than the short Operation Fiber. It therefore survives the create/resume Operation but is still structurally drained by Principal teardown.
+## What 0.3 provides
 
-Each configured logical server receives a deterministic runtime namespace per Principal Session. The returned handle exposes the mapping:
+- canonical Tenant / Principal resolution from trusted product identity;
+- exact `CompositionPlan -> RuntimeComposition` binding;
+- Principal-scoped replaceable credentials;
+- Tenant-scoped MCP configuration;
+- Principal-bound Agent `create()` / `resume()`;
+- immutable, fail-closed Session ownership;
+- deterministic per-Session MCP namespaces;
+- Principal-owned long-lived Agents;
+- official DSH MCP Tools integration;
+- clean installed-artifact and post-publication registry verification.
 
-```ts
-handle.servers
-// [{ serverName: 'erp', runtimeServerName: 'erp-...', toolPrefix: 'mcp__erp-...__' }]
+## Architecture
+
+```text
+Product authentication
+  -> Product Ingress
+  -> RuntimeComposition
+  -> Tenant / Principal
+  -> one-shot create/resume Operation
+  -> Principal-owned DSH Agent
+  -> official MCP client
+  -> native Agent-scoped MCP Tools
 ```
 
-This is required by the pinned official MCP client's root-wide `serverName` reservation while preserving Agent-scoped ToolRuntime registration. It is stable across resume of the same Session.
+The important boundaries are simple:
 
-M5 supports official MCP **Tools** only. It does not implement a parallel MCP stack and does not bridge Resources/Prompts that the pinned Harness does not consume.
+- Product owns authentication.
+- Core owns identity, composition and lifecycle.
+- Operation owns one short semantic decision, not the Agent lifetime.
+- Principal owns long-lived Agents.
+- DSH owns MCP wire behavior.
 
-### One-shot work vs live Agent lifetime
+## Security boundary
 
-The integration internally starts one Principal-owned Operation to capture `TenantMcpConfig` + `PrincipalCredentials` and authorize create/resume exactly once. That Operation is short-lived; the resulting DSH Agent is Principal-owned and long-lived.
+Cordis Context provides trusted same-process identity/lifecycle separation, not hostile-code isolation. Strong secret/process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote deployment boundaries.
 
-## Low-level Runtime
+## Compatibility
 
-The v0.2 APIs remain available under `dsh-multi-tenant/runtime`, `operation` and `composition` for framework/integration code. Product code should prefer `runtime-composition` so Deployment/Tenant/Principal/Operation recipes cannot be accidentally mixed across Plans.
+- Node: `^22.19.0 || >=24.0.0`
+- Cordis: `>=4.0.1 <5`
+- DSH: `0.1.1-rc.2`
 
-## Guarantees
-
-- claim-once immutable Session ownership and fail-closed access;
-- canonical Tenant/Principal publication and quiescent teardown;
-- typed capability scope/dependency validation;
-- scope-local canonical fingerprints;
-- exact whole-plan RuntimeComposition attestation;
-- trusted ingress -> canonical Principal;
-- Principal Credentials isolation/replacement;
-- Tenant MCP configuration isolation;
-- cross-Principal resume denied before DSH resume;
-- one-shot Operation semantics with Principal-owned long-lived Agents;
-- official DSH MCP client initial discovery before Agent publication;
-- Agent-scoped native MCP Tools and deterministic per-Session runtime namespaces;
-- pinned real-DSH/MCP executable evidence.
+The release gate verifies the packed artifact in a clean consumer beside the pinned DSH installation, and repeats the same consumer contract against the exact npm artifact after publication.
 
 ## Public subpaths
 
@@ -151,26 +134,4 @@ dsh-multi-tenant/credentials
 dsh-multi-tenant/mcp
 dsh-multi-tenant/store
 dsh-multi-tenant/testing
-```
-
-## Runtime requirement for MCP
-
-`dsh-multi-tenant/mcp` composes the official `@deepseek-ai/dsh-mcp-client` from the compatible DSH installation at runtime. The M5 compatibility probe installs and tests the exact pinned public package. The integration does not vendor or fork that protocol implementation.
-
-## Security boundary
-
-Cordis Context is trusted same-process isolation/composition, not a hostile-code sandbox. M5 reduces normal-path credential exposure by resolving bindings inside Agent setup, but malicious code sharing the process remains outside the guarantee. Strong filesystem/process/network/shell/secret isolation belongs to container/Pod/sidecar/remote deployment architecture.
-
-Long-term authority-capability direction is documented in the repository at `docs/vision/authority-capabilities.md`; it is not part of the current npm API contract.
-
-## Install
-
-```sh
-dsh plugin --profile <profile> add dsh-multi-tenant
-```
-
-## Verify
-
-```sh
-pnpm release:check
 ```

@@ -2,87 +2,74 @@
 
 # Release contract
 
-The project is in rapid prerelease development. Release mechanics are intentionally simple and deterministic.
+`0.3` is the live release line. Release automation is intentionally small: prove the artifact, publish one package, verify the exact registry result.
 
-## Current artifact
+## Current release identity
 
 - **Package:** `dsh-multi-tenant`
-- **Current version:** read from `packages/multi-tenant/package.json`
-- **Current candidate:** `0.2.0-rc.3`
+- **Candidate:** `0.3.0-rc.1`
+- **Identity source:** `packages/multi-tenant/package.json`
 - **npm dist-tag:** `latest`
 - **DSH baseline:** `0.1.1-rc.2` @ `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`
-- **Publishing:** npm Trusted Publishing through GitHub Actions OIDC
+- **Publishing:** GitHub Actions OIDC + npm Trusted Publishing
 - **Provenance:** enabled
 
-The Runtime Contract is currently the only live workspace package and the only release artifact.
+There is one publishable workspace package and one publication workflow.
 
-## Single source of truth
+## What this release proves
 
-The package manifest owns release identity:
+The release gate covers the product-facing path:
 
 ```text
-packages/multi-tenant/package.json
-  ├─ version
-  └─ publishConfig.tag = latest
+trusted product subject
+  -> Product Ingress
+  -> RuntimeComposition
+  -> Tenant / Principal
+  -> Tenant MCP config + Principal Credentials
+  -> safe create/resume
+  -> Principal-owned DSH Agent
+  -> official MCP client
+  -> native Agent-scoped MCP Tools
 ```
 
-The release workflow does not ask the operator to retype a version. Manual dispatch from `main` reads the manifest, verifies the repository, runs the complete release proof and publishes exactly that version.
-
-## One npm channel
-
-During the current rapid-iteration phase, the project maintains a single npm channel:
-
-> `latest` = the newest version the project has intentionally published.
-
-Prerelease/stable meaning is expressed by SemVer itself (`0.2.0-rc.3`, later `0.2.0`, etc.), not by maintaining a second `next` channel.
-
-Install the current release with:
-
-```sh
-dsh plugin --profile <profile> add dsh-multi-tenant
-```
+The current release note is `docs/releases/v0.3.0-rc.1.md`.
 
 ## Pre-publication proof
-
-From a clean checkout:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm release:check
 ```
 
-The proof includes package/architecture invariants, release preflight, TypeScript typecheck, unit/contract tests, build, packed external-consumer smoke and exact-version DSH compatibility probes.
+The proof includes current architecture invariants, release/document preflight, typecheck/tests/build, exact DSH/Cordis compatibility probes, real MCP wire execution, and the packed npm artifact installed beside the pinned DSH CLI in a clean consumer.
 
-CI separately checks out the exact upstream DSH release commit and verifies its source version.
+`pnpm smoke` also verifies tarball contents and every public export target, so there is no separate legacy package-smoke pipeline.
 
 ## Publication flow
 
 `.github/workflows/release.yml` is manually dispatched from `main` and:
 
-1. reads `packages/multi-tenant/package.json.version` into one release identity;
-2. validates npm Trusted Publishing capability;
-3. performs frozen install and `pnpm release:check`;
-4. checks npm repository ownership and whether the exact version already exists;
-5. publishes with npm OIDC/provenance when needed;
-6. verifies the exact registry artifact and that `latest` resolves to it;
-7. creates the matching Git tag and GitHub release.
+1. reads the exact version from the package manifest;
+2. runs the full release proof again;
+3. verifies npm repository ownership and exact-version state;
+4. publishes with OIDC/provenance when the version is absent;
+5. verifies npm version, repository, integrity and `latest`;
+6. installs and exercises the exact registry artifact using the same v0.3 consumer smoke;
+7. creates the matching Git tag and prerelease GitHub Release.
 
-The workflow is idempotent for an already-published exact version: publication is skipped, while verification/tag/release recovery can continue.
+If the exact version already exists, publication is skipped while verification/tag/release recovery can continue.
 
-## Registry proof
+## Permanent GitHub Actions
 
-`scripts/registry-smoke.mjs` installs the exact published artifact into a clean consumer and exercises the current Runtime Contract, including:
+Only two workflows belong in the live tree:
 
-- store + ownership kernel;
-- `ctx.tenantRuntime`;
-- canonical Tenant/Principal creation;
-- tenant capability inheritance;
-- durable session ownership from a Principal Context;
-- provider store contract;
-- npm `latest` pointing to the released version.
+- `ci.yml` — current source/package/platform evidence;
+- `release.yml` — explicit publication and post-publication verification.
+
+One-shot investigation workflows must be deleted once their conclusion has been encoded in permanent tests or gates.
 
 ## Release philosophy
 
-Release automation should protect correctness without creating process ceremony. Current development prefers frequent, explicit releases over maintaining multiple channels or compatibility promises that slow structural improvement.
+Git history/tags preserve old prerelease archaeology. The live repository does not keep `0.1`/`0.2` release pipelines, old release notes, or milestone-specific verification simply for historical completeness.
 
-Future v0.3 packages should enter the release graph only after their independent contract/lifecycle boundary exists. Do not create release machinery for speculative packages.
+`0.3.0-rc.1` remains a prerelease: real product evidence may justify deliberate breaking changes.

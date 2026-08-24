@@ -2,13 +2,13 @@
 
 # Spec — RuntimeComposition Binding and Attestation
 
-> Status: live v0.3 product-facing composition contract.
+> Status: live `0.3` product-facing composition contract.
 
 ## Problem
 
 A `CompositionPlan` can derive Deployment/Tenant/Principal/Operation definitions, but those low-level helpers are intentionally independent primitives. Product code must not accidentally materialize Deployment from Plan A, Tenant from Plan B and Operation from Plan C merely because individual capability keys happen to resolve.
 
-Scope-local fingerprints solve canonical creation locality; they do **not** by themselves prove that one product request path is using one whole Plan.
+Scope-local fingerprints solve canonical creation locality; they do not by themselves prove that one product request path is using one whole Plan.
 
 ## Contract
 
@@ -35,8 +35,6 @@ One root Context has at most one active exact RuntimeComposition:
 
 ## Attestation vs canonical identity
 
-These identities have different jobs:
-
 ```text
 plan.fingerprint
   whole product composition attestation
@@ -46,8 +44,6 @@ plan.scopeFingerprints.tenant / principal
 ```
 
 An Operation-only change may leave Tenant/Principal scope fingerprints unchanged, which is correct. But it is still a different whole product Plan and cannot silently join an already active product-facing `RuntimeComposition`.
-
-This preserves composition locality without allowing Plan mixing.
 
 ## Bound handles
 
@@ -60,7 +56,7 @@ A bound Principal Operation accepts only:
 
 Operation-local provider setup/isolation comes from the bound Plan. Requested capabilities must also be declared by that Plan; otherwise `RuntimeCompositionCapabilityError` fails before semantic work starts.
 
-Low-level v0.2 Runtime and `*DefinitionFromPlan()` helpers remain available for framework/integration work, but they are no longer the recommended product-facing composition path.
+Low-level Runtime and `*DefinitionFromPlan()` helpers remain available for framework/integration work, but product code should prefer the bound `RuntimeComposition` surface.
 
 ## Lifecycle
 

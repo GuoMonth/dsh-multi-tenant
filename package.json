@@ -7,16 +7,13 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "verify": "node scripts/verify-packages.mjs && node scripts/verify-v03-foundation.mjs",
+    "verify": "node scripts/verify-packages.mjs && node scripts/verify-v03.mjs",
     "probe:dsh": "node scripts/session-genesis-probe.mjs && node scripts/agent-owner-context-probe.mjs",
     "probe:cordis": "node scripts/cordis-operation-lifecycle-probe.mjs",
-    "probe:saas-core": "node scripts/saas-core-vertical-slice-probe.mjs",
-    "probe:mcp": "node scripts/m5-mcp-agent-integration-probe.mjs",
-    "probe:platform": "pnpm probe:dsh && pnpm probe:cordis && pnpm probe:saas-core && pnpm probe:mcp",
-    "smoke": "node scripts/package-smoke.mjs",
+    "probe:mcp": "node scripts/mcp-agent-integration-probe.mjs",
+    "probe:platform": "pnpm probe:dsh && pnpm probe:cordis && pnpm probe:mcp",
+    "smoke": "node scripts/artifact-consumer-smoke.mjs --local",
     "release:preflight": "node scripts/release-preflight.mjs",
-    "release:registry-preflight": "node scripts/registry-preflight.mjs",
-    "release:registry-smoke": "node scripts/registry-smoke.mjs",
     "release:check": "pnpm verify && pnpm release:preflight && pnpm typecheck && pnpm test && pnpm build && pnpm smoke && pnpm probe:platform"
   }
 }
