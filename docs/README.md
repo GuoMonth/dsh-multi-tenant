@@ -8,9 +8,11 @@ Navigation hub for the live `dsh-multi-tenant` architecture and release contract
 
 - [README](../README.md) — current product/runtime overview
 - [CONTRIBUTING](../CONTRIBUTING.md) — engineering and assumption-first policy
-- [Direction](../ROADMAP.md) — short current-state + M5 target preview; no detailed milestone Roadmap
+- [Direction](../ROADMAP.md) — current M5 focus plus long-term direction; no detailed milestone Roadmap
 
 ## Live architecture
+
+These documents describe **implemented contracts or behavior the current release line depends on**:
 
 - [Architecture](./specs/architecture.md) — authoritative topology and security boundaries
 - [SaaS boundaries](./specs/saas-boundaries.md) — Product Ingress, Runtime capability and Agent Integration planes
@@ -19,6 +21,12 @@ Navigation hub for the live `dsh-multi-tenant` architecture and release contract
 - [M4 Product Ingress + Credentials](./specs/m4-product-ingress-credentials.md) — trusted identity mapping and Principal credential contract
 - [Principal operation lifecycle](./specs/operation-lifecycle.md) — Principal-owned one-shot semantic work
 - [Session / Agent publication boundary](./adr/session-genesis.md) — DSH setup/publication decision
+
+## Long-term vision
+
+Vision records direction; it is **not a current API contract and does not create a release gate**:
+
+- [Authority-Oriented Capabilities](./vision/authority-capabilities.md) — evolution from `Credential-as-Data` toward `Capability-as-Authority`, long-term Broker/Integration plugin responsibilities, and why M5 should still ship first on the M4 primitives.
 
 ## Evidence
 
