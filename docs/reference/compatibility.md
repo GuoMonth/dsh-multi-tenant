@@ -1,127 +1,71 @@
 [简体中文](./compatibility.zh-CN.md) | English
 
-# Compatibility & versioning policy
+# Compatibility & evidence
 
-## Runtime baseline
+`0.3` supports an explicit platform baseline. The project does not follow floating DSH/npm latest in blocking CI.
+
+## Supported baseline
 
 - **Node:** `^22.19.0 || >=24.0.0`
-- **Cordis peer:** `@deepseek-ai/cordis >=4.0.1 <5`
-- **DSH:** explicit baseline only; never a floating dependency
+- **Cordis:** `@deepseek-ai/cordis >=4.0.1 <5`
+- **DSH:** `0.1.1-rc.2`
+- **DSH release commit:** `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`
 
-CI exercises Node `22.19.0` and Node `24`.
+`scripts/dsh-target.mjs` owns the DSH version/commit identity.
 
-## Current DSH baseline
+## What CI proves
 
-`scripts/dsh-target.mjs` is the single source of truth:
+### Exact upstream identity
 
-```js
-DSH_TARGET = {
-  repository: 'deepseek-ai/deepseek-harness',
-  version: '0.1.1-rc.2',
-  commit: 'b150a551b8d465e31e418e1b2eaf5e79bbb7d28e',
-}
-```
+CI checks out the exact DSH release commit and verifies the source version before compatibility jobs are accepted.
 
-Future upgrades are manual and explicit; blocking CI does not auto-follow npm `latest` or upstream `master`.
+### DSH lifecycle seams still used by 0.3
 
-## Evidence model
+`pnpm probe:dsh` proves two current external assumptions:
 
-Compatibility is proven from several independent directions. A baseline is accepted only when the evidence for the **current live architecture** passes; historical seams do not remain blocking merely because older versions once depended on them.
+- Agent setup/publication ordering prevents setup failure from exposing a half-configured Agent;
+- DSH Agent creation preserves the caller-bound Principal-derived owner context.
 
-### Exact upstream source identity
+These probes remain because the `0.3` product path still depends on those upstream behaviors, not because they belong to an older release line.
 
-GitHub Actions checks out the pinned upstream repository at the exact release commit and verifies:
+### Cordis lifecycle seam
 
-- checkout HEAD equals `DSH_TARGET.commit`;
-- upstream root `package.json.version` equals `DSH_TARGET.version`.
+`pnpm probe:cordis` proves parent/child Fiber teardown and the reactive nature of `ctx.inject()`. The latter is why user semantic work uses the non-reactive Principal Operation boundary.
 
-### DSH publication and owner-context behavior
+### Real MCP Agent integration
 
-`pnpm probe:dsh` installs exact published DSH packages into clean temporary consumers and proves:
+`pnpm probe:mcp` is the main upstream vertical proof. It installs the pinned public DSH packages and uses a real stdio MCP server to verify:
 
-- **Session genesis** — setup/publication visibility and rollback behavior;
-- **caller-bound Agent owner context** — DSH Agent creation preserves trusted Tenant/Principal caller metadata and capability resolution.
+- official MCP-client `serverName` behavior;
+- real `tools/list` discovery;
+- real DSH `ToolRuntime.execute()` -> MCP `tools/call`;
+- Agent-scoped Tool visibility;
+- concurrent Tenant/Principal config and credential isolation;
+- cross-Principal resume denial before the DSH Agent seam;
+- startup-failure and teardown behavior.
 
-This is upstream seam evidence, not the semantic definition of a user Operation.
+### Installed artifact
 
-### Cordis lifecycle behavior
+`pnpm smoke` builds/packs `dsh-multi-tenant`, verifies required tarball/export targets, installs the packed artifact beside `@deepseek-ai/dsh@0.1.1-rc.2` in a clean consumer, and exercises the current Product Ingress / RuntimeComposition / Credentials / MCP contract.
 
-`pnpm probe:cordis` proves the external lifecycle assumptions the Runtime uses:
-
-- child Fiber ownership/cleanup follows parent lifetime;
-- `ctx.inject()` is dependency-reactive and may rerun after provider loss/recovery.
-
-The second fact is precisely why user-visible work uses a non-reactive Principal Operation rather than a raw inject callback.
-
-### SaaS Core vertical compatibility
-
-`pnpm probe:saas-core` exercises the complete active DSH-facing path against the pinned public AgentRegistry:
-
-```text
-Typed CompositionPlan
-  -> Tenant / Principal
-  -> Principal-owned one-shot Operation
-  -> typed capability snapshot
-  -> real DSH Agent create / resume / failure
-```
-
-The proof covers multiple Tenants/Principals, caller-bound identity/capability visibility, exact-once semantic execution, create/resume, downstream failure and quiescent cleanup.
-
-This is the primary integration evidence for the current v0.3 Core.
-
-### Packed artifact behavior
-
-`pnpm smoke` builds and packs the npm artifact, installs it into a clean external consumer and executes the public Runtime/Composition/Operation contract, including typed capability snapshots and scope-local composition identity.
-
-Source tests alone are not sufficient evidence for a release artifact.
-
-## Historical evidence is not a permanent gate
-
-Historical Web/ApiProxy, global admission-decorator and raw reactive-integration-fiber experiments remain in Git history rather than live blocking compatibility suites.
-
-If a future architecture genuinely depends on one of those seams again, reintroduce a focused proof from current requirements instead of reviving the old surface by default.
-
-## Manual baseline refresh
-
-When intentionally moving DSH/Cordis forward:
-
-1. select explicit versions and, for DSH, the release commit;
-2. update `scripts/dsh-target.mjs` and active dependency pins;
-3. regenerate `pnpm-lock.yaml` from the real registry when the workspace graph changes;
-4. verify exact upstream source identity;
-5. run `pnpm probe:platform` so DSH + Cordis + SaaS Core assumptions are exercised together;
-6. run quality/packed-consumer gates;
-7. fix failures structurally rather than weakening evidence;
-8. update live docs to the new baseline and keep historical release notes unchanged.
+The post-publication registry smoke reuses that same installed-consumer proof against the exact npm version.
 
 ## Compatibility philosophy
 
-This project is in rapid prerelease development. We do not preserve early API shapes, test harnesses or investigation surfaces merely because they were once correct.
+This project is in rapid prerelease development:
 
-Compatibility work follows three rules:
+- current external seams are proven because the live product depends on them;
+- old milestone names, historical release notes and superseded probes are removed from the active tree;
+- breaking changes are allowed when real integration evidence proves a better contract;
+- Git history/tags preserve archaeology; the live repository optimizes for current correctness and speed.
 
-- where this repository owns a boundary, enforce it;
-- where DSH/Cordis/provider/integration ecosystems own a seam the live architecture depends on, prove or standardize it;
-- when a seam no longer serves the product direction, remove it from the live tree instead of maintaining compatibility theater.
+## Moving the baseline
 
-## CI gates
+When intentionally moving DSH/Cordis forward:
 
-Pull requests and `main` require:
-
-- exact upstream DSH source baseline verification;
-- frozen-lockfile installation;
-- package/architecture invariants (`pnpm verify`);
-- release manifest preflight;
-- TypeScript typecheck;
-- unit and contract tests;
-- build;
-- packed external-consumer smoke;
-- DSH + Cordis + SaaS Core platform probes on Node 22.19 and Node 24.
-
-## Runtime/core dependency invariant
-
-The current publishable package keeps runtime dependencies minimal and uses Cordis/DSH native seams rather than embedding vendor implementations into the Core.
-
-Product authentication protocols, durable secret stores, databases, HTTP/WebSocket servers and concrete vendor integrations belong outside the Core unless a future proven boundary explicitly requires otherwise.
-
-MCP is treated according to the DSH-native integration seam available at the selected baseline; v0.3 does not add a parallel protocol stack merely for compatibility breadth.
+1. choose explicit versions and a DSH release commit;
+2. update `scripts/dsh-target.mjs` and active dependency pins;
+3. regenerate the lockfile when needed;
+4. run source identity, platform probes and installed-artifact smoke;
+5. fix failures structurally rather than weakening the evidence;
+6. update live docs to the new baseline.
