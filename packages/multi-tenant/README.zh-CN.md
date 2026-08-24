@@ -1,28 +1,40 @@
 # dsh-multi-tenant
 
-**面向 DeepSeek Harness 的 Multi-Tenant SaaS Runtime primitives。**
+**让 DeepSeek Harness 可以安全地跑在真正的 Multi-Tenant SaaS 产品后面。**
 
-当一个 DSH 产品要同时服务多个组织和多个用户，而且 Tenant config、Principal credential、Session ownership、Agent-scoped MCP Tools 不能串时，就用这个 package。
+当一个 DSH Runtime 要同时服务多个组织和多个用户，而且 Tenant config、Principal credential、Session ownership、Agent-scoped MCP Tools 绝对不能串时，就用这个 package。
 
-> Package candidate：**`dsh-multi-tenant@0.3.0-rc.1`**
->
-> Compatible DSH baseline：`0.1.1-rc.2`。
+> **`dsh-multi-tenant@0.3.0-rc.1`** · compatible DSH baseline：`0.1.1-rc.2`
 
-## 为什么要装它
+## 它解决的问题
 
-产品开发者通常不想每次都自己重写下面这一整层：
+单用户 Agent 很简单：
 
 ```text
-trusted user
-  -> Tenant / Principal
-  -> Tenant-specific MCP config
-  -> Principal-specific credentials
-  -> safe Session ownership
-  -> DSH Agent create/resume
-  -> native MCP Tools
+request -> Agent -> MCP -> backend
 ```
 
-这个 package 提供这条链需要的 Runtime / composition 能力；authentication、数据库、secret store、厂商业务协议继续属于你的产品或 integration plugin。
+SaaS Agent Runtime 真正要保证的是：
+
+```text
+Acme / Alice   -> Acme MCP + Alice credential + Alice Sessions
+Acme / Bob     -> Acme MCP + Bob credential   + Bob Sessions
+Globex / Alice -> Globex MCP + Globex/Alice credential + Globex Sessions
+```
+
+如果没有一层可复用 Runtime boundary，每个产品最终都会自己重复写 Tenant 查找、credential plumbing、MCP setup、Session authorization 和 Agent lifecycle。
+
+`dsh-multi-tenant` 把它收敛成一条产品链路：
+
+```text
+trusted subject
+  -> Tenant / Principal
+  -> Tenant MCP config
+  -> Principal credentials
+  -> fail-closed Session ownership
+  -> Principal-bound Agent create/resume
+  -> native DSH MCP Tools
+```
 
 ## 安装
 
@@ -32,13 +44,17 @@ Compatible DSH profile：
 dsh plugin --profile <profile> add dsh-multi-tenant
 ```
 
-如果 framework code 已经拥有 compatible DSH installation：
+如果 framework code 本身已经拥有 compatible DSH installation：
 
 ```sh
 pnpm add dsh-multi-tenant
 ```
 
-## Quick start
+MCP 路径直接复用 DSH installation 提供的官方 `@deepseek-ai/dsh-mcp-client`，本项目不 vendor / fork MCP。
+
+## Quick Start
+
+Authentication 由产品负责。请求已经可信以后，把它 resolve 成 Tenant / Principal，Runtime 负责把后面的多租户 Agent 链路组合起来。
 
 ```ts
 const plan = compileSaaSDefinition({
@@ -57,32 +73,25 @@ const agents = createMcpAgentIntegration(principal)
 const handle = await agents.create({ sessionId })
 ```
 
-`create()` resolve 时，官方 DSH MCP client 已完成 initial discovery，返回的 Agent 已经拥有 native Agent-scoped MCP Tools。
+`create()` resolve 时，官方 DSH MCP client 已经完成 initial discovery，Agent 已经拥有 native Agent-scoped MCP Tools。`resume()` 会在 DSH persistence / setup 之前检查 Session ownership。
 
-## 核心产品 contract
+## 0.3 给你的能力
 
-### Product Ingress
+- trusted product identity -> canonical Tenant / Principal；
+- exact `CompositionPlan -> RuntimeComposition` binding；
+- Principal-scoped replaceable credentials；
+- Tenant-scoped MCP configuration；
+- Principal-bound Agent `create()` / `resume()`；
+- immutable、fail-closed Session ownership；
+- deterministic per-Session MCP namespace；
+- Principal-owned long-lived Agent；
+- 官方 DSH MCP Tools integration；
+- clean installed-artifact 与 post-publication registry verification。
 
-Framework 从 authentication 之后开始。`createProductIngress()` 把产品已经信任的 subject 映射成 validated canonical Tenant / Principal。
-
-### RuntimeComposition
-
-一张精确 `CompositionPlan` 绑定一个 active product Runtime；同一 root 上不同 whole-plan identity 会 fail，而不是静默混用 Deployment / Tenant / Principal / Operation recipe。
-
-### Principal Credentials
-
-`principalCredentials` 是 replaceable Principal-scoped low-level credential capability。`InMemoryPrincipalCredentials` 仅用于 reference / test。
-
-### Tenant MCP + Agent integration
-
-`tenantMcpConfig` 是 Tenant-scoped。`createMcpAgentIntegration(principal)` 一次 capture Tenant MCP config + Principal credentials，检查 Session ownership，然后 create / resume Principal-owned long-lived DSH Agent。
-
-Package 复用 compatible DSH installation 自带的官方 `@deepseek-ai/dsh-mcp-client`，不 vendor / fork MCP。
-
-## Architecture
+## 技术架构
 
 ```text
-trusted subject
+Product authentication
   -> Product Ingress
   -> RuntimeComposition
   -> Tenant / Principal
@@ -92,7 +101,27 @@ trusted subject
   -> native Agent-scoped MCP Tools
 ```
 
-## Public subpaths
+边界很简单：
+
+- Product 管 authentication。
+- Core 管 identity、composition、lifecycle。
+- Operation 只拥有一次短生命周期 semantic decision，不拥有 Agent lifetime。
+- Principal 拥有 long-lived Agent。
+- DSH 拥有 MCP wire behavior。
+
+## 安全边界
+
+Cordis Context 提供 trusted same-process identity / lifecycle separation，不是 hostile-code sandbox。真正的 secret / process / filesystem / network 强隔离应该放在 process / container / Pod / sidecar / remote boundary。
+
+## Compatibility
+
+- Node：`^22.19.0 || >=24.0.0`
+- Cordis：`>=4.0.1 <5`
+- DSH：`0.1.1-rc.2`
+
+Release gate 会把真正打包后的 artifact 安装到 clean consumer，并与 pinned DSH 一起验证；发布以后再对 exact npm artifact 重跑同一份 consumer contract。
+
+## Public Subpaths
 
 ```text
 dsh-multi-tenant
@@ -106,15 +135,3 @@ dsh-multi-tenant/mcp
 dsh-multi-tenant/store
 dsh-multi-tenant/testing
 ```
-
-## Security boundary
-
-Cordis Context 提供 trusted same-process composition / lifecycle separation，不是 hostile-code isolation。更强的 secret / process / filesystem / network isolation 应由 process / container / Pod / sidecar / remote deployment boundary 提供。
-
-## Compatibility
-
-- Node：`^22.19.0 || >=24.0.0`
-- Cordis：`>=4.0.1 <5`
-- DSH baseline：`0.1.1-rc.2`
-
-Repository release gate 会把 packed artifact 与 pinned DSH 一起安装到干净 consumer 验证，并在 npm publication 后重复验证 exact registry artifact。
