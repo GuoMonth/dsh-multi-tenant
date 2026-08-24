@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Package smoke: prove the packed tarball is the same contract we test in the
- * repository. Build -> pack -> verify contents/exports -> install into a clean
- * consumer -> exercise the frozen kernel, canonical Runtime, and v0.3 typed
- * Composition -> Principal Operation path through public package surfaces.
+ * Packed-consumer smoke for the contract users actually install.
+ *
+ * Build -> pack -> verify public export targets -> install in a clean consumer
+ * -> exercise ownership kernel + bound RuntimeComposition + M4 ingress and
+ * Principal Credentials through package subpaths/root exports.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -28,18 +29,20 @@ function collectTargets(exports, acc = []) {
 
 const tmp = mkdtempSync(join(tmpdir(), 'dsh-mt-pack-'))
 const consumer = mkdtempSync(join(tmpdir(), 'dsh-mt-consumer-'))
+
 try {
   execFileSync('pnpm', ['--filter', 'dsh-multi-tenant', 'build'], { cwd: root, stdio: 'ignore' })
   execFileSync('pnpm', ['--filter', 'dsh-multi-tenant', 'pack', '--pack-destination', tmp], {
     cwd: root,
     stdio: 'ignore',
   })
-  const tarball = readdirSync(tmp).find(f => f.endsWith('.tgz'))
+
+  const tarball = readdirSync(tmp).find(file => file.endsWith('.tgz'))
   if (!tarball) throw new Error('pnpm pack produced no tarball')
 
   const listing = execFileSync('tar', ['-tzf', join(tmp, tarball)], { encoding: 'utf8' })
   const lines = listing.split('\n')
-  const has = f => lines.some(line => line === f || line.endsWith(`/${f}`))
+  const has = file => lines.some(line => line === file || line.endsWith(`/${file}`))
 
   const required = [
     'package.json',
@@ -47,117 +50,148 @@ try {
     'dist/runtime.mjs',
     'dist/operation.mjs',
     'dist/composition.mjs',
+    'dist/runtime-composition.mjs',
+    'dist/ingress.mjs',
+    'dist/credentials.mjs',
     'dist/store.mjs',
     'dist/testing.mjs',
     'cordis.patch.yml',
     'README.md',
     'LICENSE',
   ]
-  const missing = required.filter(f => !has(f))
+  const missing = required.filter(file => !has(file))
   if (missing.length) throw new Error(`tarball is missing: ${missing.join(', ')}`)
 
   const targets = collectTargets(pkg.exports)
-  const unresolved = targets.filter(t => !has(t.replace(/^\.\//, '')))
+  const unresolved = targets.filter(target => !has(target.replace(/^\.\//, '')))
   if (unresolved.length) throw new Error(`exports targets missing from tarball: ${unresolved.join(', ')}`)
 
-  writeFileSync(join(consumer, 'package.json'), JSON.stringify({ name: 'smoke-consumer', private: true, type: 'module' }))
-  execFileSync('pnpm', ['add', join(tmp, tarball), '@deepseek-ai/cordis@4.0.1'], { cwd: consumer, stdio: 'ignore' })
-  writeFileSync(join(consumer, 'smoke.mjs'), [
-    'import { Context } from "@deepseek-ai/cordis";',
-    'import Service, { defineCapability, provideCapability } from "dsh-multi-tenant";',
-    'import Store from "dsh-multi-tenant/store";',
-    'import Runtime from "dsh-multi-tenant/runtime";',
-    'import { OperationDependencyUnavailableError } from "dsh-multi-tenant/operation";',
-    'import {',
-    '  bootstrapDeploymentComposition,',
-    '  compileSaaSDefinition,',
-    '  operationDefinitionFromPlan,',
-    '  principalDefinitionFromPlan,',
-    '  tenantDefinitionFromPlan,',
-    '} from "dsh-multi-tenant/composition";',
-    'import { assertTenantSessionStoreContract, assertRuntimeCapabilityProviderContract } from "dsh-multi-tenant/testing";',
-    'const ctx = new Context();',
-    'await ctx.plugin(Store);',
-    'await ctx.plugin(Service);',
-    'await ctx.plugin(Runtime);',
-    'const alice = { tenantId: "acme", userId: "alice" };',
-    'await ctx.multiTenant.claimSession("s1", alice);',
-    'if ((await ctx.multiTenant.canAccessSession(alice, "s1")) !== true) throw new Error("smoke: same-user should be allowed");',
-    'const tenant = await ctx.tenantRuntime.tenants.ensure("acme", {',
-    '  isolateServices: ["tenantAuth"],',
-    '  setup: ({ ctx: tenantCtx }) => { tenantCtx.provide("tenantAuth", "auth-A"); },',
-    '});',
-    'if (tenant.ctx.get("tenantAuth") !== "auth-A") throw new Error("smoke: tenant capability did not resolve");',
-    'if (ctx.get("tenantAuth") !== undefined) throw new Error("smoke: tenant capability leaked to root");',
-    'const principal = await tenant.principals.ensure("alice");',
-    'await principal.ctx.multiTenant.claimSession("s2", principal.identity);',
-    'const ownerFromRoot = await ctx.multiTenant.getSessionOwner("s2");',
-    'if (ownerFromRoot?.tenantId !== "acme" || ownerFromRoot?.userId !== "alice") throw new Error("smoke: ownership kernel state did not cross context boundary");',
-    'await assertTenantSessionStoreContract(async (c) => { await c.plugin(Store); return c.tenantSessionStore });',
-    'await assertRuntimeCapabilityProviderContract({',
-    '  serviceName: "smokeCapability",',
-    '  level: "tenant",',
-    '  mount: (scopeCtx, marker) => { scopeCtx.provide("smokeCapability", marker); },',
-    '  fingerprint: scopeCtx => scopeCtx.get("smokeCapability"),',
-    '});',
-    'const smokeDeployment = defineCapability("smokeDeployment", "deployment");',
-    'const smokeTenant = defineCapability("smokeTenant", "tenant");',
-    'const smokePrincipal = defineCapability("smokePrincipal", "principal");',
-    'const smokeOperation = defineCapability("smokeOperation", "operation");',
-    'const missingCapability = defineCapability("missing", "principal");',
-    'const ambient = ctx.plugin(function smokeDeploymentProvider(providerCtx) {',
-    '  provideCapability(providerCtx, smokeDeployment, "deployment-ready");',
-    '});',
-    'await ambient;',
-    'const makePlan = (operationKey = "operation-v1") => compileSaaSDefinition({',
-    '  capabilities: [',
-    '    { capability: smokeDeployment, required: true },',
-    '    { capability: smokeTenant, required: true },',
-    '    { capability: smokePrincipal, required: true },',
-    '    { capability: smokeOperation, required: true },',
-    '  ],',
-    '  providers: [',
-    '    { id: "ambient", capability: smokeDeployment },',
-    '    { id: "tenant", capability: smokeTenant, setup: ({ ctx: c }) => { provideCapability(c, smokeTenant, "tenant-ready"); } },',
-    '    { id: "principal", capability: smokePrincipal, requires: [smokeTenant], setup: ({ ctx: c }) => { provideCapability(c, smokePrincipal, "principal-ready"); } },',
-    '    { id: "operation", capability: smokeOperation, definitionKey: operationKey, requires: [smokePrincipal], setup: ({ ctx: c }) => { provideCapability(c, smokeOperation, "operation-ready"); } },',
-    '  ],',
-    '});',
-    'const plan = makePlan();',
-    'const operationOnlyPlan = makePlan("operation-v2");',
-    'if (plan.fingerprint === operationOnlyPlan.fingerprint) throw new Error("smoke: whole Plan fingerprint ignored Operation drift");',
-    'if (plan.scopeFingerprints.tenant !== operationOnlyPlan.scopeFingerprints.tenant) throw new Error("smoke: Operation-only change polluted Tenant identity");',
-    'if (plan.scopeFingerprints.principal !== operationOnlyPlan.scopeFingerprints.principal) throw new Error("smoke: Operation-only change polluted Principal identity");',
-    'const deployment = await bootstrapDeploymentComposition(ctx, plan);',
-    'const saasTenant = await ctx.tenantRuntime.tenants.ensure("saas-acme", tenantDefinitionFromPlan(plan));',
-    'const saasAlice = await saasTenant.principals.ensure("alice", principalDefinitionFromPlan(plan));',
-    'if ((await ctx.tenantRuntime.tenants.ensure("saas-acme", tenantDefinitionFromPlan(operationOnlyPlan))) !== saasTenant) throw new Error("smoke: scope-local Tenant join failed");',
-    'if ((await saasTenant.principals.ensure("alice", principalDefinitionFromPlan(operationOnlyPlan))) !== saasAlice) throw new Error("smoke: scope-local Principal join failed");',
-    'const operation = saasAlice.operations.start({',
-    '  ...operationDefinitionFromPlan(plan),',
-    '  requires: [smokeDeployment, smokeTenant, smokePrincipal, smokeOperation],',
-    '  execute: ({ capabilities }) => [',
-    '    capabilities.require(smokeDeployment),',
-    '    capabilities.require(smokeOperation),',
-    '    capabilities.require(smokePrincipal),',
-    '    capabilities.require(smokeTenant),',
-    '  ].join("|"),',
-    '});',
-    'const operationValue = await operation.result;',
-    'if (operationValue !== "deployment-ready|operation-ready|principal-ready|tenant-ready") throw new Error(`smoke: unexpected Operation snapshot ${operationValue}`);',
-    'if (operation.state !== "disposed" || saasAlice.operations.size !== 0) throw new Error("smoke: Operation did not become quiescent");',
-    'const missing = saasAlice.operations.start({ requires: [missingCapability], execute() { throw new Error("must not execute"); } });',
-    'let missingFailed = false;',
-    'try { await missing.result; } catch (error) { missingFailed = error instanceof OperationDependencyUnavailableError; }',
-    'if (!missingFailed) throw new Error("smoke: packaged Operation dependency error contract failed");',
-    'await saasTenant.dispose();',
-    'await deployment.dispose();',
-    'await ambient.dispose();',
-    'await tenant.dispose();',
-    'await ctx.fiber.dispose();',
-    'console.log("consumer smoke passed");',
-  ].join('\n'))
-  execFileSync('node', ['smoke.mjs'], { cwd: consumer, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  writeFileSync(join(consumer, 'package.json'), JSON.stringify({
+    name: 'smoke-consumer',
+    private: true,
+    type: 'module',
+  }))
+  execFileSync('pnpm', ['add', join(tmp, tarball), '@deepseek-ai/cordis@4.0.1'], {
+    cwd: consumer,
+    stdio: 'ignore',
+  })
+
+  writeFileSync(join(consumer, 'smoke.mjs'), `
+import { Context } from '@deepseek-ai/cordis'
+import Service, {
+  CredentialUnavailableError,
+  InMemoryPrincipalCredentials,
+  RuntimeCompositionConflictError,
+  compileSaaSDefinition,
+  createProductIngress,
+  definePrincipalCredentialsProvider,
+  materializeRuntimeComposition,
+  principalCredentials,
+} from 'dsh-multi-tenant'
+import Store from 'dsh-multi-tenant/store'
+import Runtime from 'dsh-multi-tenant/runtime'
+import { materializeRuntimeComposition as materializeFromSubpath } from 'dsh-multi-tenant/runtime-composition'
+import { createProductIngress as ingressFromSubpath } from 'dsh-multi-tenant/ingress'
+import { principalCredentials as credentialsFromSubpath } from 'dsh-multi-tenant/credentials'
+
+if (materializeFromSubpath !== materializeRuntimeComposition) throw new Error('runtime-composition subpath mismatch')
+if (ingressFromSubpath !== createProductIngress) throw new Error('ingress subpath mismatch')
+if (credentialsFromSubpath !== principalCredentials) throw new Error('credentials subpath mismatch')
+
+const ctx = new Context()
+await ctx.plugin(Store)
+await ctx.plugin(Service)
+await ctx.plugin(Runtime)
+
+const kernelPrincipal = { tenantId: 'kernel-acme', userId: 'alice' }
+await ctx.multiTenant.claimSession('smoke-session', kernelPrincipal)
+if (!(await ctx.multiTenant.canAccessSession(kernelPrincipal, 'smoke-session'))) {
+  throw new Error('ownership kernel same-principal access failed')
+}
+if (await ctx.multiTenant.canAccessSession({ tenantId: 'globex', userId: 'alice' }, 'smoke-session')) {
+  throw new Error('ownership kernel cross-tenant denial failed')
+}
+
+const makePlan = revision => compileSaaSDefinition({
+  capabilities: [{ capability: principalCredentials, required: true }],
+  providers: [definePrincipalCredentialsProvider({
+    id: 'credentials-' + revision,
+    definitionKey: revision,
+    create({ principal }) {
+      return new InMemoryPrincipalCredentials({
+        erpToken: revision + ':' + principal.tenantId + '/' + principal.userId,
+      })
+    },
+  })],
+})
+
+const v1 = makePlan('v1')
+const app = await materializeRuntimeComposition(ctx, v1)
+if ((await materializeRuntimeComposition(ctx, v1)) !== app) throw new Error('same Plan did not join')
+
+let conflict = false
+try {
+  await materializeRuntimeComposition(ctx, makePlan('v2'))
+} catch (error) {
+  conflict = error instanceof RuntimeCompositionConflictError
+}
+if (!conflict) throw new Error('different active whole Plan did not conflict')
+
+const ingress = createProductIngress(app, subject => ({
+  tenantId: subject.org,
+  userId: subject.user,
+}))
+const alice = await ingress.resolve({ org: 'acme', user: 'alice' })
+const tokenOperation = alice.operations.start({
+  requires: [principalCredentials],
+  async execute({ capabilities }) {
+    return capabilities.require(principalCredentials).require('erpToken')
+  },
+})
+if ((await tokenOperation.result) !== 'v1:acme/alice') throw new Error('M4 credential path returned wrong value')
+
+const missingOperation = alice.operations.start({
+  requires: [principalCredentials],
+  async execute({ capabilities }) {
+    return capabilities.require(principalCredentials).require('missing')
+  },
+})
+let missingCredential = false
+try {
+  await missingOperation.result
+} catch (error) {
+  missingCredential = error instanceof CredentialUnavailableError
+}
+if (!missingCredential) throw new Error('missing credential contract failed')
+
+await app.dispose()
+if (alice.runtime.state !== 'disposed') throw new Error('RuntimeComposition did not drain Principal')
+
+const v2 = makePlan('v2')
+const replacement = await materializeRuntimeComposition(ctx, v2)
+const replacementIngress = createProductIngress(replacement, subject => ({
+  tenantId: subject.org,
+  userId: subject.user,
+}))
+const replacementAlice = await replacementIngress.resolve({ org: 'acme', user: 'alice' })
+const replacementOperation = replacementAlice.operations.start({
+  requires: [principalCredentials],
+  async execute({ capabilities }) {
+    return capabilities.require(principalCredentials).require('erpToken')
+  },
+})
+if ((await replacementOperation.result) !== 'v2:acme/alice') throw new Error('provider replacement failed')
+
+await replacement.dispose()
+await ctx.fiber.dispose()
+console.log('consumer smoke passed')
+`)
+
+  execFileSync('node', ['smoke.mjs'], {
+    cwd: consumer,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
 
   console.log(`package smoke passed: ${tarball}`)
 } finally {

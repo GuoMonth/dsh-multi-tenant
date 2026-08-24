@@ -107,6 +107,39 @@ export type {
   DeploymentComposition,
 } from './composition.ts'
 
+export {
+  materializeRuntimeComposition,
+  RuntimeCompositionError,
+  RuntimeCompositionConflictError,
+  RuntimeCompositionClosedError,
+  RuntimeCompositionCapabilityError,
+} from './runtime-composition.ts'
+export type {
+  RuntimeCompositionAttestation,
+  RuntimeCompositionOperationDefinition,
+  ComposedOperationRegistry,
+  ComposedPrincipal,
+  ComposedPrincipalRegistry,
+  ComposedTenant,
+  ComposedTenantRegistry,
+  RuntimeComposition,
+} from './runtime-composition.ts'
+
+export { createProductIngress } from './ingress.ts'
+export type { ProductIdentityResolver, ProductIngress } from './ingress.ts'
+
+export {
+  principalCredentials,
+  InMemoryPrincipalCredentials,
+  CredentialUnavailableError,
+  definePrincipalCredentialsProvider,
+} from './credentials.ts'
+export type {
+  PrincipalCredentials,
+  PrincipalCredentialsFactoryPreparation,
+  PrincipalCredentialsProviderOptions,
+} from './credentials.ts'
+
 export { TenantSessionStore, InMemoryTenantSessionStore } from './store.ts'
 export type { TenantPrincipal, SessionOwner, ClaimResult } from './types.ts'
 export {

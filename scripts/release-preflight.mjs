@@ -66,6 +66,9 @@ if (!runtime) {
     './runtime',
     './operation',
     './composition',
+    './runtime-composition',
+    './ingress',
+    './credentials',
     './store',
     './testing',
     './cordis.patch.yml',
@@ -73,20 +76,19 @@ if (!runtime) {
     if (!(required in exports)) errors.push(`${expectedPackageName}: exports must include ${required}`)
   }
 
-  // Guard the current public narrative, not historical section names. If the
-  // Framework model evolves, this list should evolve with the live contract
-  // instead of forcing docs to preserve obsolete release-era structure.
+  // Guard the current product-facing public narrative. These markers should
+  // move with the live contract instead of forcing obsolete README topology.
   const readme = readFileSync(join(dir, 'README.md'), 'utf8')
-  for (const heading of [
-    '## Runtime model',
-    '## Supported guarantee',
-    '## Typed CapabilityToken',
-    '## SaaS Composition',
-    '## One-shot Operation boundary',
-    '## Framework boundary planes',
-    '## Explicit boundaries',
+  for (const marker of [
+    '## Product-facing path',
+    'RuntimeComposition',
+    'Product Ingress',
+    'Principal Credentials',
+    'One-shot work',
+    '## Low-level Runtime',
+    '## Security boundary',
   ]) {
-    if (!readme.includes(heading)) errors.push(`${expectedPackageName}: README missing ${heading}`)
+    if (!readme.includes(marker)) errors.push(`${expectedPackageName}: README missing ${marker}`)
   }
 }
 
@@ -117,6 +119,8 @@ for (const requiredPath of [
   'docs/specs/v0.3-assumptions.json',
   'docs/specs/saas-composition.md',
   'docs/specs/saas-boundaries.md',
+  'docs/specs/runtime-composition.md',
+  'docs/specs/m4-product-ingress-credentials.md',
   'scripts/session-genesis-probe.mjs',
   'scripts/agent-owner-context-probe.mjs',
   'scripts/cordis-operation-lifecycle-probe.mjs',
@@ -133,4 +137,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; single-package typed Runtime/Framework graph; OIDC-only publishing`)
+console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion} -> ${expectedTag}; bound RuntimeComposition + M4 public surface; OIDC-only publishing`)

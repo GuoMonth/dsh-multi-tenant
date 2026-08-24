@@ -1,38 +1,30 @@
 [English](./README.md) | 简体中文
 
-# 文档
+# Docs
 
-`dsh-multi-tenant` 当前 live architecture 与 release contract 的导航中心。
+`dsh-multi-tenant` 当前 live architecture / release contract 导航。
 
-## 指南
+## Guides
 
-- [README](../README.zh-CN.md) — 项目概览与当前 Runtime Contract
-- [CONTRIBUTING](../CONTRIBUTING.zh-CN.md) — 工程、相关性与 assumption-first 规范
-- [ROADMAP](../ROADMAP.zh-CN.md) — v0.2 基础与 v0.3 SaaS Framework 方向
+- [README](../README.zh-CN.md) —— 当前产品/Runtime 概览
+- [CONTRIBUTING](../CONTRIBUTING.zh-CN.md) —— engineering / assumption-first policy
+- [Direction](../ROADMAP.zh-CN.md) —— 只保留当前状态与 M5 目标，不再维护详细 milestone Roadmap
 
-## 当前架构
+## Live Architecture
 
-- [架构](./specs/architecture.zh-CN.md) — canonical Tenant / Principal Runtime 模型
-- [Session / Agent Publication Boundary](./adr/session-genesis.zh-CN.md) — 当前 DSH setup / publication 决策
+- [Architecture](./specs/architecture.zh-CN.md) —— topology 与 security boundary 权威文档
+- [SaaS Boundaries](./specs/saas-boundaries.zh-CN.md) —— Product Ingress、Runtime Capability、Agent Integration planes
+- [SaaS Composition](./specs/saas-composition.zh-CN.md) —— compiler、scope-local identity、provider materialization
+- [RuntimeComposition](./specs/runtime-composition.zh-CN.md) —— exact Plan binding / attestation 与 product-facing lifecycle
+- [M4 Product Ingress + Credentials](./specs/m4-product-ingress-credentials.zh-CN.md) —— trusted identity mapping 与 Principal credential contract
+- [Principal Operation Lifecycle](./specs/operation-lifecycle.zh-CN.md) —— Principal-owned one-shot semantic work
+- [Session / Agent Publication](./adr/session-genesis.zh-CN.md) —— DSH setup / publication decision
 
-## v0.3 P0 Specs
+## Evidence
 
-- [P0 底座](./specs/v0.3-foundation.zh-CN.md) — scope、开发顺序与 promotion gate
-- [SaaS Composition](./specs/saas-composition.zh-CN.md) — `SaaSDefinition -> CompositionPlan -> Runtime Composition`
-- [Principal Operation Lifecycle](./specs/operation-lifecycle.zh-CN.md) — Principal-owned one-shot work 与 Agent boundary
-- [`v0.3-assumptions.json`](./specs/v0.3-assumptions.json) — 机器可读 blocking assumption 与 executable proof
+- [v0.3 Foundation](./specs/v0.3-foundation.zh-CN.md) —— engineering / evidence gates
+- [`v0.3-assumptions.json`](./specs/v0.3-assumptions.json) —— machine-readable external assumption / proof
+- [Compatibility](./reference/compatibility.zh-CN.md) —— exact DSH baseline 与 CI evidence
+- [Release Contract](./reference/release.zh-CN.md) —— npm / OIDC publication contract
 
-## 参考
-
-- [兼容性与版本](./reference/compatibility.zh-CN.md) — 精确 DSH baseline 与当前 CI evidence
-- [发布契约](./reference/release.zh-CN.md) — package version 单一事实源、npm latest、OIDC publication 与 registry proof
-
-历史 Web/ApiProxy、admission-decorator 与早期静态调查文档刻意留在 Git history，而不是继续占据 live documentation tree。
-
-## Releases
-
-- [`v0.2.0-rc.3`](./releases/v0.2.0-rc.3.md) — 已发布 v0.2 Runtime Contract
-- [`v0.2.0-rc.2`](./releases/v0.2.0-rc.2.md) — canonical Runtime Contract 收敛
-- [`v0.2.0-rc.1`](./releases/v0.2.0-rc.1.md) — 第一个 context-native v0.2 runtime candidate
-- [`v0.1.0-rc.2`](./releases/v0.1.0-rc.2.md) — 冻结 kernel API 收敛
-- [`v0.1.0-rc.1`](./releases/v0.1.0-rc.1.md) — 第一次公开 kernel prerelease
+历史 Web / ApiProxy 和已经 superseded 的 investigation 只保留在 Git history，不继续占据 live docs。
