@@ -2,98 +2,104 @@
 
 # Contributing
 
-This repository optimizes for **current structural correctness and fast prerelease iteration**, not compatibility with old milestone shapes.
+`dsh-multi-tenant` is a fast-moving prerelease project. Contributions should optimize for **current product correctness, executable evidence and a small live tree** rather than preserving historical shape.
 
-## Start from the live product model
+## Product and architecture rule
+
+The current product path is:
 
 ```text
-Product authentication
-  -> trusted Product Ingress
+trusted product subject
+  -> Product Ingress
   -> RuntimeComposition
   -> canonical Tenant / Principal
-  -> typed Runtime capabilities
-  -> one-shot Operation
+  -> Tenant MCP config + Principal Credentials
+  -> one-shot create/resume Operation
   -> Principal-owned DSH Agent
-  -> native DSH integrations
+  -> official MCP client
+  -> native MCP Tools
 ```
 
-Before adding code, answer:
+Before adding a new abstraction, package or compatibility layer, ask whether a real vertical slice needs it.
 
-1. Who owns the identity/state/resource?
-2. What lifecycle creates, publishes, cancels and tears it down?
-3. Can Cordis/DSH already express the dependency or registration boundary?
-4. What invalid state should be structurally impossible?
-5. What executable evidence proves the behavior?
-6. Does this still serve the current `0.3` product direction?
+> **Do not create architecture because a name sounds reusable. Let repeated real integrations earn the abstraction.**
 
-If a design needs many exceptions, revisit the data model instead of adding compatibility glue.
+The project follows this boundary rule:
 
-## Boundary rule
+> **Enforce strictly where we control the boundary; define standards where ecosystem cooperation is required; state the boundary explicitly where we cannot control it.**
 
-- **We control it -> enforce it.** Fail closed where appropriate and test it.
-- **The ecosystem controls it -> prove/standardize the smallest seam.** Pin external baselines and keep executable compatibility evidence.
-- **We cannot enforce it -> state the boundary.** Do not hide it behind a local fork or parallel registry.
+## Evidence before abstraction
 
-## Current structural rules
+A blocking external assumption must have executable evidence before public API depends on it.
 
-- Product authentication stays outside Core; ingress starts from an already trusted subject.
-- Tenant and Principal are canonical lifecycle identities; Principal is nested under Tenant.
-- `CapabilityToken<T, Scope>` binds semantic key, type and authority/lifecycle scope.
-- Cordis remains the DI/service/lifecycle substrate; do not build a second container.
-- `RuntimeComposition` binds one exact product plan and prevents silent plan mixing.
-- Operation is non-reactive one-shot semantic work and captures required capabilities once.
-- A long-lived DSH Agent belongs to the Principal, not to the short create/resume Operation.
-- Session ownership fails closed; unauthorized resume is rejected before DSH work.
-- Agent Integration uses native DSH seams; do not create a second Agent/MCP registry.
-- Strong hostile-code isolation belongs to process/container/Pod/sidecar/remote boundaries.
+Prefer this sequence:
 
-A deliberate prerelease redesign may change these rules only when executable evidence shows a better global structure.
+```text
+product requirement
+  -> explicit boundary / assumption
+  -> executable probe or contract test
+  -> public API
+  -> documentation
+```
 
-## External compatibility
+Source reading explains upstream behavior but does not replace a probe when the behavior is release-critical.
 
-Current exact DSH baseline:
+Current external assumptions are tracked in `docs/specs/v0.3-assumptions.json`.
 
-- version: `0.1.1-rc.2`
-- release commit: `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`
+## Cordis / DSH first
 
-`scripts/dsh-target.mjs` is authoritative. A baseline refresh is explicit: update the pin, run current source/platform/artifact proofs, fix failures structurally, then update live docs.
+Prefer native DSH and Cordis seams:
 
-See `docs/reference/compatibility.md`.
+- Context / Fiber for ownership and lifecycle;
+- Cordis services for capabilities;
+- DSH Agent scope for Agent-local behavior;
+- official DSH MCP client / ToolRuntime for MCP Tools.
 
-## Evidence policy
+Do not introduce a second DI container, parallel lifecycle system or custom MCP protocol stack merely to make an abstraction look cleaner.
 
-`docs/specs/v0.3-assumptions.json` tracks blocking external assumptions. A public contract must not rely on an unproven blocking assumption.
+## Live tree policy
 
-Use the smallest useful proof:
+The active repository is **not an archive**.
 
-- unit/contract tests for repository-owned semantics;
-- compatibility probes for external DSH/Cordis behavior;
-- real integration probes for protocol/Agent seams;
-- installed-artifact smoke for what npm users actually receive.
+Keep:
 
-Source reading is useful for forming a hypothesis; it is not a release proof.
+- current code;
+- current product/runtime contracts;
+- current executable evidence;
+- current release machinery;
+- non-binding long-term Vision that still affects architectural judgment.
+
+Delete or consolidate:
+
+- superseded milestone documents/names;
+- old prerelease release notes after the project has moved to a new active baseline;
+- one-shot investigation workflows after their conclusion is captured by permanent tests;
+- redundant probes that are covered by a stronger current end-to-end proof;
+- compatibility scaffolding that no current release contract needs.
+
+Git history and tags preserve archaeology. Do not charge the current tree a permanent maintenance cost for it.
 
 ## Vision is not contract
 
-`docs/vision/*` records long-term direction only. It does not pre-approve package names or public APIs.
+Long-term direction may live under `docs/vision/*`, but Vision does not create a release gate or pre-approve package names/public APIs.
 
-The current authority vision prefers typed abilities over permanent raw-credential exposure. A public Broker contract must be earned by repeated semantics across real integrations, not by architectural imagination.
+The current authority-capability Vision prefers eventually giving Operations typed abilities instead of raw credentials. A future Broker may be a replaceable plugin capability and service integrations may expose typed clients/transports. That remains Vision until multiple real integrations prove the common contract.
 
-## Package rule
+## Change checklist
 
-Create a package only when there is a real independent consumer/replacement/lifecycle/versioning boundary.
+Before merging a material change:
 
-Do not scaffold speculative Auth, Broker, ERP, MCP or Transport package families. Research and one-off evidence belong in focused tests/scripts/docs or Git history.
+- the product value is clear;
+- ownership/lifecycle boundaries are explicit;
+- affected public contracts and docs are updated;
+- release-critical external assumptions have executable evidence;
+- Node 22.19 and Node 24 gates remain green where relevant;
+- the packed artifact, not only workspace source, is exercised for package-facing changes;
+- temporary investigation infrastructure has been removed or promoted into a permanent current proof;
+- no retired milestone artifact is accidentally reintroduced.
 
-## Definition of done
+## Release changes
 
-A change is done when:
+`packages/multi-tenant/package.json` is the release identity source of truth. The retained release workflow publishes from `main` through npm Trusted Publishing/OIDC and then verifies the exact registry artifact.
 
-- ownership/lifecycle/type implications are coherent;
-- it serves the current product direction;
-- current specs/docs are aligned;
-- required external assumptions are executable and green;
-- `pnpm release:check` is green;
-- no obsolete compatibility shim, milestone scaffold or duplicate protocol/registry is added.
-
-Historical prerelease documents and superseded investigations belong in Git history, not the live tree.
+Do not create release machinery for speculative future packages. Add it only when a real independently releasable boundary exists.
