@@ -11,16 +11,16 @@ const errors = []
 const requiredSpecs = [
   'docs/specs/architecture.md',
   'docs/specs/architecture.zh-CN.md',
-  'docs/specs/v0.3-foundation.md',
-  'docs/specs/v0.3-foundation.zh-CN.md',
   'docs/specs/saas-boundaries.md',
   'docs/specs/saas-boundaries.zh-CN.md',
   'docs/specs/saas-composition.md',
   'docs/specs/saas-composition.zh-CN.md',
   'docs/specs/runtime-composition.md',
   'docs/specs/runtime-composition.zh-CN.md',
-  'docs/specs/m4-product-ingress-credentials.md',
-  'docs/specs/m4-product-ingress-credentials.zh-CN.md',
+  'docs/specs/product-ingress-credentials.md',
+  'docs/specs/product-ingress-credentials.zh-CN.md',
+  'docs/specs/mcp-agent-integration.md',
+  'docs/specs/mcp-agent-integration.zh-CN.md',
   'docs/specs/operation-lifecycle.md',
   'docs/specs/operation-lifecycle.zh-CN.md',
   'docs/specs/v0.3-assumptions.json',
@@ -64,11 +64,17 @@ requireMarkers('docs/specs/runtime-composition.md', [
   'RuntimeCompositionConflictError',
   'RuntimeCompositionCapabilityError',
 ])
-requireMarkers('docs/specs/m4-product-ingress-credentials.md', [
-  'Product Ingress Boundary',
+requireMarkers('docs/specs/product-ingress-credentials.md', [
+  'Product Ingress boundary',
   'principalCredentials',
   'PrincipalCredentials',
   'definePrincipalCredentialsProvider',
+])
+requireMarkers('docs/specs/mcp-agent-integration.md', [
+  'DSH-native MCP Agent Integration',
+  'tenantMcpConfig',
+  'Principal-owned DSH Agent',
+  'scripts/mcp-agent-integration-probe.mjs',
 ])
 
 for (const path of [
@@ -94,6 +100,20 @@ for (const path of [
   ]) {
     if (source.includes(legacy)) errors.push(`${path}: contains obsolete v0.3 architecture marker ${legacy}`)
   }
+}
+
+for (const retired of [
+  'ROADMAP.md',
+  'ROADMAP.zh-CN.md',
+  'docs/specs/v0.3-foundation.md',
+  'docs/specs/v0.3-foundation.zh-CN.md',
+  'docs/specs/m4-product-ingress-credentials.md',
+  'docs/specs/m5-mcp-agent-integration.md',
+  'scripts/saas-core-vertical-slice-probe.mjs',
+  'scripts/m5-mcp-agent-integration-probe.mjs',
+  'scripts/package-smoke.mjs',
+]) {
+  if (existsSync(join(root, retired))) errors.push(`retired pre-v0.3/milestone artifact returned: ${retired}`)
 }
 
 if (!existsSync(ledgerPath)) {
@@ -139,4 +159,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log('v0.3 architecture verification passed: binding, M4 boundaries and assumption ledger are structurally valid')
+console.log('v0.3 architecture verification passed: current product contracts, evidence ledger and retired-artifact boundaries are valid')
