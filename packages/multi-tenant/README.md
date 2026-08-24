@@ -55,6 +55,8 @@ const provider = definePrincipalCredentialsProvider({
 
 `principalCredentials` is a canonical `CapabilityToken<PrincipalCredentials, 'principal'>`. It is isolated by Principal lifecycle and can be replaced without changing Framework Core. `InMemoryPrincipalCredentials` is reference/test infrastructure, not a production secret store.
 
+`PrincipalCredentials` is intentionally a **low-level current primitive**, not a promise that raw tokens are the long-term recommended Agent-facing abstraction. The long-term direction is for service-specific Integration Plugins to provide typed clients/transports while authority/credential Broker plugins keep secrets behind a narrower boundary. That direction is non-binding today and must not block the current M5 MCP Tools vertical slice.
+
 ### 4. One-shot work
 
 ```ts
@@ -101,7 +103,9 @@ dsh-multi-tenant/testing
 
 ## Security boundary
 
-Cordis Context is trusted same-process isolation/composition, not a hostile-code sandbox. Strong filesystem/process/network/shell isolation belongs to container/Pod deployment architecture.
+Cordis Context is trusted same-process isolation/composition, not a hostile-code sandbox. A future same-process Broker can reduce normal-path secret exposure but cannot protect against malicious code sharing the process. Strong filesystem/process/network/shell/secret isolation belongs to container/Pod/sidecar/remote deployment architecture.
+
+Long-term authority-capability direction is documented in the repository at `docs/vision/authority-capabilities.md`; it is not part of the current npm API contract.
 
 ## Install
 

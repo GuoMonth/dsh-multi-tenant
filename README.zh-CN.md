@@ -6,7 +6,7 @@
 
 > 已发布基础：`dsh-multi-tenant@0.2.0-rc.3`。
 >
-> 当前 v0.3 开发线：CompositionPlan 绑定/attestation、Product Ingress、Principal Credentials 已进入 Core contract。
+> 当前 v0.3 开发线：CompositionPlan binding/attestation、Product Ingress、Principal Credentials 已进入 Core contract；**下一步只聚焦 M5 真实 MCP Tools Agent Integration**。
 >
 > 当前 pinned DSH baseline：`0.1.1-rc.2` / `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`；CI 不追 floating `latest` / `master`。
 
@@ -100,7 +100,9 @@ const definition = {
 
 `principalCredentials` 是 Principal-scoped：不同 sibling / Tenant 隔离；provider 可以替换而不改 Core；消费发生在 one-shot Operation snapshot 中。In-memory 实现只用于 reference / test，不是 production secret store，并且刻意不提供枚举 secret 的 API。
 
-详见 `docs/specs/m4-product-ingress-credentials.zh-CN.md`。
+**定位说明：** `PrincipalCredentials` 是当前阶段的 low-level credential primitive，用来把真实产品链路跑起来；它不代表长期推荐让 Agent / Operation 直接接触 raw token。长期更希望 Integration Plugin 提供 `ErpClient` / `McpTransport` 这类 typed ability，把 secret 留在可替换的 authority / broker boundary 后面。这个长期方向不改变当前 M4 contract，也不阻塞 M5。
+
+详见 `docs/specs/m4-product-ingress-credentials.zh-CN.md`；长期非绑定方向见 `docs/vision/authority-capabilities.zh-CN.md`。
 
 ## 当前 Core Guarantees
 
@@ -120,7 +122,7 @@ const definition = {
 
 ## M5 预告
 
-下一目标刻意保持很小：
+下一目标刻意保持很小，**不再 redesign M4，也不提前冻结 universal Broker API**：
 
 ```text
 Product Ingress
@@ -133,7 +135,27 @@ Product Ingress
   -> native MCP Tools
 ```
 
-不造平行 MCP protocol stack；DSH 没有稳定 native consumer seam 前不桥接 Resources / Prompts。详细 milestone Roadmap 已退休，`ROADMAP.zh-CN.md` 只保留当前状态与 M5 目标。
+先使用现有 Credentials primitive 跑通真实 DSH MCP Tools vertical slice；如果实现中自然出现 brokered helper，先保持 private。只有 MCP + 第二个真实 integration（例如 ERP）证明了共享的 authority / refresh / injection / audit 语义以后，才考虑在后续 prerelease 做 breaking change，提炼正式 Broker contract。
+
+不造平行 MCP protocol stack；DSH 没有稳定 native consumer seam 前不桥接 Resources / Prompts。`ROADMAP.zh-CN.md` 只保留当前焦点和长期方向，不恢复长篇 milestone list。
+
+## 长期原则
+
+```text
+Core identity / lifecycle
+        ↓
+Authority / Credential Broker plugin
+        ↓
+Service Integration plugin
+        ↓
+Typed Client / Transport capability
+        ↓
+Operation
+```
+
+> **Core 管身份和生命周期；Broker 管授权与 secret；Integration 管厂商协议；Operation 消费 typed ability；Secret 在可行时留在 authority boundary 后面。**
+
+不同 ERP / MCP / GitHub 等接入应该通过可组合 Integration Plugin 生长，Broker 也应是可替换 plugin capability，而不是 Core 里的上帝对象。详细原则见 `docs/vision/authority-capabilities.zh-CN.md`。
 
 ## Public Subpaths
 
@@ -151,7 +173,7 @@ dsh-multi-tenant/testing
 
 ## Security Boundary
 
-Cordis Context 是 trusted same-process composition / lifecycle boundary，不隔离 process memory、filesystem、shell、network、environment variable 或恶意同进程插件。Strong isolation 属于 process / container / Pod deployment profile。
+Cordis Context 是 trusted same-process composition / lifecycle boundary，不隔离 process memory、filesystem、shell、network、environment variable 或恶意同进程插件。Same-process Broker 未来可以显著减少正常路径上的 secret 暴露，但不能把恶意同进程代码变成安全的；Strong isolation 仍属于 process / container / Pod / sidecar / remote authority boundary。
 
 ## 安装
 

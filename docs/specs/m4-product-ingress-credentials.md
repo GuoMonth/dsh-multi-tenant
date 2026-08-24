@@ -41,6 +41,14 @@ interface PrincipalCredentials {
 
 It does not expose enumeration, serialization or a universal secret-store API.
 
+### Contract positioning
+
+This API is deliberately a **low-level credential primitive for the current v0.3 line**. It proves Principal ownership, isolation, provider replacement and lifecycle with a real capability and gives M5 a practical way to complete a real integration.
+
+It does **not** assert that application/Agent code should permanently receive raw credentials. A later evidence-driven design may place credential access behind an authority/broker plugin and expose service-specific typed clients/transports to Operations instead.
+
+That future direction is non-binding and does not change this M4 contract. M5 must not be blocked on inventing a universal Broker API. See `../vision/authority-capabilities.md`.
+
 ## Provider adapter
 
 `definePrincipalCredentialsProvider()` receives the resolved Principal and AbortSignal inside Principal setup. A conforming provider may source credentials from any implementation; Core only requires a `PrincipalCredentials` value to be materialized in the correct scope.
@@ -58,6 +66,17 @@ The M4 contract tests prove:
 - missing credential fails explicitly;
 - replacing the credentials provider changes behavior without modifying Framework Core;
 - RuntimeComposition disposal recreates a clean Principal/provider lifecycle.
+
+## Non-goals
+
+M4 does not attempt to define:
+
+- a universal Credential Broker API;
+- service-specific ERP/MCP/GitHub client contracts;
+- credential refresh/audit/policy semantics shared across vendors;
+- a hostile-code secret sandbox.
+
+Those abstractions should be earned by later real integrations before any breaking public contract is introduced.
 
 ## Security boundary
 

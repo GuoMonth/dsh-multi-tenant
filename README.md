@@ -6,7 +6,7 @@ Make DeepSeek Harness (DSH) a real **Multi-Tenant Runtime** and provide a compos
 
 > Published foundation: `dsh-multi-tenant@0.2.0-rc.3`.
 >
-> Active v0.3 development: CompositionPlan binding/attestation, Product Ingress and Principal Credentials are now part of the Core contract.
+> Active v0.3 development: CompositionPlan binding/attestation, Product Ingress and Principal Credentials are now part of the Core contract; **the next focus is only M5 real MCP Tools Agent Integration**.
 >
 > Pinned DSH baseline: `0.1.1-rc.2` at `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`; CI does not follow floating `latest`/`master`.
 
@@ -100,7 +100,9 @@ const definition = {
 
 `principalCredentials` is Principal-scoped, isolated between siblings/Tenants, replaceable without changing Core, and consumed through the one-shot Operation snapshot. The in-memory implementation is intentionally a reference/test implementation, not a production secret store, and does not expose an enumeration API.
 
-See `docs/specs/m4-product-ingress-credentials.md`.
+**Positioning:** `PrincipalCredentials` is the current low-level credential primitive used to get real product flows working. It is not a statement that raw-token access is the long-term recommended Agent/Operation API. Over time, Integration Plugins should prefer typed abilities such as `ErpClient` or `McpTransport`, keeping secrets behind a replaceable authority/broker boundary. This long-term direction does not change the current M4 contract and must not block M5.
+
+See `docs/specs/m4-product-ingress-credentials.md`; see `docs/vision/authority-capabilities.md` for the non-binding long-term direction.
 
 ## Core guarantees
 
@@ -120,7 +122,7 @@ Current executable evidence covers:
 
 ## M5 preview
 
-The next target is deliberately small:
+The next target is deliberately small: **do not redesign M4 and do not freeze a universal Broker API yet**.
 
 ```text
 Product Ingress
@@ -133,7 +135,27 @@ Product Ingress
   -> native MCP Tools
 ```
 
-No parallel MCP protocol stack and no Resources/Prompts bridge until DSH exposes a stable native consumer seam. The detailed milestone Roadmap has been retired; `ROADMAP.md` now only records current state and this M5 target.
+Use the existing Credentials primitive to ship a real DSH MCP Tools vertical slice first. If a brokered helper naturally appears, keep it private. Only after MCP plus a second real integration (for example ERP) prove repeated authority/refresh/injection/audit semantics should a later prerelease extract a public Broker contract with deliberate breaking changes.
+
+No parallel MCP protocol stack and no Resources/Prompts bridge until DSH exposes a stable native consumer seam. `ROADMAP.md` records only the current focus and long-term direction rather than a detailed milestone list.
+
+## Long-term principle
+
+```text
+Core identity / lifecycle
+        ↓
+Authority / Credential Broker plugin
+        ↓
+Service Integration plugin
+        ↓
+Typed Client / Transport capability
+        ↓
+Operation
+```
+
+> **Core owns identity/lifecycle; Broker owns authority/secrets; Integration owns vendor protocol; Operation consumes typed abilities; secrets stay behind the authority boundary whenever practical.**
+
+Different ERP/MCP/GitHub/vendor integrations should grow as composable Integration Plugins. A Broker should likewise be a replaceable plugin capability rather than a Core god object. See `docs/vision/authority-capabilities.md`.
 
 ## Public subpaths
 
@@ -151,7 +173,7 @@ dsh-multi-tenant/testing
 
 ## Security boundary
 
-Cordis Context is a trusted same-process composition/lifecycle boundary. It does not isolate process memory, filesystem, shell, network, environment variables or malicious same-process plugins. Strong isolation belongs to process/container/Pod deployment profiles.
+Cordis Context is a trusted same-process composition/lifecycle boundary. It does not isolate process memory, filesystem, shell, network, environment variables or malicious same-process plugins. A future same-process Broker can materially reduce normal-path secret exposure, but it cannot make hostile same-process code safe; strong isolation still belongs to process/container/Pod/sidecar/remote authority boundaries.
 
 ## Install
 
