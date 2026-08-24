@@ -6,13 +6,14 @@
  *   node scripts/artifact-consumer-smoke.mjs --local
  *   node scripts/artifact-consumer-smoke.mjs dsh-multi-tenant@0.3.0-rc.1
  *
- * --local builds/packs the current workspace first. Registry verification passes
- * an exact npm spec. Both paths install the candidate beside the pinned DSH CLI,
- * then exercise the v0.3 Product Ingress / RuntimeComposition / Credentials / MCP
- * surface and trigger the packaged M5 dynamic import of the official MCP client.
+ * --local builds/packs the current workspace first, verifies tarball/export
+ * completeness, then installs the candidate beside the pinned DSH CLI. Registry
+ * verification passes an exact npm spec. Both paths exercise the v0.3 Product
+ * Ingress / RuntimeComposition / Credentials / MCP surface and trigger the
+ * packaged dynamic import of the official MCP client.
  */
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,6 +23,17 @@ const requested = process.argv[2]
 if (!requested) {
   console.error('usage: node scripts/artifact-consumer-smoke.mjs <package-spec|--local>')
   process.exit(2)
+}
+
+function collectTargets(value, acc = []) {
+  if (typeof value === 'string') {
+    acc.push(value)
+    return acc
+  }
+  if (value && typeof value === 'object') {
+    for (const child of Object.values(value)) collectTargets(child, acc)
+  }
+  return acc
 }
 
 const consumer = mkdtempSync(join(tmpdir(), 'dsh-mt-artifact-consumer-'))
@@ -38,6 +50,35 @@ try {
     const tarball = readdirSync(packDir).find(file => file.endsWith('.tgz'))
     if (!tarball) throw new Error('local artifact smoke: pnpm pack produced no tarball')
     packageSpec = join(packDir, tarball)
+
+    const pkg = JSON.parse(readFileSync(join(root, 'packages', 'multi-tenant', 'package.json'), 'utf8'))
+    const listing = execFileSync('tar', ['-tzf', packageSpec], { encoding: 'utf8' }).split('\n')
+    const has = file => listing.some(line => line === file || line.endsWith(`/${file}`))
+    const required = [
+      'package.json',
+      'dist/index.mjs',
+      'dist/runtime.mjs',
+      'dist/operation.mjs',
+      'dist/composition.mjs',
+      'dist/runtime-composition.mjs',
+      'dist/ingress.mjs',
+      'dist/credentials.mjs',
+      'dist/mcp.mjs',
+      'dist/store.mjs',
+      'dist/testing.mjs',
+      'cordis.patch.yml',
+      'README.md',
+      'LICENSE',
+    ]
+    const missing = required.filter(file => !has(file))
+    if (missing.length) throw new Error(`local artifact smoke: tarball is missing ${missing.join(', ')}`)
+
+    const unresolved = collectTargets(pkg.exports)
+      .map(target => target.replace(/^\.\//, ''))
+      .filter(target => !has(target))
+    if (unresolved.length) {
+      throw new Error(`local artifact smoke: export targets missing from tarball: ${unresolved.join(', ')}`)
+    }
   }
 
   writeFileSync(join(consumer, 'package.json'), JSON.stringify({
@@ -81,6 +122,15 @@ import Service, {
 } from 'dsh-multi-tenant'
 import Store from 'dsh-multi-tenant/store'
 import Runtime from 'dsh-multi-tenant/runtime'
+import { materializeRuntimeComposition as materializeFromSubpath } from 'dsh-multi-tenant/runtime-composition'
+import { createProductIngress as ingressFromSubpath } from 'dsh-multi-tenant/ingress'
+import { principalCredentials as credentialsFromSubpath } from 'dsh-multi-tenant/credentials'
+import { tenantMcpConfig as mcpFromSubpath } from 'dsh-multi-tenant/mcp'
+
+if (materializeFromSubpath !== materializeRuntimeComposition) throw new Error('artifact smoke: runtime-composition export mismatch')
+if (ingressFromSubpath !== createProductIngress) throw new Error('artifact smoke: ingress export mismatch')
+if (credentialsFromSubpath !== principalCredentials) throw new Error('artifact smoke: credentials export mismatch')
+if (mcpFromSubpath !== tenantMcpConfig) throw new Error('artifact smoke: MCP export mismatch')
 
 const ctx = new Context()
 await ctx.plugin(Store)
@@ -99,18 +149,12 @@ const agents = {
   async create(options) {
     createCalls += 1
     await options.setup?.(fakeAgentCtx)
-    return {
-      agent: { id: options.sessionId, ctx: fakeAgentCtx },
-      async dispose() {},
-    }
+    return { agent: { id: options.sessionId, ctx: fakeAgentCtx }, async dispose() {} }
   },
   async resume(options) {
     resumeCalls += 1
     await options.setup?.(fakeAgentCtx)
-    return {
-      agent: { id: options.resumeSessionId, ctx: fakeAgentCtx },
-      async dispose() {},
-    }
+    return { agent: { id: options.resumeSessionId, ctx: fakeAgentCtx }, async dispose() {} }
   },
 }
 ctx.provide('agents', agents)
@@ -131,9 +175,7 @@ const plan = compileSaaSDefinition({
             serverName: 'erp',
             command: 'true',
             env: { TENANT_ID: tenantId },
-            credentialEnv: {
-              API_TOKEN: { credential: 'apiToken', prefix: 'Bearer ' },
-            },
+            credentialEnv: { API_TOKEN: { credential: 'apiToken', prefix: 'Bearer ' } },
             reconnect: { enabled: false },
           }],
         }
@@ -143,19 +185,14 @@ const plan = compileSaaSDefinition({
       id: 'artifact-credentials',
       definitionKey: 'artifact-v1',
       create({ principal }) {
-        return new InMemoryPrincipalCredentials({
-          apiToken: principal.tenantId + '/' + principal.userId,
-        })
+        return new InMemoryPrincipalCredentials({ apiToken: principal.tenantId + '/' + principal.userId })
       },
     }),
   ],
 })
 
 const app = await materializeRuntimeComposition(ctx, plan)
-const ingress = createProductIngress(app, subject => ({
-  tenantId: subject.tenant,
-  userId: subject.user,
-}))
+const ingress = createProductIngress(app, subject => ({ tenantId: subject.tenant, userId: subject.user }))
 const alice = await ingress.resolve({ tenant: 'acme', user: 'alice' })
 const bob = await ingress.resolve({ tenant: 'acme', user: 'bob' })
 
@@ -176,7 +213,7 @@ const integration = createMcpAgentIntegration(alice)
 const created = await integration.create({ sessionId: 'artifact-alice-s1' })
 if (createCalls !== 1) throw new Error('artifact smoke: create did not reach DSH Agent seam exactly once')
 if (!resolvedMcpPlugin || typeof resolvedMcpPlugin.apply !== 'function') {
-  throw new Error('artifact smoke: packaged M5 path could not resolve official @deepseek-ai/dsh-mcp-client')
+  throw new Error('artifact smoke: packaged path could not resolve official @deepseek-ai/dsh-mcp-client')
 }
 const runtimeName = created.servers[0]?.runtimeServerName
 if (runtimeName !== runtimeMcpServerName('erp', alice.identity, 'artifact-alice-s1')) {
