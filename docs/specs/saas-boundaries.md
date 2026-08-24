@@ -2,11 +2,11 @@
 
 # Spec — SaaS Framework Boundary Planes
 
-> Status: live v0.3 contract after M4.
+> Status: live `0.3` contract.
 
-A SaaS product is not one flat provider list. Different concerns cross different semantic boundaries.
+A SaaS Agent product is not one flat provider list. Different concerns cross different semantic boundaries.
 
-## North-star path
+## Product path
 
 ```text
 Product / Transport authentication
@@ -21,16 +21,18 @@ Typed Runtime Capability Ownership
       ↓
 Principal-owned one-shot Operation
       ↓
+Principal-owned DSH Agent
+      ↓
 Agent Integration Boundary
       ↓
-DeepSeek Harness
+Native DSH integrations / MCP Tools
 ```
 
-These are planes, not package names.
+These are semantic planes, not package names.
 
 ## 1. Product Ingress Boundary
 
-Authentication is product-owned. Cookie/JWT/OAuth/OIDC/SAML/service credentials and transport-specific verification all happen before Core trusts a subject.
+Authentication is product-owned. Cookie/JWT/OAuth/OIDC/SAML/service credentials and transport-specific verification happen before Core trusts a subject.
 
 The framework owns only:
 
@@ -41,29 +43,25 @@ trusted subject
   -> bound canonical Principal
 ```
 
-`createProductIngress()` now implements this boundary. It does not parse vendor tokens or create a second auth system.
+`createProductIngress()` does not parse vendor tokens or create a second auth system.
 
 ## 2. RuntimeComposition boundary
 
 A `CompositionPlan` is normalized executable intent; a `RuntimeComposition` is its materialized product-facing binding.
 
-One active root cannot silently combine parts from different whole Plans. Same Plan joins; different whole-plan identity conflicts. This is **whole-plan attestation**, not canonical scope identity.
+One active root cannot silently combine parts from different whole Plans. Same Plan joins; different whole-plan identity conflicts. This is whole-plan attestation, distinct from canonical scope identity.
 
 ## 3. Typed Runtime Capability Ownership
 
-Runtime capabilities use `CapabilityToken<T, Scope>` and real Cordis lifecycle scopes:
+Runtime capabilities use `CapabilityToken<T, Scope>` with real Cordis lifecycle scopes:
 
 ```text
 deployment -> tenant -> principal -> operation
 ```
 
-Credentials are now the first concrete product-facing example: `principalCredentials` is truly Principal-owned rather than merely labeled `principal`.
-
-Cordis remains the resolver and lifecycle substrate.
+`principalCredentials` is Principal-owned. `tenantMcpConfig` is Tenant-owned. Cordis remains the resolver/lifecycle substrate.
 
 ## 4. Composition locality
-
-Canonical node identity remains scope-local:
 
 ```text
 whole Plan fingerprint        product Runtime attestation
@@ -72,34 +70,31 @@ scopeFingerprints.principal   Principal creation dependency closure
 scopeFingerprints.operation   Operation provider dependency closure
 ```
 
-An Operation-only change does not create false Tenant/Principal drift. A real ancestor dependency change does.
-
-This locality can coexist with strict whole-plan `RuntimeComposition` binding because the two identities answer different questions.
+Unrelated descendant evolution does not create false parent drift, while a real ancestor dependency change does.
 
 ## 5. One-shot Operation boundary
 
-A user-visible action owns one Principal child Operation. It materializes Operation providers, captures required typed capabilities exactly once, executes exactly once and tears down.
+A user-visible action owns one short Principal Operation. It materializes Operation providers, captures required typed capabilities once, executes semantic work once and tears down.
 
-The bound API does not accept another Plan or arbitrary Operation setup recipe. It also rejects a requested capability that the Plan never declared.
+The bound API does not accept another Plan and rejects capabilities that the Plan never declared.
 
 ## 6. Agent Integration Boundary
 
-Runtime state does not automatically leak into Agent state.
+Runtime state becomes Agent state only through explicit integration:
 
 ```text
-Operation snapshot
-  -> Agent integration recipe
-  -> DSH ownerCtx create/resume
-  -> Agent setup
-  -> native DSH tools/plugins
+Tenant MCP config + Principal credentials
+  -> Operation snapshot / authorization
+  -> Principal Context
+  -> DSH Agent setup
+  -> official MCP client
+  -> native Agent-scoped Tools
 ```
 
-MCP belongs here as the next reference path because one integration consumes multiple Runtime capabilities (for example Tenant MCP config + Principal Credentials + Operation state) and translates them into DSH-native setup.
+The live Agent is Principal-owned, so it survives the short create/resume Operation and is still drained by Principal teardown.
 
-## M5 implication
-
-The next target is the official `@deepseek-ai/dsh-mcp-client` Tool path. Do not build a parallel MCP protocol stack. Do not implement Resources/Prompts compatibility merely to fill an abstraction slot while the pinned Harness lacks a stable native consumer seam.
+MCP uses the official DSH Tools bridge. The project does not build a parallel MCP stack, and it does not synthesize Resources/Prompts support while the pinned Harness lacks a stable native consumer seam.
 
 ## Strong deployment isolation
 
-All boundaries above assume trusted same-process composition. Filesystem/process/shell/network/malicious-plugin isolation belongs to deployment/container/Pod architecture.
+All boundaries above assume trusted same-process composition. Filesystem/process/shell/network/malicious-plugin isolation belongs to deployment/container/Pod/sidecar/remote architecture.
