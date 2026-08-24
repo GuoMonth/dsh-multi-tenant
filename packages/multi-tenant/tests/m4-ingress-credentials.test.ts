@@ -8,7 +8,10 @@ import {
   principalCredentials,
 } from '../src/credentials.ts'
 import { createProductIngress } from '../src/ingress.ts'
-import { materializeRuntimeComposition } from '../src/runtime-composition.ts'
+import {
+  materializeRuntimeComposition,
+  type ComposedPrincipal,
+} from '../src/runtime-composition.ts'
 import { TenantRuntimeService } from '../src/runtime.ts'
 import { MultiTenantService } from '../src/service.ts'
 import { InMemoryTenantSessionStore } from '../src/store.ts'
@@ -44,7 +47,7 @@ const resolveIdentity = (subject: TrustedSubject) => ({
   userId: subject.account,
 })
 
-async function readErpToken(principal: Awaited<ReturnType<ReturnType<typeof createProductIngress<TrustedSubject>>['resolve']>>) {
+async function readErpToken(principal: ComposedPrincipal): Promise<string> {
   const operation = principal.operations.start({
     requires: [principalCredentials],
     async execute({ capabilities }) {

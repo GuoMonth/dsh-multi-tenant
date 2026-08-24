@@ -4,7 +4,10 @@ import {
   provideCapability,
   type CapabilityToken,
 } from './capability.ts'
-import type { CapabilityProviderDefinition } from './composition.ts'
+import type {
+  CapabilityProviderDefinition,
+  CapabilityProviderPreparation,
+} from './composition.ts'
 import { principalOf } from './runtime.ts'
 import type { TenantPrincipal } from './types.ts'
 
@@ -100,7 +103,7 @@ export function definePrincipalCredentialsProvider(
     capability: principalCredentials,
     ...(options.definitionKey === undefined ? {} : { definitionKey: options.definitionKey }),
     ...(options.requires === undefined ? {} : { requires: options.requires }),
-    async setup({ ctx, signal }) {
+    async setup({ ctx, signal }: CapabilityProviderPreparation) {
       const principal = principalOf(ctx)
       if (principal === undefined) {
         throw new TypeError('PrincipalCredentials provider must materialize inside a Principal Runtime scope')

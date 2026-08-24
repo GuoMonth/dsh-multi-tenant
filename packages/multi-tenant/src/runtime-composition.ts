@@ -108,7 +108,7 @@ class ComposedPrincipalImpl implements ComposedPrincipal {
   readonly operations: ComposedOperationRegistry
 
   constructor(
-    private readonly composition: RuntimeCompositionImpl,
+    composition: RuntimeCompositionImpl,
     readonly runtime: PrincipalRuntimeScope,
   ) {
     this.identity = runtime.identity
@@ -186,7 +186,7 @@ class RuntimeCompositionImpl implements RuntimeComposition {
   private readonly declaredCapabilities: ReadonlyMap<string, CapabilityToken>
 
   constructor(
-    private readonly root: Context,
+    root: Context,
     readonly plan: CompositionPlan,
     private readonly deployment: DeploymentComposition,
     private readonly releaseActive: () => void,
