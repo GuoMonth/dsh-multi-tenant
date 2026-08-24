@@ -125,7 +125,7 @@ if (!existsSync(releaseWorkflowPath)) {
   if (workflow.includes('inputs.version')) errors.push('release workflow must derive the version from package.json instead of duplicating version input')
   if (workflow.includes('--tag next')) errors.push('release workflow must publish the package default latest channel, not next')
   if (!workflow.includes('pnpm release:check')) errors.push('release workflow must run the full release:check before registry publication')
-  if (!workflow.includes('release:registry-smoke')) errors.push('release workflow must verify the exact registry artifact after publication')
+  if (!workflow.includes('scripts/registry-smoke.mjs')) errors.push('release workflow must verify the exact registry artifact after publication')
 }
 
 const rootPackage = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
