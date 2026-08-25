@@ -186,8 +186,6 @@ export async function createMcpSaaSRuntime<TrustedSubject>(
         ...(options.mcp.definitionKey === undefined ? {} : { definitionKey: options.mcp.definitionKey }),
         async load(preparation) {
           try {
-            // Normalize inside the product seam so malformed product data is
-            // attributed to Tenant MCP config rather than to identity materialization.
             return normalizeTenantMcpConfig(await options.mcp.load(preparation))
           } catch (error) {
             throw productExperienceError(
@@ -205,7 +203,6 @@ export async function createMcpSaaSRuntime<TrustedSubject>(
         async create(preparation) {
           try {
             const credentials = await options.credentials.create(preparation)
-            // Validate at the product seam for the same attribution reason.
             assertCredentialsContract(credentials)
             return credentials
           } catch (error) {
@@ -222,7 +219,7 @@ export async function createMcpSaaSRuntime<TrustedSubject>(
   })
 
   const composition = await materializeRuntimeComposition(ctx, plan)
-  const ingress = createProductIngress(composition, async (subject) => {
+  const ingress = createProductIngress<TrustedSubject>(composition, async (subject) => {
     try {
       return await options.identity(subject)
     } catch (error) {
