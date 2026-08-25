@@ -8,8 +8,8 @@ Old prerelease notes, milestone names, completed release scopes and one-shot ver
 
 ## Start here
 
-- [Project README](../README.md) — what problem the project solves, installation and the first product flow
-- [Direction](../DIRECTION.md) — current product direction after the First Product Experience release
+- [Project README](../README.md) — what problem the project solves, installation, durable local ownership and the first product flow
+- [Direction](../DIRECTION.md) — current direction after the Durable Local Experience release
 - [CONTRIBUTING](../CONTRIBUTING.md) — engineering, evidence and live-tree policy
 
 ## Current product/runtime contracts
@@ -24,16 +24,18 @@ Old prerelease notes, milestone names, completed release scopes and one-shot ver
 
 ## Current product baseline
 
-`0.3.0-rc.2 — First Product Experience` adds the runnable real-DSH-Web starter, thin existing-auth identity bridge, shorter MCP-specific product facade and secret-safe first-use diagnostics.
+`0.3.0-rc.3 — Durable Local Experience` keeps the rc.2 real-DSH-Web product path and makes immutable Session ownership survive local process restart with a zero-external-service SQLite provider selected by the normal DSH bundle.
 
-The release intentionally keeps production persistence, universal Broker/Auth abstractions, Permission/Audit products and the second ERP integration as evidence-driven follow-ups rather than release blockers.
+SQLite is intentionally the local durable / single-node adoption provider. Multi-instance PostgreSQL/other persistence, credential lifecycle, Policy/Audit and further integrations remain evidence-driven follow-ups.
+
+The stock DSH Web request-Principal gap tracked in #41 is an acknowledged upstream boundary rather than a hidden release blocker. Production Web deployments keep DSH private behind a Product Gateway/BFF that performs authentication and protected resource authorization before forwarding.
 
 ## Evidence and release
 
 - [`v0.3-assumptions.json`](./specs/v0.3-assumptions.json) — machine-readable external assumptions and proofs
 - [Compatibility](./reference/compatibility.md) — pinned DSH/Cordis baseline and current CI evidence
 - [Release contract](./reference/release.md) — npm/OIDC publication and registry verification
-- [0.3.0-rc.2 release note](./releases/v0.3.0-rc.2.md) — current release candidate/product baseline
+- [0.3.0-rc.3 release note](./releases/v0.3.0-rc.3.md) — current release candidate/product baseline
 
 ## Long-term vision
 
