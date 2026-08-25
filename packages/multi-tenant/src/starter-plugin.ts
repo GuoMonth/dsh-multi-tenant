@@ -5,11 +5,11 @@ import { apply as applyStarter, type Config } from './starter.ts'
 export const name = 'multi-tenant-starter'
 
 /**
- * Access to `ctx.webServer` is an explicit Cordis dependency. Keeping this on
- * the plugin boundary lets Loader order the starter after the DSH Web host and
- * prevents ambient service access from bypassing Cordis lifecycle semantics.
+ * The starter mounts into DSH Web and materializes canonical Tenant/Principal
+ * scopes through the existing TenantRuntime service. Both are explicit Cordis
+ * dependencies so Loader owns ordering and service access remains structural.
  */
-export const inject = ['webServer']
+export const inject = ['webServer', 'tenantRuntime']
 
 export type { Config }
 
