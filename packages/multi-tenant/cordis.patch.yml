@@ -1,9 +1,11 @@
 # DeepSeek Harness bundle layer.
 #
-# v0.2 keeps the v0.1 ownership kernel deployment-global and adds the
-# context-native runtime manager. Tenant/principal capability providers are
-# mounted later under contexts minted by `ctx.tenantRuntime`; they are not
-# hard-coded into this bundle.
+# The ownership kernel and Tenant Runtime stay deployment-global. Product
+# capability providers are materialized later inside canonical Runtime scopes.
+#
+# The First Product Experience starter is deliberately present as a dormant
+# row only. It publishes demo identities/routes exclusively when the operator
+# explicitly launches with DSH_MULTI_TENANT_STARTER=1.
 - insert:
     - id: tenant-session-store
       name: dsh-multi-tenant/store
@@ -13,3 +15,8 @@
 
     - id: tenant-runtime
       name: dsh-multi-tenant/runtime
+
+    - id: multi-tenant-starter
+      name: dsh-multi-tenant/starter
+      config:
+        enabled: !!js process.env.DSH_MULTI_TENANT_STARTER === '1'
