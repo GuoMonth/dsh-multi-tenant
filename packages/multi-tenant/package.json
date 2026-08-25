@@ -54,6 +54,18 @@
       "types": "./dist/mcp.d.mts",
       "import": "./dist/mcp.mjs"
     },
+    "./product": {
+      "types": "./dist/product.d.mts",
+      "import": "./dist/product.mjs"
+    },
+    "./web": {
+      "types": "./dist/web.d.mts",
+      "import": "./dist/web.mjs"
+    },
+    "./diagnostics": {
+      "types": "./dist/diagnostics.d.mts",
+      "import": "./dist/diagnostics.mjs"
+    },
     "./store": {
       "types": "./dist/store.d.mts",
       "import": "./dist/store.mjs"
