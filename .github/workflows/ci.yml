@@ -111,3 +111,21 @@ jobs:
 
       - name: Run DSH, Cordis and MCP executable proofs
         run: pnpm probe:platform
+
+  first-product-experience:
+    name: First Product Experience (real DSH Web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+
+      - name: Install dependencies (frozen)
+        run: pnpm install --frozen-lockfile
+
+      - name: Boot real DSH Web and prove identity, MCP and Session isolation
+        run: pnpm probe:fpe

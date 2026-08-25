@@ -4,9 +4,11 @@
 
 **让 DeepSeek Harness 真正变成一个可以承载 SaaS 产品的 Multi-Tenant Agent Runtime。**
 
-如果你已经认可 DeepSeek Harness 的 Agent 执行模型，但准备把它放进一个真正的 SaaS 产品，那么最先变复杂的通常不是模型，而是这几件事：**这个请求属于谁、能拿哪份 credential、应该连接哪个 MCP、能不能恢复某个 Session，以及这个长生命周期 Agent 最终归谁管理。**
+如果你已经认可 DeepSeek Harness 的 Agent 执行模型，但准备把它放进真正的 SaaS 产品，那么最先变复杂的通常不是模型，而是这几件事：**这个请求属于谁、能拿哪份 credential、应该连接哪个 MCP、能不能恢复某个 Session，以及这个长生命周期 Agent 最终归谁管理。**
 
 > 当前已发布版本：**`dsh-multi-tenant@0.3.0-rc.1`**
+>
+> 当前分支正在实现已经冻结的 **`0.3.0-rc.2` First Product Experience**。
 >
 > Compatible DSH baseline：`0.1.1-rc.2` / `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`。
 
@@ -26,17 +28,134 @@ Acme / Bob     -> Acme ERP MCP + Bob credential   + Bob Sessions
 Globex / Alice -> Globex ERP MCP + Globex/Alice credential + Globex Sessions
 ```
 
-这时候如果没有明确的 Runtime boundary，下面的问题很快会变成产品 bug 或安全 bug：
+如果没有明确 Runtime boundary，Tenant lookup、credential plumbing、MCP setup、Session authorization、Agent lifecycle 很快都会变成产品 bug 或安全 bug。
 
-- 这个请求到底属于哪个 Tenant / Principal？
-- 这个 Tenant 应该连接哪个 MCP endpoint / config？
-- 这个 Principal 应该使用哪份 credential？
-- Bob 能不能 resume Alice 的 Session？
-- 不同 Tenant 都叫 `erp` 的 MCP server，会不会撞 namespace？
-- MCP / Agent setup 失败时，会不会留下 half-configured Agent？
-- Principal 被销毁时，它持有的 long-lived Agent 与 MCP tools 是否真正被 drain？
+`dsh-multi-tenant` 就是处理 **产品身份 + Runtime ownership + Session safety + DSH Agent integration** 这一层，同时继续复用 Cordis / DSH 原生生命周期，不造第二套 Runtime。
 
-`dsh-multi-tenant` 就是来处理这层 **产品身份 + Runtime ownership + Session safety + DSH Agent integration** 的，同时继续复用 Cordis / DSH 原生生命周期，不再造一套平行 Runtime。
+## 先看到价值，再接产品
+
+`0.3.0-rc.2` 增加了一个显式 opt-in 的 First Product Experience，直接跑在官方 DSH Web profile 上：
+
+```sh
+dsh plugin --profile web add dsh-multi-tenant
+DSH_MULTI_TENANT_STARTER=1 dsh web
+```
+
+然后打开 DSH 打印出来的地址，再访问 `/_dsh-multi-tenant`。
+
+starter **默认休眠**；只有显式设置 `DSH_MULTI_TENANT_STARTER=1` 才会发布 demo identities / routes。
+
+页面可以切换：
+
+```text
+Acme / Alice
+Acme / Bob
+Globex / Alice
+```
+
+并直接验证：
+
+```text
+demo product login
+  -> trusted subject
+  -> canonical Tenant / Principal
+  -> Principal-bound DSH Agent
+  -> 官方 @deepseek-ai/dsh-mcp-client
+  -> 真实 stdio MCP tools/list + tools/call
+  -> 肉眼可见的 identity / Session isolation
+```
+
+starter MCP Tool 会返回 Tenant、Principal 和 `credentialAccepted: true`。Principal credential 确实被注入 MCP child process，但 raw credential 不会出现在浏览器响应或 model-facing Tool result 里。
+
+然后从 Acme/Alice 切到 Acme/Bob，尝试 resume Alice Session，会在 DSH resume/persistence setup 之前被拒绝。Globex/Alice 则证明第二个 Tenant 也走同一套 Runtime path。
+
+这个 panel 挂在真实 DSH Web **旁边**，使用同一个 `ctx.webServer`；它不是第二套聊天前端，也不是第二个 HTTP server。
+
+## 安装
+
+正常 DSH profile：
+
+```sh
+dsh plugin --profile <profile> add dsh-multi-tenant
+```
+
+如果 framework code 本身已经拥有 compatible DSH installation：
+
+```sh
+pnpm add dsh-multi-tenant
+```
+
+MCP integration 继续复用 compatible DSH installation 自带的官方 MCP client，不 vendor / fork MCP。
+
+## 最短产品链路
+
+Authentication 仍然由你的产品负责。`0.3.0-rc.2` 增加一个薄的 MCP-specific facade，让第一次成功只需要处理四个产品 seam：trusted identity、Tenant MCP config、Principal credentials、Agent create/resume。
+
+```ts
+import { createMcpSaaSRuntime } from 'dsh-multi-tenant'
+
+const app = await createMcpSaaSRuntime(ctx, {
+  identity(subject: TrustedSubject) {
+    // subject 已经由你的产品完成认证。
+    return {
+      tenantId: subject.organizationId,
+      userId: subject.userId,
+    }
+  },
+  mcp: {
+    load({ tenantId }) {
+      return {
+        servers: [{
+          transport: 'streamable-http',
+          serverName: 'erp',
+          url: endpointForTenant(tenantId),
+          credentialHeaders: {
+            Authorization: { credential: 'erpToken', prefix: 'Bearer ' },
+          },
+        }],
+      }
+    },
+  },
+  credentials: {
+    create({ principal }) {
+      return loadCredentialsFor(principal)
+    },
+  },
+})
+
+const principal = await app.resolve(trustedSubject)
+const handle = await principal.create({ sessionId })
+```
+
+这个 facade 不会替代 Core。它只是把已经存在的 `CompositionPlan`、`RuntimeComposition`、Product Ingress、`createMcpAgentIntegration()` 组合成当前最短 happy path；高级使用者仍然可以直接使用底层 primitives。
+
+`create()` resolve 时，官方 MCP client 已经在 unpublished Agent setup 中完成 initial connection、`tools/list` 同步和 Tool registration；`resume()` 会先检查 Session ownership，再进入 DSH persistence/setup。
+
+### 已有 JWT / Cookie / req.user 怎么接
+
+Web bridge 不负责重新发明认证，只消费你现有认证体系的可信结果：
+
+```ts
+import {
+  mountMcpSaaSWebBridge,
+  readBearerToken,
+  readCookie,
+} from 'dsh-multi-tenant'
+
+mountMcpSaaSWebBridge(ctx, app, {
+  async authenticate(req) {
+    const jwt = readBearerToken(req.headers)
+    if (jwt) return verifyExistingJwt(jwt)
+
+    const sessionId = readCookie(req.headers, 'product_session')
+    if (sessionId) return lookupExistingServerSession(sessionId)
+
+    return undefined
+  },
+})
+```
+
+`readBearerToken()` / `readCookie()` 只是 transport extractor。JWT signature、OIDC、server session、refresh、`req.user` construction 继续归产品自己。
 
 ## 加上它以后有什么变化
 
@@ -52,8 +171,8 @@ product request
 
 之后
 ----
-trusted product subject
-  -> Product Ingress
+已经认证过的 product subject
+  -> Product Ingress / Web bridge
   -> canonical Tenant / Principal
   -> Tenant MCP config + Principal Credentials
   -> fail-closed Session ownership
@@ -64,83 +183,25 @@ trusted product subject
 `0.3` 直接给你：
 
 - trusted product subject -> canonical `Tenant / Principal`；
-- exact `CompositionPlan -> RuntimeComposition` binding，避免产品层偷偷混用不同 Plan；
+- exact `CompositionPlan -> RuntimeComposition` binding；
 - Principal-scoped replaceable credentials；
 - Tenant-scoped MCP configuration；
 - Principal-bound Agent `create()` / `resume()`；
 - immutable、fail-closed Session ownership；
-- 官方 `@deepseek-ai/dsh-mcp-client` integration，不重造 MCP protocol stack；
+- 官方 `@deepseek-ai/dsh-mcp-client` integration；
 - native Agent-scoped MCP Tools；
-- long-lived Agent 归 Principal 所有，不挂在一次短请求 Operation 上；
-- clean installed-artifact 与 post-publication registry verification。
-
-## 安装
-
-正常 DSH profile：
-
-```sh
-dsh plugin --profile <profile> add dsh-multi-tenant
-```
-
-如果你的 framework code 本身已经拥有 compatible DSH installation：
-
-```sh
-pnpm add dsh-multi-tenant
-```
-
-MCP integration 会复用 compatible DSH installation 自带的官方 MCP client，而不是在本项目里 vendor / fork 一份。
-
-## 最短产品链路
-
-Authentication 仍然由你的产品负责。请求已经可信以后，把它映射成 Tenant / Principal，提供 Tenant MCP config 与 Principal credentials，然后 create / resume Agent。
-
-```ts
-const plan = compileSaaSDefinition({
-  capabilities: [
-    { capability: tenantMcpConfig, required: true },
-    { capability: principalCredentials, required: true },
-  ],
-  providers: [
-    defineTenantMcpConfigProvider({
-      id: 'tenant-mcp',
-      load({ tenantId }) {
-        return {
-          servers: [{
-            transport: 'streamable-http',
-            serverName: 'erp',
-            url: endpointFor(tenantId),
-            credentialHeaders: {
-              Authorization: { credential: 'erpToken', prefix: 'Bearer ' },
-            },
-          }],
-        }
-      },
-    }),
-    definePrincipalCredentialsProvider({
-      id: 'credentials',
-      create({ principal }) {
-        return loadCredentialsFor(principal)
-      },
-    }),
-  ],
-})
-
-const app = await materializeRuntimeComposition(ctx, plan)
-const ingress = createProductIngress(app, resolveTrustedSubject)
-const principal = await ingress.resolve(subject)
-
-const agents = createMcpAgentIntegration(principal)
-const handle = await agents.create({ sessionId })
-```
-
-`create()` resolve 时，官方 MCP client 已经在 Agent setup 中完成 initial discovery，因此返回的 Agent 已经拥有 native MCP Tools。`resume()` 会在触发 DSH persistence / setup 之前先检查 Session ownership。
+- long-lived Agent 归 Principal 所有；
+- MCP-specific product facade，而不是第二套 Runtime；
+- same-server Web identity/admission bridge；
+- secret-safe structured diagnostics；
+- opt-in runnable starter + permanent real-DSH-Web CI evidence。
 
 ## 技术架构
 
 ```text
 Product / Transport authentication
         ↓ trusted subject
-Product Ingress
+Product Web bridge / Product Ingress
         ↓ TenantPrincipal
 RuntimeComposition                 exact whole-plan attestation
         ↓
@@ -157,48 +218,71 @@ Principal-owned DSH Agent          long-lived
 native Agent-scoped MCP Tools
 ```
 
-核心 ownership 规则刻意保持很小：
+核心 ownership 规则仍然刻意保持很小：
 
 - **Product owns authentication**：Core 从 identity 已经可信以后开始。
-- **Core owns identity / lifecycle / composition**：它不是 vendor auth framework，也不是 ERP framework。
-- **Operation 是短生命周期 semantic work**：required capability 只 capture 一次，也不拥有 long-lived Agent。
-- **Principal owns Agent**：Principal teardown 会 drain 自己的 Agents 与 Agent-scoped MCP resources。
-- **DSH owns MCP wire behavior**：项目只组合官方 MCP client，不重造 MCP。
+- **Core owns identity / lifecycle / composition**。
+- **Product facade 保持薄且 MCP-specific**：不创建第二套 Runtime。
+- **Operation 是短生命周期 semantic work**：不拥有 long-lived Agent。
+- **Principal owns Agent**：Principal teardown drain 自己的 Agent / MCP resources。
+- **DSH owns MCP wire behavior**：本项目只组合官方 MCP client。
 
 详见 [`docs/specs/architecture.zh-CN.md`](./docs/specs/architecture.zh-CN.md)、[`docs/specs/product-ingress-credentials.zh-CN.md`](./docs/specs/product-ingress-credentials.zh-CN.md)、[`docs/specs/mcp-agent-integration.zh-CN.md`](./docs/specs/mcp-agent-integration.zh-CN.md)。
 
+## Web 边界要说清楚
+
+Pinned DSH Web 已经有 trusted-host `/api` carrier，也会把 HTTP header 带到 transport request；但它当前不会为每一个已有 stock Web RPC business method materialize 一个产品认证后的 Principal Context。
+
+所以 rc.2 严格保证的是 **product identity + Agent create/resume admission** Principal-aware / fail-closed。我们不会因为 starter 页面上有“登录切换”就宣称所有 stock DSH Web RPC 自动 tenant-authorized。
+
+这是需要后续认真解决的 upstream integration seam，不应该用一个看起来很安全的假登录遮过去。
+
+## First-use diagnostics
+
+对产品/浏览器暴露的是稳定、secret-safe 的错误：
+
+```json
+{
+  "code": "SESSION_ACCESS_DENIED",
+  "stage": "session-ownership",
+  "message": "This Session belongs to another Principal."
+}
+```
+
+原始 vendor/auth/credential error 只保留在 server-side `cause`，不会被 `toProductDiagnostic()` 序列化。
+
+当前 stage 覆盖 identity resolution、Tenant MCP config、Principal credentials、Session ownership、MCP setup，以及能够显式证明的 post-create MCP discovery check。Pinned 官方 MCP client 把 initial connect/discovery/register 合并为一次 activation failure，所以我们不会在上游无法证明时编造更细的错误阶段。
+
 ## 安全边界
 
-项目提供 trusted code 场景下很强的 **same-process identity / lifecycle separation**，但 Cordis Context 不是 hostile-code sandbox。能任意读 process memory、filesystem、shell、network 的恶意同进程代码不在保证范围内。
+项目提供 trusted code 场景下很强的 **same-process identity / lifecycle separation**，但 Cordis Context 不是 hostile-code sandbox。真正的 secret/process/filesystem/network 强隔离应该放在 process/container/Pod/sidecar/remote authority boundary。
 
-需要 hostile-code isolation 或 secret non-disclosure 时，应该使用 process / container / Pod / sidecar / remote authority boundary。
+starter 只是 MVP proof：它的本地 demo cookie 不是生产认证方案；Tool 不返回 demo credential，也不代表同进程已经变成 hostile-code sandbox。
 
-## Compatibility 与 Release Evidence
+## Compatibility 与可执行证据
 
 - Node：`^22.19.0 || >=24.0.0`
 - Cordis：`>=4.0.1 <5`
 - DSH：`0.1.1-rc.2` + 上面的精确 release commit
 
-CI 会证明真实外部 DSH / Cordis assumptions、真实 stdio MCP server、真实 `tools/list`、真实 DSH `ToolRuntime.execute()` -> MCP `tools/call`、并发 Tenant / Principal isolation、cross-Principal resume denial、startup failure、teardown，以及真正打包后的 npm artifact。
+原有 CI 继续验证真实 DSH/Cordis assumptions、真实 stdio MCP `tools/list`、真实 `ToolRuntime.execute()` -> `tools/call`、并发 Tenant/Principal isolation、cross-Principal resume denial、startup failure、teardown 与 packed artifact。
+
+rc.2 新增 permanent First Product Experience lane：pack 当前 candidate -> clean pinned DSH Web profile -> 真正启动 `dsh web` -> 通过 HTTP 跑 login/identity/Agent/MCP/Session -> 验证第二 Tenant -> 扫描 HTTP/stdout/stderr 确保 raw starter credential 没有泄漏。
 
 详见 [`docs/reference/compatibility.zh-CN.md`](./docs/reference/compatibility.zh-CN.md)。
 
-## 下个版本聚焦
+## 范围控制
 
-`0.3.0-rc.2` 明确以 **First Product Experience** 为最高优先级，而不是继续做新的 Core milestone。
+`0.3.0-rc.2` 是一个 MVP value-validation release。下面这些明确不阻塞：
 
-P0 目标就是把真实产品链路做出明显体感：
-
-```text
-已有 JWT / Cookie / req.user
-  -> Tenant / Principal
-  -> DSH Web
-  -> Principal-bound Agent
-  -> 真实 MCP Tool
-  -> 肉眼可见的 identity / Session 隔离
-```
-
-这个版本只聚焦：可运行 DSH Web SaaS Starter、薄 JWT/Cookie Identity Bridge、更短 product-facing happy path、可操作 first-use diagnostics。Production persistence、通用 Broker/Auth abstraction、Permission/Audit 产品、第二个 ERP integration 都明确是 non-blocking follow-up。
+- Redis/Postgres/MySQL production Session Store；
+- universal Credential Broker / Capability-as-Authority；
+- generic OAuth/OIDC/token refresh framework；
+- Permission/Policy plugin 与完整 Audit/OTel product；
+- 第二个 ERP/direct-API integration；
+- hostile-code strong isolation；
+- MCP Resources/Prompts；
+- replacement frontend 或 broad Desktop/CLI packaging。
 
 完整范围见 [`docs/scopes/v0.3.0-rc.2.zh-CN.md`](./docs/scopes/v0.3.0-rc.2.zh-CN.md)。
 
@@ -210,9 +294,9 @@ P0 目标就是把真实产品链路做出明显体感：
 
 ## Release 状态
 
-`0.3.0-rc.1` 是当前已发布 prerelease。项目会继续快速推进，真实 integration 如果证明当前 contract 不够好，后续仍允许 deliberate breaking change。
+`0.3.0-rc.1` 仍是当前已发布 prerelease。这个 PR 实现 frozen rc.2 scope，但不会在这里自动 publish。
 
-当前 live tree 只保留 `0.3` 仍有用的 release 文档和发布基建；旧 v0.1 / v0.2 的 prerelease archaeology 留在 Git history / tag 里，不继续污染主分支。
+live tree 只保留当前 `0.3` 仍有用的文档和 release infrastructure；旧 prerelease archaeology 留在 Git history/tag。
 
 详见 [`docs/releases/v0.3.0-rc.1.md`](./docs/releases/v0.3.0-rc.1.md)、[`docs/scopes/v0.3.0-rc.2.zh-CN.md`](./docs/scopes/v0.3.0-rc.2.zh-CN.md) 与 [`docs/reference/release.zh-CN.md`](./docs/reference/release.zh-CN.md)。
 
