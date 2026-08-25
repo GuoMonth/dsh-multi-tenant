@@ -171,6 +171,37 @@ export type {
   McpAgentIntegration,
 } from './mcp.ts'
 
+export { createMcpSaaSRuntime } from './product.ts'
+export type {
+  McpSaaSTenantMcpOptions,
+  McpSaaSCredentialsOptions,
+  McpSaaSRuntimeOptions,
+  McpSaaSPrincipal,
+  McpSaaSRuntime,
+} from './product.ts'
+
+export {
+  mountMcpSaaSWebBridge,
+  readBearerToken,
+  readCookie,
+} from './web.ts'
+export type {
+  TrustedWebSubjectResolver,
+  McpSaaSWebBridgeOptions,
+  McpSaaSWebBridge,
+} from './web.ts'
+
+export {
+  ProductExperienceError,
+  productExperienceError,
+  toProductDiagnostic,
+} from './diagnostics.ts'
+export type {
+  ProductExperienceStage,
+  ProductExperienceErrorCode,
+  ProductDiagnostic,
+} from './diagnostics.ts'
+
 export { TenantSessionStore, InMemoryTenantSessionStore } from './store.ts'
 export type { TenantPrincipal, SessionOwner, ClaimResult } from './types.ts'
 export {
