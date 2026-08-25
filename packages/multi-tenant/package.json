@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.3.0-rc.1",
-  "description": "Composable multi-tenant SaaS runtime for DeepSeek Harness with canonical Tenant/Principal lifecycle, trusted ingress, scoped credentials, one-shot Operations, and DSH-native MCP Agent integration.",
+  "version": "0.3.0-rc.2",
+  "description": "Multi-tenant SaaS runtime for DeepSeek Harness with trusted Web identity, Principal-bound Agents, session isolation, scoped credentials, and native MCP Tools.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
   "repository": {
