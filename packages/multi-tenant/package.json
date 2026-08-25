@@ -67,8 +67,8 @@
       "import": "./dist/diagnostics.mjs"
     },
     "./starter": {
-      "types": "./dist/starter.d.mts",
-      "import": "./dist/starter.mjs"
+      "types": "./dist/starter-plugin.d.mts",
+      "import": "./dist/starter-plugin.mjs"
     },
     "./store": {
       "types": "./dist/store.d.mts",
