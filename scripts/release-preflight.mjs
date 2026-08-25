@@ -69,7 +69,7 @@ if (!runtime) {
   for (const required of [
     '.', './runtime', './operation', './composition', './runtime-composition',
     './ingress', './credentials', './mcp', './product', './web', './diagnostics',
-    './starter', './store', './testing', './cordis.patch.yml',
+    './starter', './store', './sqlite-store', './testing', './cordis.patch.yml',
   ]) {
     if (!(required in exports)) errors.push(`${expectedPackageName}: exports must include ${required}`)
   }
@@ -85,6 +85,7 @@ if (!runtime) {
     'RuntimeComposition',
     'Principal-scoped replaceable credentials',
     'Tenant-scoped MCP configuration',
+    'SQLite',
     '## Architecture',
     '## Security boundary',
   ]) {
@@ -122,6 +123,9 @@ if (String(rootPackage.scripts?.['probe:platform'] ?? '').includes('saas-core'))
 if (!String(rootPackage.scripts?.['release:check'] ?? '').includes('probe:fpe')) {
   errors.push('release:check must gate publication on the First Product Experience proof')
 }
+if (!String(rootPackage.scripts?.['release:check'] ?? '').includes('probe:sqlite')) {
+  errors.push('release:check must gate publication on the durable local SQLite proof')
+}
 
 const registrySmoke = readFileSync(join(root, 'scripts/registry-smoke.mjs'), 'utf8')
 if (!registrySmoke.includes('artifact-consumer-smoke.mjs')) {
@@ -144,6 +148,7 @@ for (const requiredPath of [
   'scripts/cordis-operation-lifecycle-probe.mjs',
   'scripts/mcp-agent-integration-probe.mjs',
   'scripts/first-product-experience-probe.mjs',
+  'scripts/sqlite-session-store-probe.mjs',
   'scripts/fixtures/mcp-identity-server.mjs',
   'scripts/artifact-consumer-smoke.mjs',
   'scripts/registry-preflight.mjs',
@@ -183,4 +188,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion}; First Product Experience + lean v0.3 live tree + installed-artifact proof + OIDC publishing`)
+console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion}; FPE + durable local SQLite + installed-artifact proof + OIDC publishing`)
