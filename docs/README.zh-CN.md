@@ -9,8 +9,9 @@
 ## 从这里开始
 
 - [项目 README](../README.zh-CN.md) — 先看它解决什么问题、怎么安装、怎么跑第一条产品链路
-- [Direction](../DIRECTION.zh-CN.md) — 当前方向，不维护长篇 milestone roadmap
-- [CONTRIBUTING](../CONTRIBUTING.zh-CN.md) — engineering / evidence policy
+- [Direction](../DIRECTION.zh-CN.md) — 当前产品方向
+- [v0.3.0-rc.2 Scope](./scopes/v0.3.0-rc.2.zh-CN.md) — 已冻结的下个版本目标：First Product Experience
+- [CONTRIBUTING](../CONTRIBUTING.zh-CN.md) — engineering / evidence / live-tree policy
 
 ## 当前产品 / Runtime Contract
 
@@ -22,12 +23,20 @@
 - [SaaS boundaries](./specs/saas-boundaries.zh-CN.md) — Product Ingress、Runtime capability、Agent Integration planes
 - [SaaS composition](./specs/saas-composition.zh-CN.md) — compiler、scope-local identity、provider materialization
 
+## 当前 Release Scope
+
+`0.3.0-rc.2` 明确 product-first。P0 只包含：可运行的 DSH Web SaaS Starter、薄 JWT/Cookie Identity Bridge、更短的 product-facing happy path，以及可操作 first-use diagnostics。
+
+Production persistence、通用 Broker/Auth abstraction、Permission/Audit 产品、第二个 ERP integration 都明确属于 non-blocking follow-up。
+
+完整验收标准与 Non-goals 见 [Scope 文档](./scopes/v0.3.0-rc.2.zh-CN.md)。
+
 ## Evidence 与 Release
 
 - [`v0.3-assumptions.json`](./specs/v0.3-assumptions.json) — machine-readable external assumptions / proofs
 - [Compatibility](./reference/compatibility.zh-CN.md) — pinned DSH / Cordis baseline 与当前 CI evidence
 - [Release contract](./reference/release.zh-CN.md) — npm / OIDC publication 与 registry verification
-- [0.3.0-rc.1 release note](./releases/v0.3.0-rc.1.md) — 当前 release candidate
+- [0.3.0-rc.1 release note](./releases/v0.3.0-rc.1.md) — 当前已发布版本
 
 ## 长期 Vision
 
