@@ -8,8 +8,8 @@
 
 ## 从这里开始
 
-- [项目 README](../README.zh-CN.md) — 先看它解决什么问题、怎么安装、怎么跑第一条产品链路
-- [Direction](../DIRECTION.zh-CN.md) — First Product Experience 发布后的当前产品方向
+- [项目 README](../README.zh-CN.md) — 先看它解决什么问题、怎么安装、durable local ownership 和第一条产品链路
+- [Direction](../DIRECTION.zh-CN.md) — Durable Local Experience 发布后的当前产品方向
 - [CONTRIBUTING](../CONTRIBUTING.zh-CN.md) — engineering / evidence / live-tree policy
 
 ## 当前产品 / Runtime Contract
@@ -24,16 +24,18 @@
 
 ## 当前产品基线
 
-`0.3.0-rc.2 — First Product Experience` 提供可运行的真实 DSH Web Starter、薄 existing-auth identity bridge、更短的 MCP-specific product facade，以及 secret-safe first-use diagnostics。
+`0.3.0-rc.3 — Durable Local Experience` 保留 rc.2 已证明的真实 DSH Web 产品链路，同时让 immutable Session ownership 通过 normal DSH bundle 默认选择的 zero-external-service SQLite provider 在本地进程重启后继续存在。
 
-Production persistence、通用 Broker/Auth abstraction、Permission/Audit 产品、第二个 ERP integration 继续作为由真实 evidence 决定优先级的 follow-up，而不是阻塞 release。
+SQLite 刻意定位为 local durable / single-node adoption provider。Multi-instance PostgreSQL/其他 persistence、credential lifecycle、Policy/Audit 和更多 integration 继续作为 evidence-driven follow-up。
+
+#41 记录的 stock DSH Web request-Principal gap 是已承认 upstream boundary，不再伪装成 release blocker。Production Web 部署把 DSH 放在 Product Gateway/BFF 后面的私网，由 Gateway 先完成 authentication 和 protected resource authorization。
 
 ## Evidence 与 Release
 
 - [`v0.3-assumptions.json`](./specs/v0.3-assumptions.json) — machine-readable external assumptions / proofs
 - [Compatibility](./reference/compatibility.zh-CN.md) — pinned DSH / Cordis baseline 与当前 CI evidence
 - [Release contract](./reference/release.zh-CN.md) — npm / OIDC publication 与 registry verification
-- [0.3.0-rc.2 release note](./releases/v0.3.0-rc.2.md) — 当前 release candidate / 产品基线
+- [0.3.0-rc.3 release note](./releases/v0.3.0-rc.3.md) — 当前 release candidate / 产品基线
 
 ## 长期 Vision
 
