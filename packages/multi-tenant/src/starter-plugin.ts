@@ -5,11 +5,18 @@ import { apply as applyStarter, type Config } from './starter.ts'
 export const name = 'multi-tenant-starter'
 
 /**
- * The starter mounts into DSH Web and materializes canonical Tenant/Principal
- * scopes through the existing TenantRuntime service. Both are explicit Cordis
- * dependencies so Loader owns ordering and service access remains structural.
+ * Every service the runnable proof depends on is declared at the Cordis plugin
+ * boundary. Loader therefore owns ordering, and the demo cannot silently boot
+ * against a partial/non-Web DSH composition.
  */
-export const inject = ['webServer', 'tenantRuntime']
+export const inject = [
+  'webServer',
+  'tenantRuntime',
+  'multiTenant',
+  'agents',
+  'tools',
+  'sessionPersistence',
+]
 
 export type { Config }
 
