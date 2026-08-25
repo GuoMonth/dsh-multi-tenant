@@ -4,7 +4,7 @@
 
 Use this package when one DSH runtime must serve many organizations and users without mixing Tenant configuration, Principal credentials, Session ownership or Agent-scoped MCP Tools.
 
-> **`dsh-multi-tenant@0.3.0-rc.2` — First Product Experience**
+> **`dsh-multi-tenant@0.3.0-rc.3` — Durable Local Experience**
 >
 > Compatible DSH baseline: `0.1.1-rc.2`.
 
@@ -53,6 +53,32 @@ pnpm add dsh-multi-tenant
 ```
 
 The MCP path reuses the official `@deepseek-ai/dsh-mcp-client` supplied by DSH. This package does not vendor or fork MCP.
+
+## Durable local ownership
+
+A normal DSH plugin install now uses the package's SQLite provider by default. It is backed by Node's built-in `node:sqlite`, so individual developers do not need PostgreSQL, Docker, a native addon or another database dependency just to prove restart-safe Session ownership.
+
+```text
+Alice claims Session s1
+        ↓
+<cwd>/.dsh-multi-tenant/session-ownership.sqlite
+        ↓ restart DSH / Node
+Alice -> s1          allowed
+Bob   -> s1          denied
+Globex/Alice -> s1   denied
+```
+
+Override the path with `DSH_MULTI_TENANT_SQLITE_PATH`, or mount the provider directly:
+
+```ts
+import SQLiteTenantSessionStore from 'dsh-multi-tenant/sqlite-store'
+
+await ctx.plugin(SQLiteTenantSessionStore, {
+  path: './state/session-ownership.sqlite',
+})
+```
+
+SQLite is the **local durable / single-node adoption provider**, not a horizontally scaled production database claim. `InMemoryTenantSessionStore` remains available for hermetic tests. Future PostgreSQL/other providers should implement the same `TenantSessionStore` contract.
 
 ## First Product Experience
 
@@ -161,6 +187,7 @@ mountMcpSaaSWebBridge(ctx, app, {
 - Tenant-scoped MCP configuration;
 - Principal-bound Agent `create()` / `resume()`;
 - immutable, fail-closed Session ownership;
+- zero-external-service SQLite ownership persistence across local restarts;
 - deterministic per-Session MCP namespaces;
 - Principal-owned long-lived Agents;
 - official DSH MCP Tools integration;
@@ -168,7 +195,7 @@ mountMcpSaaSWebBridge(ctx, app, {
 - same-server DSH Web identity/admission bridge;
 - structured secret-safe first-use diagnostics;
 - opt-in real-DSH-Web starter;
-- permanent executable First Product Experience evidence;
+- permanent executable FPE + durable-local evidence;
 - clean installed-artifact and post-publication registry verification.
 
 ## Architecture
@@ -212,7 +239,11 @@ The pinned official MCP client reports initial connect/discovery/register as one
 
 Cordis Context provides trusted same-process identity/lifecycle separation, not hostile-code isolation. Strong secret/process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote boundaries.
 
-The pinned DSH Web carrier also does not currently materialize a product-authenticated Principal Context for every stock Web RPC business method. rc.2 guarantees product-aware identity + Agent create/resume admission + Session ownership; it does not claim that every stock DSH Web RPC becomes tenant-authorized automatically.
+The pinned DSH Web carrier also does not currently materialize a product-authenticated Principal Context for every stock Web RPC business method. rc.3 guarantees product-aware identity + Agent create/resume admission + Session ownership; it does not claim that every stock DSH Web RPC becomes tenant-authorized automatically. This boundary is tracked in #41.
+
+For production Web exposure, keep DSH Web private behind a Product Gateway/BFF that authenticates the request, resolves the same canonical Tenant/Principal, and authorizes protected Session/Agent resources before forwarding. Public clients must not be able to bypass the gateway and reach stock DSH `/api` directly.
+
+SQLite is similarly scoped: it gives individual developers and single-node deployments durable ownership across restart, not multi-replica production persistence.
 
 The starter's demo cookie is not a production authentication mechanism.
 
@@ -222,7 +253,7 @@ The starter's demo cookie is not a production authentication mechanism.
 - Cordis: `>=4.0.1 <5`
 - DSH: `0.1.1-rc.2`
 
-`pnpm release:check` includes the real-Web First Product Experience proof before publication.
+`pnpm release:check` includes both the real-Web First Product Experience proof and the separate-process SQLite restart/competition proof before publication.
 
 ## Public subpaths
 
@@ -240,5 +271,6 @@ dsh-multi-tenant/web
 dsh-multi-tenant/diagnostics
 dsh-multi-tenant/starter
 dsh-multi-tenant/store
+dsh-multi-tenant/sqlite-store
 dsh-multi-tenant/testing
 ```
