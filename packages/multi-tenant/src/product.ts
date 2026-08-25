@@ -3,6 +3,7 @@ import { compileSaaSDefinition } from './composition.ts'
 import {
   CredentialUnavailableError,
   definePrincipalCredentialsProvider,
+  principalCredentials,
   type PrincipalCredentials,
 } from './credentials.ts'
 import {
@@ -13,7 +14,6 @@ import {
   createMcpAgentIntegration,
   defineTenantMcpConfigProvider,
   McpIntegrationError,
-  principalCredentials,
   tenantMcpConfig,
   type McpAgentCreateOptions,
   type McpAgentHandle,
