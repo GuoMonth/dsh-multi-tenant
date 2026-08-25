@@ -6,7 +6,7 @@
 
 如果你已经认可 DeepSeek Harness 的 Agent 执行模型，但准备把它放进一个真正的 SaaS 产品，那么最先变复杂的通常不是模型，而是这几件事：**这个请求属于谁、能拿哪份 credential、应该连接哪个 MCP、能不能恢复某个 Session，以及这个长生命周期 Agent 最终归谁管理。**
 
-> Release candidate：**`dsh-multi-tenant@0.3.0-rc.1`**
+> 当前已发布版本：**`dsh-multi-tenant@0.3.0-rc.1`**
 >
 > Compatible DSH baseline：`0.1.1-rc.2` / `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`。
 
@@ -183,6 +183,25 @@ CI 会证明真实外部 DSH / Cordis assumptions、真实 stdio MCP server、�
 
 详见 [`docs/reference/compatibility.zh-CN.md`](./docs/reference/compatibility.zh-CN.md)。
 
+## 下个版本聚焦
+
+`0.3.0-rc.2` 明确以 **First Product Experience** 为最高优先级，而不是继续做新的 Core milestone。
+
+P0 目标就是把真实产品链路做出明显体感：
+
+```text
+已有 JWT / Cookie / req.user
+  -> Tenant / Principal
+  -> DSH Web
+  -> Principal-bound Agent
+  -> 真实 MCP Tool
+  -> 肉眼可见的 identity / Session 隔离
+```
+
+这个版本只聚焦：可运行 DSH Web SaaS Starter、薄 JWT/Cookie Identity Bridge、更短 product-facing happy path、可操作 first-use diagnostics。Production persistence、通用 Broker/Auth abstraction、Permission/Audit 产品、第二个 ERP integration 都明确是 non-blocking follow-up。
+
+完整范围见 [`docs/scopes/v0.3.0-rc.2.zh-CN.md`](./docs/scopes/v0.3.0-rc.2.zh-CN.md)。
+
 ## 接下来往哪里走
 
 当前 `PrincipalCredentials` 仍然是 low-level primitive。长期更希望往 **Capability-as-Authority** 演进：Operation 消费 `ErpClient` / transport 这类 typed ability，secret 尽量留在可替换 Broker / authority plugin 后面。
@@ -191,11 +210,11 @@ CI 会证明真实外部 DSH / Cordis assumptions、真实 stdio MCP server、�
 
 ## Release 状态
 
-`0.3.0-rc.1` 仍然是 prerelease，而且项目会继续快速推进。真实 integration 如果证明当前 contract 不够好，后续允许 deliberate breaking change。
+`0.3.0-rc.1` 是当前已发布 prerelease。项目会继续快速推进，真实 integration 如果证明当前 contract 不够好，后续仍允许 deliberate breaking change。
 
 当前 live tree 只保留 `0.3` 仍有用的 release 文档和发布基建；旧 v0.1 / v0.2 的 prerelease archaeology 留在 Git history / tag 里，不继续污染主分支。
 
-详见 [`docs/releases/v0.3.0-rc.1.md`](./docs/releases/v0.3.0-rc.1.md) 与 [`docs/reference/release.zh-CN.md`](./docs/reference/release.zh-CN.md)。
+详见 [`docs/releases/v0.3.0-rc.1.md`](./docs/releases/v0.3.0-rc.1.md)、[`docs/scopes/v0.3.0-rc.2.zh-CN.md`](./docs/scopes/v0.3.0-rc.2.zh-CN.md) 与 [`docs/reference/release.zh-CN.md`](./docs/reference/release.zh-CN.md)。
 
 ## License
 

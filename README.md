@@ -6,7 +6,7 @@
 
 If you already like DeepSeek Harness but now need to put it behind a real SaaS product, this project handles the layer that usually becomes dangerous first: **which organization/user owns the request, which credentials and MCP config they may use, which Session they may resume, and which long-lived Agent lifecycle belongs to them.**
 
-> Release candidate: **`dsh-multi-tenant@0.3.0-rc.1`**
+> Current release: **`dsh-multi-tenant@0.3.0-rc.1`**
 >
 > Compatible DSH baseline: `0.1.1-rc.2` at `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`.
 
@@ -182,6 +182,25 @@ CI proves the real external assumptions, a real stdio MCP server, real `tools/li
 
 See [`docs/reference/compatibility.md`](./docs/reference/compatibility.md).
 
+## Next release focus
+
+`0.3.0-rc.2` is intentionally focused on **First Product Experience** rather than another Core milestone.
+
+The P0 goal is to make the real product path tangible:
+
+```text
+existing JWT / Cookie / req.user
+  -> Tenant / Principal
+  -> DSH Web
+  -> Principal-bound Agent
+  -> real MCP Tool
+  -> visible identity / Session isolation
+```
+
+The release is limited to a runnable DSH Web SaaS starter, thin JWT/Cookie identity bridges, a shorter product-facing happy path and actionable first-use diagnostics. Production persistence, universal Broker/Auth abstractions, Permission/Audit products and the second ERP integration are explicitly non-blocking follow-ups.
+
+See [`docs/scopes/v0.3.0-rc.2.md`](./docs/scopes/v0.3.0-rc.2.md).
+
 ## Where this is going
 
 The current `PrincipalCredentials` capability is deliberately low-level. The preferred long-term direction is **Capability-as-Authority**: Operations consume typed abilities such as an `ErpClient`/transport while secrets stay behind replaceable Broker/authority plugins whenever practical.
@@ -190,11 +209,11 @@ That is Vision, not a frozen `0.3` API. See [`docs/vision/authority-capabilities
 
 ## Release status
 
-`0.3.0-rc.1` is a prerelease and the project is intentionally moving fast. Breaking changes are acceptable when real integrations prove a better contract.
+`0.3.0-rc.1` is the currently published prerelease. The project is intentionally moving fast, and deliberate breaking changes remain acceptable when real integrations prove a better contract.
 
 The live repository keeps only current `0.3` release documentation and current release infrastructure; older prerelease archaeology stays in Git history/tags rather than the active tree.
 
-See [`docs/releases/v0.3.0-rc.1.md`](./docs/releases/v0.3.0-rc.1.md) and [`docs/reference/release.md`](./docs/reference/release.md).
+See [`docs/releases/v0.3.0-rc.1.md`](./docs/releases/v0.3.0-rc.1.md), [`docs/scopes/v0.3.0-rc.2.md`](./docs/scopes/v0.3.0-rc.2.md), and [`docs/reference/release.md`](./docs/reference/release.md).
 
 ## License
 
