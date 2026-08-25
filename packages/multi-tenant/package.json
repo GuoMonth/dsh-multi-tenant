@@ -74,6 +74,10 @@
       "types": "./dist/store.d.mts",
       "import": "./dist/store.mjs"
     },
+    "./sqlite-store": {
+      "types": "./dist/sqlite-store.d.mts",
+      "import": "./dist/sqlite-store.mjs"
+    },
     "./testing": {
       "types": "./dist/testing.d.mts",
       "import": "./dist/testing.mjs"
@@ -95,7 +99,8 @@
     "saas",
     "authorization",
     "tenant-isolation",
-    "mcp"
+    "mcp",
+    "sqlite"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
