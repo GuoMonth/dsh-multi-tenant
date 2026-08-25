@@ -90,6 +90,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Prove durable local SQLite ownership across process restart
+        run: pnpm probe:sqlite
+
       - name: Installed artifact smoke
         run: pnpm smoke
 
