@@ -208,16 +208,23 @@ export function mountMcpSaaSWebBridge<TrustedSubject>(
       const subject = await requireSubject(req, options.authenticate)
       const principal = await runtime.resolve(subject)
       if (action === 'identity') {
-        if (req.method !== 'GET') return writeJson(res, 405, { error: 'method-not-allowed' })
-        return writeJson(res, 200, { principal: principal.identity })
+        if (req.method !== 'GET') {
+          writeJson(res, 405, { error: 'method-not-allowed' })
+          return
+        }
+        writeJson(res, 200, { principal: principal.identity })
+        return
       }
-      if (req.method !== 'POST') return writeJson(res, 405, { error: 'method-not-allowed' })
+      if (req.method !== 'POST') {
+        writeJson(res, 405, { error: 'method-not-allowed' })
+        return
+      }
       const body = await readJson(req)
       const sessionId = sessionIdFromBody(body)
       const agent = action === 'create'
         ? await principal.create({ sessionId })
         : await principal.resume({ sessionId })
-      return writeJson(res, 200, {
+      writeJson(res, 200, {
         principal: principal.identity,
         sessionId: agent.sessionId,
         agentId: agent.agent.id,
@@ -229,12 +236,13 @@ export function mountMcpSaaSWebBridge<TrustedSubject>(
       })
     } catch (error) {
       if (error instanceof SyntaxError || error instanceof TypeError) {
-        return writeJson(res, 400, { error: 'bad-request', message: error.message })
+        writeJson(res, 400, { error: 'bad-request', message: error.message })
+        return
       }
       const wrapped = error instanceof ProductExperienceError
         ? error
         : productExperienceError('MCP_SETUP_FAILED', 'mcp-setup', 'The product request could not be completed.', error)
-      return writeJson(res, statusFor(wrapped), { error: toProductDiagnostic(wrapped) })
+      writeJson(res, statusFor(wrapped), { error: toProductDiagnostic(wrapped) })
     }
   }
 
@@ -242,12 +250,16 @@ export function mountMcpSaaSWebBridge<TrustedSubject>(
     ...(options.controlPage === false ? [] : [{
       kind: 'exact' as const,
       path: basePath,
-      handler: (req: IncomingMessage, res: ServerResponse) => {
-        if (req.method !== 'GET' && req.method !== 'HEAD') return writeJson(res, 405, { error: 'method-not-allowed' })
+      handler: (req: IncomingMessage, res: ServerResponse): void => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          writeJson(res, 405, { error: 'method-not-allowed' })
+          return
+        }
         const html = controlPage(basePath)
         if (req.method === 'HEAD') {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-length': Buffer.byteLength(html), 'cache-control': 'no-store' })
-          return res.end()
+          res.end()
+          return
         }
         writeHtml(res, html)
       },
