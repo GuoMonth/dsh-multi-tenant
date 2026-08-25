@@ -6,7 +6,7 @@
 
 If one DSH runtime must safely serve many organizations and users, this project owns the layer that usually becomes dangerous first: **which Tenant/Principal owns the request, which credentials and MCP config they may use, which Session they may resume, and which long-lived Agent lifecycle belongs to them.**
 
-> Current release candidate: **`dsh-multi-tenant@0.3.0-rc.2` — First Product Experience**
+> Current release candidate: **`dsh-multi-tenant@0.3.0-rc.3` — Durable Local Experience**
 >
 > Compatible DSH baseline: `0.1.1-rc.2` at `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`.
 
@@ -74,6 +74,38 @@ pnpm add dsh-multi-tenant
 ```
 
 The MCP path reuses the official `@deepseek-ai/dsh-mcp-client` supplied by DSH instead of vendoring or forking MCP.
+
+## Durable local ownership by default
+
+A normal DSH plugin install now uses the built-in SQLite Session ownership provider. There is no PostgreSQL container, native addon or extra npm database dependency to configure before the first durable test.
+
+```text
+Alice claims Session s1
+        ↓
+<cwd>/.dsh-multi-tenant/session-ownership.sqlite
+        ↓ restart DSH / Node
+Alice -> s1  allowed
+Bob   -> s1  denied
+Globex/Alice -> s1 denied
+```
+
+Override the database location when needed:
+
+```sh
+DSH_MULTI_TENANT_SQLITE_PATH=/path/to/session-ownership.sqlite dsh web
+```
+
+Framework code can mount the same provider directly:
+
+```ts
+import SQLiteTenantSessionStore from 'dsh-multi-tenant/sqlite-store'
+
+await ctx.plugin(SQLiteTenantSessionStore, {
+  path: './state/session-ownership.sqlite',
+})
+```
+
+SQLite is the **local durable / single-node adoption provider**. `InMemoryTenantSessionStore` remains available for hermetic tests. A future PostgreSQL or other multi-instance provider should implement the same `TenantSessionStore` contract rather than changing Core ownership semantics.
 
 ## Minimal product flow
 
@@ -146,13 +178,14 @@ The helpers only extract transport values. Authentication/verification remains i
 - Tenant-scoped MCP configuration;
 - Principal-bound Agent `create()` / `resume()`;
 - immutable, fail-closed Session ownership;
+- zero-external-service SQLite ownership persistence across local restarts;
 - deterministic per-Session MCP namespaces;
 - Principal-owned long-lived Agents;
 - official DSH MCP Tools integration;
 - MCP-specific product facade + same-server Web identity/admission bridge;
 - secret-safe structured diagnostics;
 - opt-in real-DSH-Web starter;
-- permanent executable First Product Experience evidence;
+- permanent First Product Experience and durable-local executable evidence;
 - installed-artifact and post-publication registry verification.
 
 ## Architecture
@@ -181,15 +214,30 @@ The responsibility split is intentionally small: Product owns authentication; Co
 
 ## Honest boundaries
 
-Pinned DSH Web does not currently materialize a product-authenticated Principal Context for every stock Web RPC business method. rc.2 guarantees product-aware identity + Agent create/resume admission + Session ownership, but it does **not** claim that every stock DSH Web RPC becomes tenant-authorized automatically. Follow-up: [#41](https://github.com/GuoMonth/dsh-multi-tenant/issues/41).
+Pinned DSH Web does not currently materialize a product-authenticated Principal Context for every stock Web RPC business method. rc.3 guarantees product-aware identity + Agent create/resume admission + Session ownership, but it does **not** claim that every stock DSH Web RPC becomes tenant-authorized automatically. This is the acknowledged boundary tracked in [#41](https://github.com/GuoMonth/dsh-multi-tenant/issues/41).
 
-Cordis Context is also not hostile-code isolation. Strong process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote boundaries.
+For production Web exposure until DSH provides a request-scoped Principal seam, treat DSH Web as a **private backend**:
 
-Production Session persistence, universal Broker/Auth abstractions, Permission/Audit products and a second ERP integration remain evidence-driven follow-ups rather than rc.2 blockers.
+```text
+Browser / external client
+        ↓
+Product Gateway / BFF
+  - authenticate
+  - resolve Tenant / Principal
+  - authorize Session / Agent resources
+        ↓ private network / loopback
+DSH Web + dsh-multi-tenant
+```
+
+The public client must not be able to bypass that gateway and reach stock DSH `/api` directly. This is the recommended production authority boundary, not a workaround hidden inside the SQLite store.
+
+SQLite also does not claim horizontally scaled multi-instance production durability. It is intentionally optimized for individual developers and single-node validation. Cordis Context is not hostile-code isolation either; strong process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote boundaries.
 
 ## Evidence and release
 
-`pnpm release:check` now includes the real-Web First Product Experience proof in addition to typecheck/tests/build, packed artifact smoke and the existing DSH/Cordis/MCP probes.
+`pnpm release:check` gates publication on both the real-Web First Product Experience and the durable-local SQLite proof, in addition to typecheck/tests/build, packed artifact smoke and the existing DSH/Cordis/MCP probes.
+
+`pnpm probe:sqlite` launches separate Node processes against one SQLite file and proves restart persistence, sibling-Principal denial, cross-Tenant denial and exactly-one-winner competing claims.
 
 See:
 
@@ -199,7 +247,7 @@ See:
 - [MCP Agent Integration](./docs/specs/mcp-agent-integration.md)
 - [Compatibility](./docs/reference/compatibility.md)
 - [Release contract](./docs/reference/release.md)
-- [0.3.0-rc.2 release note](./docs/releases/v0.3.0-rc.2.md)
+- [0.3.0-rc.3 release note](./docs/releases/v0.3.0-rc.3.md)
 
 ## License
 
