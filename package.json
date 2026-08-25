@@ -11,6 +11,7 @@
     "probe:dsh": "node scripts/session-genesis-probe.mjs && node scripts/agent-owner-context-probe.mjs",
     "probe:cordis": "node scripts/cordis-operation-lifecycle-probe.mjs",
     "probe:mcp": "node scripts/mcp-agent-integration-probe.mjs",
+    "probe:fpe": "node scripts/first-product-experience-probe.mjs",
     "probe:platform": "pnpm probe:dsh && pnpm probe:cordis && pnpm probe:mcp",
     "smoke": "node scripts/artifact-consumer-smoke.mjs --local",
     "release:preflight": "node scripts/release-preflight.mjs",
