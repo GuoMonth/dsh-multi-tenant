@@ -4,13 +4,14 @@
  *
  * Usage:
  *   node scripts/artifact-consumer-smoke.mjs --local
- *   node scripts/artifact-consumer-smoke.mjs dsh-multi-tenant@0.3.0-rc.1
+ *   node scripts/artifact-consumer-smoke.mjs dsh-multi-tenant@0.3.0-rc.2
  *
  * --local builds/packs the current workspace first, verifies tarball/export
  * completeness, then installs the candidate beside the pinned DSH CLI. Registry
  * verification passes an exact npm spec. Both paths exercise the v0.3 Product
- * Ingress / RuntimeComposition / Credentials / MCP surface and trigger the
- * packaged dynamic import of the official MCP client.
+ * Ingress / RuntimeComposition / Credentials / MCP surface, import the rc.2
+ * product/Web/diagnostics/starter subpaths, and trigger the packaged dynamic
+ * import of the official MCP client.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -64,6 +65,10 @@ try {
       'dist/ingress.mjs',
       'dist/credentials.mjs',
       'dist/mcp.mjs',
+      'dist/product.mjs',
+      'dist/web.mjs',
+      'dist/diagnostics.mjs',
+      'dist/starter-plugin.mjs',
       'dist/store.mjs',
       'dist/testing.mjs',
       'cordis.patch.yml',
@@ -126,11 +131,23 @@ import { materializeRuntimeComposition as materializeFromSubpath } from 'dsh-mul
 import { createProductIngress as ingressFromSubpath } from 'dsh-multi-tenant/ingress'
 import { principalCredentials as credentialsFromSubpath } from 'dsh-multi-tenant/credentials'
 import { tenantMcpConfig as mcpFromSubpath } from 'dsh-multi-tenant/mcp'
+import { createMcpSaaSRuntime } from 'dsh-multi-tenant/product'
+import { mountMcpSaaSWebBridge, readBearerToken, readCookie } from 'dsh-multi-tenant/web'
+import { toProductDiagnostic } from 'dsh-multi-tenant/diagnostics'
+import * as Starter from 'dsh-multi-tenant/starter'
 
 if (materializeFromSubpath !== materializeRuntimeComposition) throw new Error('artifact smoke: runtime-composition export mismatch')
 if (ingressFromSubpath !== createProductIngress) throw new Error('artifact smoke: ingress export mismatch')
 if (credentialsFromSubpath !== principalCredentials) throw new Error('artifact smoke: credentials export mismatch')
 if (mcpFromSubpath !== tenantMcpConfig) throw new Error('artifact smoke: MCP export mismatch')
+if (typeof createMcpSaaSRuntime !== 'function') throw new Error('artifact smoke: product facade export missing')
+if (typeof mountMcpSaaSWebBridge !== 'function' || typeof readBearerToken !== 'function' || typeof readCookie !== 'function') {
+  throw new Error('artifact smoke: Web product surface export missing')
+}
+if (typeof toProductDiagnostic !== 'function') throw new Error('artifact smoke: diagnostics export missing')
+if (typeof Starter.apply !== 'function' || Starter.name !== 'multi-tenant-starter') {
+  throw new Error('artifact smoke: starter plugin export missing')
+}
 
 const ctx = new Context()
 await ctx.plugin(Store)
