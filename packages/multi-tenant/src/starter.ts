@@ -393,7 +393,16 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
           const body = await readJson(req)
           const sessionId = requireSessionId(body)
           const handle = await runtime.create(subject, { sessionId })
-          const result = await executeWhoAmI(ctx, handle)
+          let result: unknown
+          try {
+            result = await executeWhoAmI(ctx, handle)
+          } finally {
+            // This route is a one-shot proof, not the product facade's lifetime
+            // contract. Release the live Agent after the real MCP call so the
+            // persisted Session can be resumed under the same Principal without
+            // colliding with an already-published DSH Agent of the same id.
+            await handle.dispose()
+          }
           writeJson(res, 200, {
             principal: { tenantId: subject.tenant, userId: subject.user },
             sessionId,
