@@ -14,6 +14,7 @@ import {
   createMcpAgentIntegration,
   defineTenantMcpConfigProvider,
   McpIntegrationError,
+  normalizeTenantMcpConfig,
   tenantMcpConfig,
   type McpAgentCreateOptions,
   type McpAgentHandle,
@@ -83,6 +84,16 @@ export interface McpSaaSRuntime<TrustedSubject> {
     options: McpAgentResumeOptions,
   ): Promise<McpAgentHandle<A>>
   dispose(): Promise<void>
+}
+
+function assertCredentialsContract(value: unknown): asserts value is PrincipalCredentials {
+  if (typeof value !== 'object' || value === null) {
+    throw new TypeError('Principal credentials factory must return an object')
+  }
+  const credentials = value as Partial<PrincipalCredentials>
+  if (typeof credentials.get !== 'function' || typeof credentials.require !== 'function') {
+    throw new TypeError('Principal credentials must implement get() and require()')
+  }
 }
 
 function classifyLaunchFailure(error: unknown): ProductExperienceError {
@@ -175,7 +186,9 @@ export async function createMcpSaaSRuntime<TrustedSubject>(
         ...(options.mcp.definitionKey === undefined ? {} : { definitionKey: options.mcp.definitionKey }),
         async load(preparation) {
           try {
-            return await options.mcp.load(preparation)
+            // Normalize inside the product seam so malformed product data is
+            // attributed to Tenant MCP config rather than to identity materialization.
+            return normalizeTenantMcpConfig(await options.mcp.load(preparation))
           } catch (error) {
             throw productExperienceError(
               'TENANT_MCP_CONFIG_FAILED',
@@ -191,7 +204,10 @@ export async function createMcpSaaSRuntime<TrustedSubject>(
         ...(options.credentials.definitionKey === undefined ? {} : { definitionKey: options.credentials.definitionKey }),
         async create(preparation) {
           try {
-            return await options.credentials.create(preparation)
+            const credentials = await options.credentials.create(preparation)
+            // Validate at the product seam for the same attribution reason.
+            assertCredentialsContract(credentials)
+            return credentials
           } catch (error) {
             throw productExperienceError(
               'PRINCIPAL_CREDENTIAL_FAILED',
