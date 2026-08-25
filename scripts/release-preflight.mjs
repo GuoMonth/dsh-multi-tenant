@@ -68,7 +68,8 @@ if (!runtime) {
   const exports = pkg.exports ?? {}
   for (const required of [
     '.', './runtime', './operation', './composition', './runtime-composition',
-    './ingress', './credentials', './mcp', './store', './testing', './cordis.patch.yml',
+    './ingress', './credentials', './mcp', './product', './web', './diagnostics',
+    './starter', './store', './testing', './cordis.patch.yml',
   ]) {
     if (!(required in exports)) errors.push(`${expectedPackageName}: exports must include ${required}`)
   }
@@ -79,6 +80,8 @@ if (!runtime) {
     '## Install',
     '## Quick start',
     '## What 0.3 provides',
+    'First Product Experience',
+    'createMcpSaaSRuntime',
     'RuntimeComposition',
     'Principal-scoped replaceable credentials',
     'Tenant-scoped MCP configuration',
@@ -116,6 +119,9 @@ if (rootPackage.scripts?.smoke !== 'node scripts/artifact-consumer-smoke.mjs --l
 if (String(rootPackage.scripts?.['probe:platform'] ?? '').includes('saas-core')) {
   errors.push('probe:platform must not retain the retired saas-core milestone probe')
 }
+if (!String(rootPackage.scripts?.['release:check'] ?? '').includes('probe:fpe')) {
+  errors.push('release:check must gate publication on the First Product Experience proof')
+}
 
 const registrySmoke = readFileSync(join(root, 'scripts/registry-smoke.mjs'), 'utf8')
 if (!registrySmoke.includes('artifact-consumer-smoke.mjs')) {
@@ -137,6 +143,7 @@ for (const requiredPath of [
   'scripts/agent-owner-context-probe.mjs',
   'scripts/cordis-operation-lifecycle-probe.mjs',
   'scripts/mcp-agent-integration-probe.mjs',
+  'scripts/first-product-experience-probe.mjs',
   'scripts/fixtures/mcp-identity-server.mjs',
   'scripts/artifact-consumer-smoke.mjs',
   'scripts/registry-preflight.mjs',
@@ -148,6 +155,8 @@ for (const requiredPath of [
 for (const retiredPath of [
   'ROADMAP.md',
   'ROADMAP.zh-CN.md',
+  'docs/scopes/v0.3.0-rc.2.md',
+  'docs/scopes/v0.3.0-rc.2.zh-CN.md',
   'docs/specs/v0.3-foundation.md',
   'docs/specs/m4-product-ingress-credentials.md',
   'docs/specs/m5-mcp-agent-integration.md',
@@ -174,4 +183,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion}; lean v0.3 live tree + installed-artifact proof + OIDC publishing`)
+console.log(`release preflight passed: ${expectedPackageName}@${releaseVersion}; First Product Experience + lean v0.3 live tree + installed-artifact proof + OIDC publishing`)

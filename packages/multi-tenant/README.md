@@ -4,17 +4,19 @@
 
 Use this package when one DSH runtime must serve many organizations and users without mixing Tenant configuration, Principal credentials, Session ownership or Agent-scoped MCP Tools.
 
-> **`dsh-multi-tenant@0.3.0-rc.1`** is the currently published prerelease. This branch implements the frozen `0.3.0-rc.2` First Product Experience scope. Compatible DSH baseline: `0.1.1-rc.2`.
+> **`dsh-multi-tenant@0.3.0-rc.2` — First Product Experience**
+>
+> Compatible DSH baseline: `0.1.1-rc.2`.
 
 ## The problem
 
-A single-user Agent looks like this:
+A single-user Agent can look like:
 
 ```text
 request -> Agent -> MCP -> backend
 ```
 
-A SaaS Agent runtime has to keep this safe instead:
+A SaaS runtime has to keep this safe instead:
 
 ```text
 Acme / Alice   -> Acme MCP + Alice credential + Alice Sessions
@@ -22,9 +24,7 @@ Acme / Bob     -> Acme MCP + Bob credential   + Bob Sessions
 Globex / Alice -> Globex MCP + Globex/Alice credential + Globex Sessions
 ```
 
-Without a reusable runtime boundary, every product ends up hand-building Tenant lookup, credential plumbing, MCP setup, Session authorization and Agent lifecycle rules.
-
-`dsh-multi-tenant` turns that into one product path:
+`dsh-multi-tenant` turns the repeated glue into one product path:
 
 ```text
 already-authenticated product subject
@@ -32,9 +32,11 @@ already-authenticated product subject
   -> Tenant MCP config
   -> Principal credentials
   -> fail-closed Session ownership
-  -> Principal-bound Agent create/resume
+  -> Principal-aware Agent create/resume
   -> native DSH MCP Tools
 ```
+
+Authentication stays product-owned. The framework starts after your JWT, Cookie, OIDC session, API key or other login mechanism has already produced a trusted user/subject.
 
 ## Install
 
@@ -50,20 +52,20 @@ Or from framework code that already owns the compatible DSH installation:
 pnpm add dsh-multi-tenant
 ```
 
-The MCP path reuses the official `@deepseek-ai/dsh-mcp-client` supplied by that DSH installation. This package does not vendor or fork MCP.
+The MCP path reuses the official `@deepseek-ai/dsh-mcp-client` supplied by DSH. This package does not vendor or fork MCP.
 
-### See the MVP before integrating your product
+## First Product Experience
 
-Install it into the shipped Web profile, opt in to the starter, then open the printed DSH URL plus `/_dsh-multi-tenant`:
+Before integrating your own product, run the opt-in starter on the real shipped DSH Web profile:
 
 ```sh
 dsh plugin --profile web add dsh-multi-tenant
 DSH_MULTI_TENANT_STARTER=1 dsh web
 ```
 
-The starter is **dormant by default**. The environment flag is required before it publishes demo identities or routes.
+Open the printed DSH URL plus `/_dsh-multi-tenant`.
 
-The browser panel gives you three identities:
+The starter is dormant by default and gives you three identities:
 
 ```text
 Acme / Alice
@@ -71,23 +73,26 @@ Acme / Bob
 Globex / Alice
 ```
 
-From there you can create an Agent, execute the starter's real stdio MCP `who_am_i` Tool, resume the owner Session, switch to Bob and observe the cross-Principal resume denial. The Tool confirms that a Principal credential reached the MCP process with `credentialAccepted: true`; it never returns the raw credential.
+It uses a real DSH Agent, the official DSH MCP client and a real stdio MCP JSON-RPC Tool. You can observe:
 
-This panel is mounted beside the existing DSH Web app. It is not a replacement chat frontend.
+- Acme/Alice resolving to the correct Tenant / Principal;
+- real MCP `tools/list` + `tools/call`;
+- Principal credential propagation proven as `credentialAccepted: true` without returning the raw credential;
+- owner Session resume;
+- Acme/Bob denied Alice's Session;
+- a second Tenant through Globex/Alice.
+
+The starter panel is mounted beside the existing DSH Web app on the same `ctx.webServer`; it is not another chat frontend or another HTTP server.
 
 ## Quick start
 
-For product code, `0.3.0-rc.2` adds one opinionated MCP-specific facade over the existing Core. Your first-success integration needs four product concepts: identity, Tenant MCP config, Principal credentials and Agent create/resume.
+`createMcpSaaSRuntime()` is the opinionated MCP-specific product facade over the existing Core:
 
 ```ts
-import {
-  createMcpSaaSRuntime,
-  InMemoryPrincipalCredentials,
-} from 'dsh-multi-tenant'
+import { createMcpSaaSRuntime } from 'dsh-multi-tenant'
 
 const app = await createMcpSaaSRuntime(ctx, {
   identity(subject: TrustedSubject) {
-    // subject is already authenticated by your product.
     return {
       tenantId: subject.organizationId,
       userId: subject.userId,
@@ -118,13 +123,13 @@ const principal = await app.resolve(trustedSubject)
 const handle = await principal.create({ sessionId })
 ```
 
-`createMcpSaaSRuntime()` does not replace `CompositionPlan`, `RuntimeComposition`, `ProductIngress` or `createMcpAgentIntegration`; it composes those existing primitives into the shortest current product path. Advanced consumers can still use the Core APIs directly.
+The facade composes the existing `CompositionPlan`, `RuntimeComposition`, Product Ingress and `createMcpAgentIntegration()` primitives. It is not a second Runtime or DI system.
 
-When `create()` resolves, the official DSH MCP client has completed initial connection, `tools/list` synchronization and Tool registration. `resume()` checks Session ownership before DSH persistence/setup runs.
+When `create()` resolves, the official MCP client has completed initial connection, `tools/list` synchronization and Tool registration. `resume()` checks Session ownership before DSH persistence/setup runs.
 
-### Web identity bridge
+### Existing JWT / Cookie / req.user
 
-Authentication remains product-owned. The Web bridge only consumes the trusted result:
+The Web bridge consumes the result of your existing authentication stack:
 
 ```ts
 import {
@@ -135,7 +140,6 @@ import {
 
 mountMcpSaaSWebBridge(ctx, app, {
   async authenticate(req) {
-    // Example only: verify using your existing auth stack first.
     const jwt = readBearerToken(req.headers)
     if (jwt) return verifyExistingJwt(jwt)
 
@@ -147,7 +151,7 @@ mountMcpSaaSWebBridge(ctx, app, {
 })
 ```
 
-`readBearerToken()` and `readCookie()` are transport extractors, not authentication. JWT signature verification, OIDC, cookie/session validation, refresh and user lookup stay in the product that already owns them.
+`readBearerToken()` and `readCookie()` are transport extractors, not authentication. JWT verification, OIDC, server-session validation, refresh and user lookup stay in the product.
 
 ## What 0.3 provides
 
@@ -160,10 +164,11 @@ mountMcpSaaSWebBridge(ctx, app, {
 - deterministic per-Session MCP namespaces;
 - Principal-owned long-lived Agents;
 - official DSH MCP Tools integration;
-- an MCP-specific product facade rather than a second Runtime;
-- a thin same-server DSH Web identity/admission bridge;
+- MCP-specific product facade;
+- same-server DSH Web identity/admission bridge;
 - structured secret-safe first-use diagnostics;
-- an opt-in real-DSH-Web starter and permanent end-to-end evidence lane;
+- opt-in real-DSH-Web starter;
+- permanent executable First Product Experience evidence;
 - clean installed-artifact and post-publication registry verification.
 
 ## Architecture
@@ -181,24 +186,17 @@ Product authentication
   -> native Agent-scoped MCP Tools
 ```
 
-The important boundaries are simple:
+The responsibility split stays small:
 
 - Product owns authentication.
 - Core owns identity, composition and lifecycle.
-- The product facade is MCP-specific and thin; it does not create a parallel Core.
-- Operation owns one short semantic decision, not the Agent lifetime.
+- Integration owns downstream protocol/configuration.
 - Principal owns long-lived Agents.
-- DSH owns MCP wire behavior and initial Tool discovery.
-
-### Pinned DSH Web boundary
-
-The pinned DSH Web `/api` carrier preserves HTTP headers and enforces its host-trust fence, but it does not materialize a product-authenticated Principal Context for every existing stock Web RPC business method. Therefore the rc.2 bridge makes product identity and Agent create/resume admission Principal-aware; it does **not** claim that a login selector magically tenant-authorizes every stock DSH Web RPC.
-
-That limitation is explicit because an honest boundary is safer than a cosmetic login screen.
+- DSH owns MCP wire behavior and Tool discovery.
 
 ## Diagnostics
 
-Product-facing errors expose only stable fields such as:
+Product-facing errors expose stable layers without serializing arbitrary underlying auth/vendor/credential errors:
 
 ```json
 {
@@ -208,15 +206,15 @@ Product-facing errors expose only stable fields such as:
 }
 ```
 
-Raw vendor/auth/credential causes are retained as server-side error causes and are never serialized by `toProductDiagnostic()`.
-
-The current stages are identity, Tenant MCP config, Principal credential, Session ownership, MCP setup and explicit post-create MCP discovery checks. The pinned official MCP client reports initial connect/discovery/register as one activation failure, so this package does not guess a finer failure stage when upstream cannot prove it.
+The pinned official MCP client reports initial connect/discovery/register as one activation failure, so the package does not guess a finer failure stage that upstream cannot prove.
 
 ## Security boundary
 
-Cordis Context provides trusted same-process identity/lifecycle separation, not hostile-code isolation. Strong secret/process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote deployment boundaries.
+Cordis Context provides trusted same-process identity/lifecycle separation, not hostile-code isolation. Strong secret/process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote boundaries.
 
-The starter demonstrates secret non-disclosure at the product/MCP response boundary, but it is not a hostile-code sandbox and its demo cookie is not a production authentication mechanism.
+The pinned DSH Web carrier also does not currently materialize a product-authenticated Principal Context for every stock Web RPC business method. rc.2 guarantees product-aware identity + Agent create/resume admission + Session ownership; it does not claim that every stock DSH Web RPC becomes tenant-authorized automatically.
+
+The starter's demo cookie is not a production authentication mechanism.
 
 ## Compatibility
 
@@ -224,7 +222,7 @@ The starter demonstrates secret non-disclosure at the product/MCP response bound
 - Cordis: `>=4.0.1 <5`
 - DSH: `0.1.1-rc.2`
 
-CI verifies the packed artifact in a clean consumer beside the pinned DSH installation. The First Product Experience lane additionally boots a clean real `dsh web` profile and proves real identity -> Agent -> official MCP client -> Tool execution plus cross-Principal Session denial and second-Tenant isolation.
+`pnpm release:check` includes the real-Web First Product Experience proof before publication.
 
 ## Public subpaths
 
@@ -240,7 +238,7 @@ dsh-multi-tenant/mcp
 dsh-multi-tenant/product
 dsh-multi-tenant/web
 dsh-multi-tenant/diagnostics
-dsh-multi-tenant/starter   # opt-in demo plugin only
+dsh-multi-tenant/starter
 dsh-multi-tenant/store
 dsh-multi-tenant/testing
 ```

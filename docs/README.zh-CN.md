@@ -4,13 +4,12 @@
 
 这里是 **`0.3` 当前产品基线**的 live documentation，不是历史档案馆。
 
-旧 prerelease release note、旧 milestone 名称、已经被替代的调查文档和一次性验证脚本不会因为“曾经存在过”就继续留在主树里；需要追溯时直接看 Git history / tag。
+旧 prerelease release note、旧 milestone、已经完成的 release scope 和一次性验证 artifact 不会因为“曾经存在过”就永久留在主树；需要追溯时直接看 Git history / tag。
 
 ## 从这里开始
 
 - [项目 README](../README.zh-CN.md) — 先看它解决什么问题、怎么安装、怎么跑第一条产品链路
-- [Direction](../DIRECTION.zh-CN.md) — 当前产品方向
-- [v0.3.0-rc.2 Scope](./scopes/v0.3.0-rc.2.zh-CN.md) — 已冻结的下个版本目标：First Product Experience
+- [Direction](../DIRECTION.zh-CN.md) — First Product Experience 发布后的当前产品方向
 - [CONTRIBUTING](../CONTRIBUTING.zh-CN.md) — engineering / evidence / live-tree policy
 
 ## 当前产品 / Runtime Contract
@@ -23,20 +22,18 @@
 - [SaaS boundaries](./specs/saas-boundaries.zh-CN.md) — Product Ingress、Runtime capability、Agent Integration planes
 - [SaaS composition](./specs/saas-composition.zh-CN.md) — compiler、scope-local identity、provider materialization
 
-## 当前 Release Scope
+## 当前产品基线
 
-`0.3.0-rc.2` 明确 product-first。P0 只包含：可运行的 DSH Web SaaS Starter、薄 JWT/Cookie Identity Bridge、更短的 product-facing happy path，以及可操作 first-use diagnostics。
+`0.3.0-rc.2 — First Product Experience` 提供可运行的真实 DSH Web Starter、薄 existing-auth identity bridge、更短的 MCP-specific product facade，以及 secret-safe first-use diagnostics。
 
-Production persistence、通用 Broker/Auth abstraction、Permission/Audit 产品、第二个 ERP integration 都明确属于 non-blocking follow-up。
-
-完整验收标准与 Non-goals 见 [Scope 文档](./scopes/v0.3.0-rc.2.zh-CN.md)。
+Production persistence、通用 Broker/Auth abstraction、Permission/Audit 产品、第二个 ERP integration 继续作为由真实 evidence 决定优先级的 follow-up，而不是阻塞 release。
 
 ## Evidence 与 Release
 
 - [`v0.3-assumptions.json`](./specs/v0.3-assumptions.json) — machine-readable external assumptions / proofs
 - [Compatibility](./reference/compatibility.zh-CN.md) — pinned DSH / Cordis baseline 与当前 CI evidence
 - [Release contract](./reference/release.zh-CN.md) — npm / OIDC publication 与 registry verification
-- [0.3.0-rc.1 release note](./releases/v0.3.0-rc.1.md) — 当前已发布版本
+- [0.3.0-rc.2 release note](./releases/v0.3.0-rc.2.md) — 当前 release candidate / 产品基线
 
 ## 长期 Vision
 

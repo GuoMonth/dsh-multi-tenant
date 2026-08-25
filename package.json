@@ -15,6 +15,6 @@
     "probe:platform": "pnpm probe:dsh && pnpm probe:cordis && pnpm probe:mcp",
     "smoke": "node scripts/artifact-consumer-smoke.mjs --local",
     "release:preflight": "node scripts/release-preflight.mjs",
-    "release:check": "pnpm verify && pnpm release:preflight && pnpm typecheck && pnpm test && pnpm build && pnpm smoke && pnpm probe:platform"
+    "release:check": "pnpm verify && pnpm release:preflight && pnpm typecheck && pnpm test && pnpm build && pnpm smoke && pnpm probe:platform && pnpm probe:fpe"
   }
 }
