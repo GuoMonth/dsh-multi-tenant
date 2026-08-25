@@ -13,7 +13,7 @@ export default defineConfig({
     'src/product.ts',
     'src/web.ts',
     'src/diagnostics.ts',
-    'src/starter.ts',
+    'src/starter-plugin.ts',
     'src/store.ts',
     'src/testing.ts',
   ],
