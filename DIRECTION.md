@@ -4,9 +4,9 @@
 
 `0.3` is the current product line. The live tree serves the current product rather than preserving prerelease archaeology.
 
-## Current baseline — 0.3.0-rc.2 First Product Experience
+## Current candidate — 0.3.0-rc.3 Durable Local Experience
 
-`0.3.0-rc.2` turns the proven multi-tenant Runtime into a directly usable product-facing MVP:
+`0.3.0-rc.2` proved the first real product path. `0.3.0-rc.3` removes the next adoption friction: an individual developer should not need PostgreSQL or Docker before Session ownership survives a restart.
 
 ```text
 existing JWT / Cookie / req.user
@@ -19,37 +19,56 @@ Tenant MCP config + Principal credentials
         ↓
 Principal-aware Agent create/resume
         ↓
+SQLite-backed immutable Session ownership
+        ↓ restart-safe local development
 real DSH Agent + official MCP client
         ↓
 native MCP Tool
-        ↓
-visible identity / Session isolation
 ```
 
-The release adds a runnable real-DSH-Web starter, a thin Web identity/admission bridge, an MCP-specific product facade and secret-safe first-use diagnostics. The permanent FPE probe exercises the installed candidate through a real DSH Web profile and real MCP Tool call.
+The shipped DSH bundle now selects `SQLiteTenantSessionStore` by default. It uses Node's built-in `node:sqlite`, writes `<cwd>/.dsh-multi-tenant/session-ownership.sqlite` unless overridden, and keeps the existing claim-once `TenantSessionStore` contract. The permanent SQLite probe launches separate Node processes and proves restart persistence plus exactly-one-winner competing claims.
+
+SQLite is deliberately a **local durable / single-node adoption provider**. It does not turn the package into a horizontally scaled persistence product. A later PostgreSQL/other provider should plug into the same Store seam when real deployment evidence requires it.
+
+## Acknowledged Web boundary — #41
+
+The project accepts the current pinned-DSH limitation: stock DSH Web RPC dispatch does not materialize a product-authenticated Principal Context for every business method.
+
+That is no longer treated as a blocker for the product path. Until upstream exposes a request-scoped Principal seam, the production deployment contract is:
+
+```text
+Browser / external client
+        ↓
+Product Gateway / BFF
+  - authenticate
+  - resolve canonical Tenant / Principal
+  - authorize Session / Agent resources
+        ↓ private network / loopback
+DSH Web + dsh-multi-tenant
+```
+
+Public clients must not have a bypass path to stock DSH `/api`. Issue #41 remains open as an upstream/native integration improvement, not as a hidden claim that rc.3 already protects every stock RPC in-process.
 
 ## What happens next
 
-The next priority is **real product usage**, not another architecture milestone. Consume `0.3.0-rc.2`, integrate real existing authentication/MCP systems, and use that evidence to decide which gap deserves the next breaking or additive change.
+After rc.3, priority stays evidence-driven. The most likely product gaps are:
 
-Current candidates include:
-
-- product Principal authority through stock DSH Web RPC dispatch (tracked in #41);
-- production Redis/SQL Session persistence;
-- real JWT/Cookie integration feedback and token lifecycle pressure;
+- real credential refresh / rotation / revocation pressure for long-lived Principal-owned Agents;
+- production Gateway/BFF examples and executable deployment evidence around the acknowledged #41 boundary;
 - a second ERP/direct-business-API vertical slice;
-- repeated authority/refresh/injection/audit semantics that may finally justify a Broker / `Capability-as-Authority` contract;
-- Permission/Audit capabilities when actual products require them.
+- PostgreSQL or another multi-instance `TenantSessionStore` when actual deployments need horizontal scaling;
+- minimal audit/policy hooks when real products need them;
+- repeated authority/refresh/injection/audit semantics that may eventually justify a Broker / `Capability-as-Authority` contract.
 
-No candidate is predeclared as the next release milestone. Evidence decides priority.
+Do not introduce a universal Auth/Broker/Policy framework merely to make the architecture look complete.
 
 ## Current boundaries
 
-`0.3.0-rc.2` intentionally does not claim:
+`0.3.0-rc.3` intentionally does not claim:
 
 - that every stock DSH Web RPC is automatically tenant-authorized by the product bridge;
+- multi-replica production durability from the bundled SQLite provider;
 - hostile-code/process/filesystem/network isolation inside one shared process;
-- production durability from the in-memory reference Session store;
 - a universal OAuth/OIDC/token-refresh or Credential Broker framework;
 - MCP Resources/Prompts beyond the pinned Harness consumer seams.
 

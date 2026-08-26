@@ -4,9 +4,9 @@
 
 `0.3` 是当前产品线。Live tree 服务当前产品，不负责保存 prerelease 考古资料。
 
-## 当前基线 — 0.3.0-rc.2 First Product Experience
+## 当前 Candidate — 0.3.0-rc.3 Durable Local Experience
 
-`0.3.0-rc.2` 把已经证明正确的 Multi-Tenant Runtime 推到了真正可试用、可复制的产品层：
+`0.3.0-rc.2` 已经证明第一条真实产品链路。`0.3.0-rc.3` 解决下一层 adoption friction：个人开发者不应该先安装 PostgreSQL 或 Docker，Session ownership 才能在重启后继续存在。
 
 ```text
 已有 JWT / Cookie / req.user
@@ -19,37 +19,56 @@ Tenant MCP config + Principal credentials
         ↓
 Principal-aware Agent create/resume
         ↓
+SQLite-backed immutable Session ownership
+        ↓ 重启后仍可验证
 真实 DSH Agent + 官方 MCP client
         ↓
 native MCP Tool
-        ↓
-肉眼可见的 identity / Session isolation
 ```
 
-这个版本提供可运行的真实 DSH Web Starter、薄 Web identity/admission bridge、MCP-specific product facade，以及 secret-safe first-use diagnostics。永久 FPE probe 会把 packed candidate 安装进 clean DSH Web profile，真正启动 Web，并执行真实 MCP Tool。
+DSH bundle 现在默认选择 `SQLiteTenantSessionStore`。它只使用 Node 内置 `node:sqlite`，默认写入 `<cwd>/.dsh-multi-tenant/session-ownership.sqlite`，并继续保持原来的 claim-once `TenantSessionStore` contract。永久 SQLite probe 会真正启动多个独立 Node process，证明 restart persistence 和竞争 claim 只有一个 winner。
+
+SQLite 的定位刻意是 **local durable / single-node adoption provider**。它不把项目包装成 horizontally-scaled persistence 产品。未来真实部署需要时，PostgreSQL/其他 provider 继续替换同一个 Store seam 即可。
+
+## 已承认的 Web 边界 — #41
+
+项目接受 pinned DSH 当前的限制：stock DSH Web RPC dispatch 不会给每个 business method materialize product-authenticated Principal Context。
+
+这个边界不再作为当前产品闭环的 blocker。上游还没有 request-scoped Principal seam 时，生产部署 contract 是：
+
+```text
+Browser / external client
+        ↓
+Product Gateway / BFF
+  - authentication
+  - canonical Tenant / Principal resolution
+  - Session / Agent resource authorization
+        ↓ private network / loopback
+DSH Web + dsh-multi-tenant
+```
+
+公网客户端不能存在绕过 Gateway 直接访问 stock DSH `/api` 的路径。#41 继续保持 open，作为未来 upstream/native integration improvement，而不是暗示 rc.3 已经在进程内保护所有 stock RPC。
 
 ## 接下来做什么
 
-下一阶段的最高优先级是 **真实产品使用证据**，不是再预设一个架构 milestone。先让 `0.3.0-rc.2` 进入真实 JWT/Cookie、真实 MCP、真实 SaaS 产品，再根据反馈决定下一个 Gap。
+rc.3 之后继续由真实产品 evidence 决定优先级。当前更可能的 Gap 是：
 
-当前候选包括：
-
-- stock DSH Web RPC 如何携带 product Principal authority（#41）；
-- production Redis / SQL Session persistence；
-- 真实 JWT/Cookie 集成与 token lifecycle 压力；
+- long-lived Principal-owned Agent 面对真实 credential refresh / rotation / revocation 的压力；
+- 围绕已承认 #41 边界的 production Gateway/BFF 示例与 executable deployment evidence；
 - 第二个 ERP / direct-business-API vertical slice；
-- authority / refresh / injection / audit 语义是否重复到足以提炼 Broker / `Capability-as-Authority`；
-- 真实产品需要时再补 Permission / Audit capability。
+- 真正需要 horizontal scaling 时再提供 PostgreSQL 或其他 multi-instance `TenantSessionStore`；
+- 真实产品需要时再补最小 audit / policy hook；
+- authority / refresh / injection / audit 语义重复到足以提炼 Broker / `Capability-as-Authority` 时再抽象。
 
-这些都不是预先冻结的“下一版本 milestone”，优先级由 evidence 决定。
+不要为了“架构完整”提前做 universal Auth/Broker/Policy framework。
 
 ## 当前边界
 
-`0.3.0-rc.2` 不宣称：
+`0.3.0-rc.3` 不宣称：
 
 - product bridge 能自动让所有 stock DSH Web RPC 获得 tenant authorization；
+- bundled SQLite provider 具备 multi-replica production durability；
 - 单进程里可以隔离 hostile code、filesystem、network、shell；
-- in-memory reference Session store 具备生产 durability；
 - 已经有通用 OAuth/OIDC/token refresh 或 Credential Broker framework；
 - pinned Harness 尚未消费的 MCP Resources / Prompts 已经被支持。
 

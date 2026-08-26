@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.3.0-rc.2",
-  "description": "Multi-tenant SaaS runtime for DeepSeek Harness with trusted Web identity, Principal-bound Agents, session isolation, scoped credentials, and native MCP Tools.",
+  "version": "0.3.0-rc.3",
+  "description": "Multi-tenant SaaS runtime for DeepSeek Harness with trusted Web identity, Principal-bound Agents, durable local session ownership, scoped credentials, and native MCP Tools.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
   "repository": {
@@ -74,6 +74,10 @@
       "types": "./dist/store.d.mts",
       "import": "./dist/store.mjs"
     },
+    "./sqlite-store": {
+      "types": "./dist/sqlite-store.d.mts",
+      "import": "./dist/sqlite-store.mjs"
+    },
     "./testing": {
       "types": "./dist/testing.d.mts",
       "import": "./dist/testing.mjs"
@@ -95,7 +99,8 @@
     "saas",
     "authorization",
     "tenant-isolation",
-    "mcp"
+    "mcp",
+    "sqlite"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

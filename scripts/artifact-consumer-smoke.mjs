@@ -4,14 +4,14 @@
  *
  * Usage:
  *   node scripts/artifact-consumer-smoke.mjs --local
- *   node scripts/artifact-consumer-smoke.mjs dsh-multi-tenant@0.3.0-rc.2
+ *   node scripts/artifact-consumer-smoke.mjs dsh-multi-tenant@0.3.0-rc.3
  *
  * --local builds/packs the current workspace first, verifies tarball/export
  * completeness, then installs the candidate beside the pinned DSH CLI. Registry
  * verification passes an exact npm spec. Both paths exercise the v0.3 Product
- * Ingress / RuntimeComposition / Credentials / MCP surface, import the rc.2
- * product/Web/diagnostics/starter subpaths, and trigger the packaged dynamic
- * import of the official MCP client.
+ * Ingress / RuntimeComposition / Credentials / MCP surface, import the product,
+ * Web, diagnostics, starter and SQLite-store subpaths, and trigger the packaged
+ * dynamic import of the official MCP client.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -70,6 +70,7 @@ try {
       'dist/diagnostics.mjs',
       'dist/starter-plugin.mjs',
       'dist/store.mjs',
+      'dist/sqlite-store.mjs',
       'dist/testing.mjs',
       'cordis.patch.yml',
       'README.md',
@@ -126,6 +127,7 @@ import Service, {
   tenantMcpConfig,
 } from 'dsh-multi-tenant'
 import Store from 'dsh-multi-tenant/store'
+import SQLiteStore from 'dsh-multi-tenant/sqlite-store'
 import Runtime from 'dsh-multi-tenant/runtime'
 import { materializeRuntimeComposition as materializeFromSubpath } from 'dsh-multi-tenant/runtime-composition'
 import { createProductIngress as ingressFromSubpath } from 'dsh-multi-tenant/ingress'
@@ -141,6 +143,7 @@ if (ingressFromSubpath !== createProductIngress) throw new Error('artifact smoke
 if (credentialsFromSubpath !== principalCredentials) throw new Error('artifact smoke: credentials export mismatch')
 if (mcpFromSubpath !== tenantMcpConfig) throw new Error('artifact smoke: MCP export mismatch')
 if (typeof createMcpSaaSRuntime !== 'function') throw new Error('artifact smoke: product facade export missing')
+if (typeof SQLiteStore !== 'function') throw new Error('artifact smoke: SQLite store export missing')
 if (typeof mountMcpSaaSWebBridge !== 'function' || typeof readBearerToken !== 'function' || typeof readCookie !== 'function') {
   throw new Error('artifact smoke: Web product surface export missing')
 }
@@ -148,6 +151,23 @@ if (typeof toProductDiagnostic !== 'function') throw new Error('artifact smoke: 
 if (typeof Starter.apply !== 'function' || Starter.name !== 'multi-tenant-starter') {
   throw new Error('artifact smoke: starter plugin export missing')
 }
+
+const sqlitePath = './artifact-session-ownership.sqlite'
+const sqliteFirst = new Context()
+await sqliteFirst.plugin(SQLiteStore, { path: sqlitePath })
+if (await sqliteFirst.tenantSessionStore.claim('artifact-persisted', { tenantId: 'acme', userId: 'alice' }) !== 'created') {
+  throw new Error('artifact smoke: SQLite first claim failed')
+}
+await sqliteFirst.fiber.dispose()
+const sqliteSecond = new Context()
+await sqliteSecond.plugin(SQLiteStore, { path: sqlitePath })
+if (await sqliteSecond.tenantSessionStore.claim('artifact-persisted', { tenantId: 'acme', userId: 'alice' }) !== 'idempotent') {
+  throw new Error('artifact smoke: installed SQLite store did not persist across reopen')
+}
+if (await sqliteSecond.tenantSessionStore.claim('artifact-persisted', { tenantId: 'acme', userId: 'bob' }) !== 'conflict') {
+  throw new Error('artifact smoke: installed SQLite store allowed ownership takeover')
+}
+await sqliteSecond.fiber.dispose()
 
 const ctx = new Context()
 await ctx.plugin(Store)

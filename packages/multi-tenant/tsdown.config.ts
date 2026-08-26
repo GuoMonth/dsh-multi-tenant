@@ -15,6 +15,7 @@ export default defineConfig({
     'src/diagnostics.ts',
     'src/starter-plugin.ts',
     'src/store.ts',
+    'src/sqlite-store.ts',
     'src/testing.ts',
   ],
   format: ['esm'],

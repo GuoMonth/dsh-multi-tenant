@@ -1,9 +1,12 @@
 # Minimal composition that loads dsh-multi-tenant through the real Cordis
 # Loader (not direct service construction), plus a fixture plugin that exercises
-# both the shared v0.1 kernel and v0.2 context-native runtime. `../src/*` resolves
-# against the demo directory's base URL, mirroring the three shipped bundle rows.
+# both the shared ownership kernel and context-native runtime. `../src/*`
+# resolves against the demo directory's base URL, mirroring the shipped bundle
+# rows while using an in-memory SQLite database so the fixture stays hermetic.
 - id: tenant-session-store
-  name: '../src/store.ts'
+  name: '../src/sqlite-store.ts'
+  config:
+    path: ':memory:'
 
 - id: multi-tenant
   name: '../src/index.ts'

@@ -4,7 +4,7 @@
 
 当一个 DSH Runtime 要同时服务多个组织和多个用户，而且 Tenant config、Principal credential、Session ownership、Agent-scoped MCP Tools 不能串时，就用这个 package。
 
-> **`dsh-multi-tenant@0.3.0-rc.2` — First Product Experience**
+> **`dsh-multi-tenant@0.3.0-rc.3` — Durable Local Experience**
 >
 > Compatible DSH baseline：`0.1.1-rc.2`。
 
@@ -53,6 +53,32 @@ pnpm add dsh-multi-tenant
 ```
 
 MCP 路径复用 DSH 自带的官方 `@deepseek-ai/dsh-mcp-client`，本项目不 vendor / fork MCP。
+
+## Durable Local Session Ownership
+
+正常 DSH plugin 安装现在默认使用 SQLite provider。它基于 Node 内置 `node:sqlite`，所以个人开发者第一次做持久化验证，不需要先安装 PostgreSQL、Docker、native addon 或额外数据库 dependency。
+
+```text
+Alice claim Session s1
+        ↓
+<cwd>/.dsh-multi-tenant/session-ownership.sqlite
+        ↓ 重启 DSH / Node
+Alice -> s1          允许
+Bob   -> s1          拒绝
+Globex/Alice -> s1   拒绝
+```
+
+可以用 `DSH_MULTI_TENANT_SQLITE_PATH` 覆盖默认路径，也可以在 framework code 中直接挂载：
+
+```ts
+import SQLiteTenantSessionStore from 'dsh-multi-tenant/sqlite-store'
+
+await ctx.plugin(SQLiteTenantSessionStore, {
+  path: './state/session-ownership.sqlite',
+})
+```
+
+SQLite 的定位是 **local durable / single-node adoption provider**，不是 horizontally-scaled production database。`InMemoryTenantSessionStore` 继续用于 hermetic test；未来 PostgreSQL/其他 provider 继续实现同一个 `TenantSessionStore` contract 即可。
 
 ## First Product Experience
 
@@ -161,6 +187,7 @@ mountMcpSaaSWebBridge(ctx, app, {
 - Tenant-scoped MCP configuration；
 - Principal-bound Agent `create()` / `resume()`；
 - immutable、fail-closed Session ownership；
+- zero-external-service SQLite ownership persistence，重启后 owner 仍保留；
 - deterministic per-Session MCP namespace；
 - Principal-owned long-lived Agent；
 - 官方 DSH MCP Tools integration；
@@ -168,7 +195,7 @@ mountMcpSaaSWebBridge(ctx, app, {
 - same-server DSH Web identity/admission bridge；
 - secret-safe structured diagnostics；
 - opt-in real-DSH-Web starter；
-- permanent First Product Experience executable evidence；
+- permanent FPE + durable-local executable evidence；
 - clean installed-artifact / registry verification。
 
 ## Architecture
@@ -212,7 +239,11 @@ Pinned 官方 MCP client 会把 initial connect/discovery/register 合并成一�
 
 Cordis Context 提供 trusted same-process identity/lifecycle separation，不是 hostile-code sandbox。真正的 secret/process/filesystem/network 强隔离属于 process/container/Pod/sidecar/remote boundary。
 
-Pinned DSH Web 目前也不会给每个 stock Web RPC business method materialize product-authenticated Principal Context。rc.2 严格保证的是 product-aware identity + Agent create/resume admission + Session ownership，而不是“所有 stock RPC 自动 tenant-authorized”。
+Pinned DSH Web 目前也不会给每个 stock Web RPC business method materialize product-authenticated Principal Context。rc.3 严格保证的是 product-aware identity + Agent create/resume admission + Session ownership，而不是“所有 stock RPC 自动 tenant-authorized”。这是 #41 已经明确承认的边界。
+
+生产 Web 暴露推荐把 DSH Web 放在 Product Gateway/BFF 后面的私网/loopback：Gateway 负责 authentication、canonical Tenant/Principal resolution 和受保护 Session/Agent resource authorization，然后才转发到 DSH。公网客户端不能绕过 Gateway 直接访问 stock DSH `/api`。
+
+SQLite 同样只承诺 individual developer / single-node restart durability，不宣称 multi-replica production persistence。
 
 starter 的 demo cookie 不是生产 authentication 机制。
 
@@ -222,7 +253,7 @@ starter 的 demo cookie 不是生产 authentication 机制。
 - Cordis：`>=4.0.1 <5`
 - DSH：`0.1.1-rc.2`
 
-发布前 `pnpm release:check` 会执行真实 DSH Web First Product Experience proof。
+发布前 `pnpm release:check` 会同时执行真实 DSH Web First Product Experience proof 和独立进程 SQLite restart/competition proof。
 
 ## Public Subpaths
 
@@ -240,5 +271,6 @@ dsh-multi-tenant/web
 dsh-multi-tenant/diagnostics
 dsh-multi-tenant/starter
 dsh-multi-tenant/store
+dsh-multi-tenant/sqlite-store
 dsh-multi-tenant/testing
 ```
