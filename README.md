@@ -4,7 +4,7 @@
 
 Current line: **`dsh-multi-tenant@0.4.0-alpha.1`**, pinned to DSH **`0.1.2-alpha.5`**.
 
-Pre-publication status: all implementation blockers are complete. The final review gate is [#48](https://github.com/GuoMonth/dsh-multi-tenant/issues/48). No `0.4` package has been published.
+Status: **release-ready source, intentionally unpublished**. The `0.4.0-alpha.1` implementation and retrospective gates are complete; publication remains a separate explicit action. No `0.4` package, tag, or GitHub Release exists.
 
 The plugin owns Principal-scoped Agent authorization, a durable SQLite Agent directory, capability leases, and DSH Agent/MCP lifecycle. The host still owns authentication, secret storage, and any strong process/container isolation.
 

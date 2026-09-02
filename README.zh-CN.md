@@ -4,7 +4,7 @@
 
 当前版本：**`dsh-multi-tenant@0.4.0-alpha.1`**，精确固定 DSH **`0.1.2-alpha.5`**。
 
-发布前状态：所有实现阻断项已经完成，最后进入复盘门禁 [#48](https://github.com/GuoMonth/dsh-multi-tenant/issues/48)。目前没有发布任何 `0.4` 包。
+状态：**源码已达到 release-ready，按计划保持未发布**。`0.4.0-alpha.1` 的实现和复盘门禁已经完成；发布仍是独立的显式操作。目前不存在 `0.4` npm 包、tag 或 GitHub Release。
 
 插件负责 Principal-scoped Agent 授权、持久 SQLite Agent Directory、能力租约，以及 DSH Agent/MCP 生命周期。宿主仍负责认证、Secret 存储，以及需要时的进程/容器级强隔离。
 
