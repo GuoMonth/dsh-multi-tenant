@@ -23,7 +23,6 @@ function record(
     tenantId: owner.tenantId,
     principalId: owner.principalId,
     sessionId: `internal-${suffix}`,
-    policyRevision: 'contract-policy-v1',
     capabilityRevision: 'contract-capability-v1',
     mcpServers: Object.freeze(['contract-mcp']),
     createdAt,
@@ -98,7 +97,6 @@ export async function assertTenantAgentRepositoryContract(
       })
       if (tombstone?.state !== 'deleted' || tombstone.deletedAt === undefined
         || tombstone.sessionId !== `deleted:${input.id}`
-        || tombstone.policyRevision !== ''
         || tombstone.capabilityRevision !== ''
         || tombstone.mcpServers.length !== 0) {
         fail('tombstone', JSON.stringify(tombstone))

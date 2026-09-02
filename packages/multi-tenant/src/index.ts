@@ -32,7 +32,6 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   if (ctx.get('runtimePartitions') === undefined) await ctx.plugin(SharedDshRuntimePartitionProvider)
   await ctx.plugin(MultiTenantService, {
     ...(config.minimumIsolation === undefined ? {} : { minimumIsolation: config.minimumIsolation }),
-    ...(config.policyRevision === undefined ? {} : { policyRevision: config.policyRevision }),
   })
 }
 

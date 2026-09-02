@@ -51,7 +51,6 @@ export interface TenantAgentRecord {
   readonly sessionId: string
   readonly state: AgentRecordState
   readonly revision: number
-  readonly policyRevision: string
   readonly capabilityRevision: string
   readonly mcpServers: readonly string[]
   readonly createdAt: string
@@ -64,7 +63,6 @@ export interface NewTenantAgentRecord {
   readonly tenantId: string
   readonly principalId: string
   readonly sessionId: string
-  readonly policyRevision: string
   readonly capabilityRevision: string
   readonly mcpServers: readonly string[]
   readonly createdAt: string

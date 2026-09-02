@@ -29,7 +29,7 @@ try {
     const created = await repository.insert({
       id: process.env.DSH_MT_AGENT,
       tenantId: 'acme', principalId: 'alice', sessionId: 'internal-restart-proof',
-      policyRevision: 'p1', capabilityRevision: 'c1', mcpServers: ['shared'],
+      capabilityRevision: 'c1', mcpServers: ['shared'],
       createdAt: '2026-01-01T00:00:00.000Z',
     })
     const ready = await repository.transition({ tenantId: 'acme', principalId: 'alice' }, created.id, 0, {

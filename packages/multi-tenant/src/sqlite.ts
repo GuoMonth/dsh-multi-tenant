@@ -12,6 +12,19 @@ import type { AgentId, AgentRecordTransition, NewTenantAgentRecord } from './typ
 const DEFAULT_BUSY_TIMEOUT_MS = 5_000
 const DEFAULT_DIRECTORY = '.dsh-multi-tenant'
 const DEFAULT_FILENAME = 'agents.sqlite'
+const EXPECTED_COLUMNS = [
+  'agent_id',
+  'tenant_id',
+  'principal_id',
+  'session_id',
+  'state',
+  'revision',
+  'capability_revision',
+  'mcp_servers',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+] as const
 
 export interface SQLiteTenantAgentRepositoryConfig {
   /** Defaults to `<cwd>/.dsh-multi-tenant/agents.sqlite`. */
@@ -72,7 +85,6 @@ function readRecord(row: unknown): TenantAgentRecord | undefined {
     sessionId: text(row, 'session_id'),
     state: state(Reflect.get(row, 'state')),
     revision,
-    policyRevision: text(row, 'policy_revision'),
     capabilityRevision: text(row, 'capability_revision'),
     mcpServers: Object.freeze([...rawServers]),
     createdAt: text(row, 'created_at'),
@@ -106,7 +118,6 @@ export class SQLiteTenantAgentRepository extends TenantAgentRepository {
           session_id TEXT NOT NULL UNIQUE,
           state TEXT NOT NULL CHECK (state IN ('provisioning', 'ready', 'failed', 'deleted')),
           revision INTEGER NOT NULL CHECK (revision >= 0),
-          policy_revision TEXT NOT NULL,
           capability_revision TEXT NOT NULL,
           mcp_servers TEXT NOT NULL,
           created_at TEXT NOT NULL,
@@ -116,11 +127,20 @@ export class SQLiteTenantAgentRepository extends TenantAgentRepository {
         CREATE INDEX IF NOT EXISTS tenant_agents_v04_owner
           ON tenant_agents_v04 (tenant_id, principal_id, created_at, agent_id);
       `)
+      const columns = database.prepare('PRAGMA table_info(tenant_agents_v04)').all()
+        .map(column => Reflect.get(column, 'name'))
+      if (columns.length !== EXPECTED_COLUMNS.length
+        || columns.some((column, index) => column !== EXPECTED_COLUMNS[index])) {
+        throw new Error(
+          'Unsupported dsh-multi-tenant prerelease SQLite schema. '
+          + 'Back up and recreate the Agent directory database; candidate schemas are not migrated.',
+        )
+      }
       this.insertRecord = database.prepare(`
         INSERT INTO tenant_agents_v04 (
           agent_id, tenant_id, principal_id, session_id, state, revision,
-          policy_revision, capability_revision, mcp_servers, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, 'provisioning', 0, ?, ?, ?, ?, ?, NULL)
+          capability_revision, mcp_servers, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, ?, ?, 'provisioning', 0, ?, ?, ?, ?, NULL)
       `)
       this.selectOwned = database.prepare(`
         SELECT * FROM tenant_agents_v04
@@ -135,7 +155,6 @@ export class SQLiteTenantAgentRepository extends TenantAgentRepository {
         UPDATE tenant_agents_v04
         SET state = ?, revision = revision + 1,
             session_id = CASE WHEN ? = 'deleted' THEN 'deleted:' || agent_id ELSE session_id END,
-            policy_revision = CASE WHEN ? = 'deleted' THEN '' ELSE policy_revision END,
             capability_revision = CASE WHEN ? = 'deleted' THEN '' ELSE ? END,
             mcp_servers = CASE WHEN ? = 'deleted' THEN '[]' ELSE ? END,
             updated_at = ?, deleted_at = ?
@@ -157,7 +176,6 @@ export class SQLiteTenantAgentRepository extends TenantAgentRepository {
         record.tenantId,
         record.principalId,
         record.sessionId,
-        record.policyRevision,
         record.capabilityRevision,
         JSON.stringify(record.mcpServers),
         record.createdAt,
@@ -201,7 +219,6 @@ export class SQLiteTenantAgentRepository extends TenantAgentRepository {
       return undefined
     }
     const result = this.transitionRecord.run(
-      transition.to,
       transition.to,
       transition.to,
       transition.to,

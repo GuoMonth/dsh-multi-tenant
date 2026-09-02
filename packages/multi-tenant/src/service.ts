@@ -48,7 +48,6 @@ declare module '@deepseek-ai/cordis' {
 
 export interface MultiTenantConfig {
   readonly minimumIsolation?: IsolationLevel
-  readonly policyRevision?: string
 }
 
 interface PreparedCapabilities {
@@ -58,12 +57,17 @@ interface PreparedCapabilities {
   readonly capabilityRevision: string
 }
 
+interface RuntimeScope {
+  readonly runtime: TenantAgentRuntime
+  invalidate(): void
+}
+
 interface LiveAgent {
   readonly handle: DshRuntimeAgentHandle
-  readonly runtime: TenantAgentRuntime
   readonly secret: SecretLease
   readonly partition: RuntimePartitionLease
   readonly capabilityRevision: string
+  readonly scopes: Set<RuntimeScope>
   detachRevocation(): void
   invalidated: boolean
 }
@@ -82,15 +86,48 @@ function meets(actual: IsolationLevel, required: IsolationLevel): boolean {
   return required === 'logical' || actual === 'strong'
 }
 
-function controlledRuntime(runtime: TenantAgentRuntime): TenantAgentRuntime {
-  return Object.freeze({
-    followup: runtime.followup.bind(runtime),
-    steer: runtime.steer.bind(runtime),
-    inject: runtime.inject.bind(runtime),
-    cancel: runtime.cancel.bind(runtime),
-    whenIdle: runtime.whenIdle.bind(runtime),
-    executeTool: runtime.executeTool.bind(runtime),
-  })
+function controlledRuntime(runtime: TenantAgentRuntime, available: () => boolean): RuntimeScope {
+  let active = true
+  const assertActive = (): void => {
+    if (!active || !available()) {
+      throw new CapabilityUnavailableError('The Agent runtime scope is no longer active.')
+    }
+  }
+  return {
+    runtime: Object.freeze({
+      followup(message: Parameters<TenantAgentRuntime['followup']>[0]) {
+        assertActive()
+        runtime.followup(message)
+      },
+      steer(message: Parameters<TenantAgentRuntime['steer']>[0]) {
+        assertActive()
+        runtime.steer(message)
+      },
+      inject(message: Parameters<TenantAgentRuntime['inject']>[0]) {
+        assertActive()
+        runtime.inject(message)
+      },
+      cancel(reason?: string) {
+        assertActive()
+        runtime.cancel(reason)
+      },
+      whenIdle() {
+        assertActive()
+        return runtime.whenIdle()
+      },
+      executeTool(
+        name: string,
+        args: unknown,
+        options?: Parameters<TenantAgentRuntime['executeTool']>[2],
+      ) {
+        assertActive()
+        return runtime.executeTool(name, args, options)
+      },
+    }),
+    invalidate() {
+      active = false
+    },
+  }
 }
 
 function capabilityRevision(snapshot: TenantMcpSnapshot, secret: SecretLease, isolation: IsolationLevel): string {
@@ -113,7 +150,6 @@ async function settleDisposers(disposers: Array<() => void | PromiseLike<void>>,
 
 export class MultiTenantService extends Service {
   private readonly minimumIsolation: IsolationLevel
-  private readonly policyRevision: string
   private readonly live = new Map<AgentId, LiveAgent>()
   private readonly tails = new Map<AgentId, Promise<void>>()
   private accepting = true
@@ -122,7 +158,6 @@ export class MultiTenantService extends Service {
   constructor(ctx: Context, config: MultiTenantConfig = {}) {
     super(ctx, 'multiTenant')
     this.minimumIsolation = config.minimumIsolation ?? 'logical'
-    this.policyRevision = config.policyRevision ?? 'principal-owner-v1'
     if (this.minimumIsolation !== 'logical' && this.minimumIsolation !== 'strong') {
       throw new TypeError('minimumIsolation must be logical or strong')
     }
@@ -147,7 +182,6 @@ export class MultiTenantService extends Service {
           tenantId: principal.tenantId,
           principalId: principal.principalId,
           sessionId,
-          policyRevision: this.policyRevision,
           capabilityRevision: prepared.capabilityRevision,
           mcpServers: prepared.snapshot.servers.map(server => server.serverName),
           createdAt: now,
@@ -214,7 +248,14 @@ export class MultiTenantService extends Service {
       const record = await this.readyRecord(principal, parsed)
       const live = await this.ensureLive(principal, record)
       if (live.invalidated || live.secret.signal.aborted) throw new CapabilityUnavailableError('Agent capabilities were revoked.')
-      return use(live.runtime)
+      const scope = controlledRuntime(live.handle.runtime, () => !live.invalidated && !live.secret.signal.aborted)
+      live.scopes.add(scope)
+      try {
+        return await use(scope.runtime)
+      } finally {
+        scope.invalidate()
+        live.scopes.delete(scope)
+      }
     })
   }
 
@@ -225,7 +266,8 @@ export class MultiTenantService extends Service {
     // Authorize before touching a live runtime. Once ownership is proven, stop
     // foreground work immediately; durable tombstoning and drain remain serial.
     await this.readyRecord(principal, parsed)
-    this.live.get(parsed)?.handle.runtime.cancel('Agent deleted')
+    const live = this.live.get(parsed)
+    if (live !== undefined) this.invalidateLive(live, 'Agent deleted')
     await this.serial(parsed, async () => {
       const record = await this.readyRecord(principal, parsed)
       const deleted = await this.repository.transition(principal, parsed, record.revision, {
@@ -241,7 +283,7 @@ export class MultiTenantService extends Service {
   close(): Promise<void> {
     if (this.closing !== undefined) return this.closing
     this.accepting = false
-    for (const entry of this.live.values()) entry.handle.runtime.cancel('multi-tenant service disposed')
+    for (const entry of this.live.values()) this.invalidateLive(entry, 'multi-tenant service disposed')
     this.closing = (async () => {
       await Promise.allSettled([...this.tails.values()])
       const results = await Promise.allSettled([...this.live.keys()].map(id => this.disposeLive(id)))
@@ -387,16 +429,15 @@ export class MultiTenantService extends Service {
   ): LiveAgent {
     const entry: LiveAgent = {
       handle,
-      runtime: controlledRuntime(handle.runtime),
       secret: prepared.secret,
       partition: prepared.partition,
       capabilityRevision: prepared.capabilityRevision,
+      scopes: new Set(),
       invalidated: false,
       detachRevocation() {},
     }
     const revoked = (): void => {
-      entry.invalidated = true
-      entry.handle.runtime.cancel('secret lease revoked')
+      this.invalidateLive(entry, 'secret lease revoked')
       void this.serial(id, async () => {
         if (this.live.get(id) === entry) await this.disposeLive(id)
       }).catch(() => undefined)
@@ -408,12 +449,19 @@ export class MultiTenantService extends Service {
     return entry
   }
 
+  private invalidateLive(entry: LiveAgent, reason: string): void {
+    entry.invalidated = true
+    for (const scope of entry.scopes) scope.invalidate()
+    entry.scopes.clear()
+    entry.handle.runtime.cancel(reason)
+  }
+
   private async disposeLive(id: AgentId): Promise<void> {
     const entry = this.live.get(id)
     if (entry === undefined) return
     this.live.delete(id)
     entry.detachRevocation()
-    entry.handle.runtime.cancel('multi-tenant runtime released')
+    this.invalidateLive(entry, 'multi-tenant runtime released')
     await settleDisposers([
       () => entry.handle.dispose(),
       () => entry.partition.dispose(),

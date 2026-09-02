@@ -33,13 +33,18 @@ import { SQLiteTenantAgentRepository } from '../src/sqlite.ts'
 class FakeRuntime implements TenantAgentRuntime {
   readonly cancellations: string[] = []
   readonly toolCalls: Array<{ name: string; args: unknown }> = []
+  readonly calls: string[] = []
 
-  followup(): void {}
-  steer(): void {}
-  inject(): void {}
-  cancel(reason = ''): void { this.cancellations.push(reason) }
-  async whenIdle(): Promise<void> {}
+  followup(): void { this.calls.push('followup') }
+  steer(): void { this.calls.push('steer') }
+  inject(): void { this.calls.push('inject') }
+  cancel(reason = ''): void {
+    this.calls.push('cancel')
+    this.cancellations.push(reason)
+  }
+  async whenIdle(): Promise<void> { this.calls.push('whenIdle') }
   async executeTool(name: string, args: unknown): Promise<never> {
+    this.calls.push('executeTool')
     this.toolCalls.push({ name, args })
     return { isError: false, value: { name, args }, content: [] } as never
   }
@@ -199,6 +204,18 @@ const alice = () => createPrincipalContext({ tenantId: 'acme', principalId: 'ali
 const bob = () => createPrincipalContext({ tenantId: 'acme', principalId: 'bob' })
 const globexAlice = () => createPrincipalContext({ tenantId: 'globex', principalId: 'alice' })
 
+function expectExpired(runtime: TenantAgentRuntime): void {
+  const calls = [
+    () => runtime.followup({} as never),
+    () => runtime.steer({} as never),
+    () => runtime.inject({} as never),
+    () => runtime.cancel('late'),
+    () => runtime.whenIdle(),
+    () => runtime.executeTool('late', {}),
+  ]
+  for (const call of calls) expect(call).toThrow(CapabilityUnavailableError)
+}
+
 describe('MultiTenantService authority kernel', () => {
   it('generates both identities and exposes only an opaque Agent resource', async () => {
     const test = await harness()
@@ -292,7 +309,6 @@ describe('MultiTenantService authority kernel', () => {
       tenantId: principal.tenantId,
       principalId: principal.principalId,
       sessionId: 'dsh-mt-existing',
-      policyRevision: 'policy-v1',
       capabilityRevision: 'old',
       mcpServers: [],
       createdAt: '2026-01-01T00:00:00.000Z',
@@ -310,6 +326,33 @@ describe('MultiTenantService authority kernel', () => {
       ['cancel', 'executeTool', 'followup', 'inject', 'steer', 'whenIdle'],
       ['cancel', 'executeTool', 'followup', 'inject', 'steer', 'whenIdle'],
     ])
+  })
+
+  it('expires every callback-scoped runtime method after resolve or reject', async () => {
+    const test = await harness()
+    const principal = alice()
+    const agent = await test.service.create(principal)
+    let resolved: TenantAgentRuntime | undefined
+    await test.service.withAgent(principal, agent.id, async runtime => {
+      resolved = runtime
+      runtime.followup({} as never)
+      runtime.steer({} as never)
+      runtime.inject({} as never)
+      runtime.cancel('inside')
+      await runtime.whenIdle()
+      await runtime.executeTool('inside', {})
+    })
+    expect(test.driver.handles[0]?.runtime.calls).toEqual([
+      'followup', 'steer', 'inject', 'cancel', 'whenIdle', 'executeTool',
+    ])
+    expectExpired(resolved!)
+
+    let rejected: TenantAgentRuntime | undefined
+    await expect(test.service.withAgent(principal, agent.id, async runtime => {
+      rejected = runtime
+      throw new Error('callback failed')
+    })).rejects.toThrow('callback failed')
+    expectExpired(rejected!)
   })
 
   it('reopens Alice from SQLite with the same internal session, then deletes it', async () => {
@@ -351,7 +394,9 @@ describe('MultiTenantService authority kernel', () => {
     const agent = await test.service.create(principal)
     const gate = Promise.withResolvers<void>()
     const entered = Promise.withResolvers<void>()
-    const use = test.service.withAgent(principal, agent.id, async () => {
+    let retained: TenantAgentRuntime | undefined
+    const use = test.service.withAgent(principal, agent.id, async runtime => {
+      retained = runtime
       entered.resolve()
       await gate.promise
     })
@@ -359,6 +404,7 @@ describe('MultiTenantService authority kernel', () => {
     const deletion = test.service.delete(principal, agent.id)
     await new Promise(resolve => setImmediate(resolve))
     expect(test.driver.handles[0]?.runtime.cancellations).toContain('Agent deleted')
+    expectExpired(retained!)
     gate.resolve()
     await Promise.all([use, deletion])
     expect(test.driver.handles[0]?.disposeCount).toBe(1)
@@ -397,6 +443,52 @@ describe('MultiTenantService authority kernel', () => {
     expect(test.driver.resumeSpecifications[0]?.sessionId).toBe(originalSession)
   })
 
+  it('invalidates an active callback facade as soon as its secret lease is revoked', async () => {
+    const test = await harness()
+    test.mcp.servers = [{
+      transport: 'stdio',
+      serverName: 'private',
+      command: 'node',
+      secretEnv: { TOKEN: { secret: 'token' } },
+    }]
+    const principal = alice()
+    const agent = await test.service.create(principal)
+    const gate = Promise.withResolvers<void>()
+    const entered = Promise.withResolvers<void>()
+    let retained: TenantAgentRuntime | undefined
+    const use = test.service.withAgent(principal, agent.id, async runtime => {
+      retained = runtime
+      entered.resolve()
+      await gate.promise
+    })
+    await entered.promise
+    test.secrets.issued[0]!.controller.abort()
+    expectExpired(retained!)
+    gate.resolve()
+    await use
+    await new Promise(resolve => setImmediate(resolve))
+    expect(test.driver.handles[0]?.disposeCount).toBe(1)
+  })
+
+  it('does not revive an expired facade when capability refresh replaces the live Agent', async () => {
+    const test = await harness()
+    const principal = alice()
+    const agent = await test.service.create(principal)
+    let oldRuntime: TenantAgentRuntime | undefined
+    await test.service.withAgent(principal, agent.id, async runtime => { oldRuntime = runtime })
+    test.mcp.revision = 'mcp-r2'
+    let refreshedRuntime: TenantAgentRuntime | undefined
+    await test.service.withAgent(principal, agent.id, async runtime => {
+      refreshedRuntime = runtime
+      await runtime.whenIdle()
+    })
+    expect(oldRuntime).not.toBe(refreshedRuntime)
+    expectExpired(oldRuntime!)
+    expectExpired(refreshedRuntime!)
+    expect(test.driver.handles[0]?.disposeCount).toBe(1)
+    expect(test.driver.resumeSpecifications).toHaveLength(1)
+  })
+
   it('allows the same MCP serverName in two independent Agent scopes', async () => {
     const test = await harness()
     test.mcp.servers = [{ transport: 'stdio', serverName: 'shared', command: 'node' }]
@@ -431,5 +523,23 @@ describe('MultiTenantService authority kernel', () => {
     await test.service.close()
     expect(test.driver.handles.every(handle => handle.runtime.cancellations.includes('multi-tenant service disposed'))).toBe(true)
     expect(test.driver.handles.every(handle => handle.disposeCount === 1)).toBe(true)
+  })
+
+  it('invalidates an active callback facade before shutdown drain completes', async () => {
+    const test = await harness()
+    const agent = await test.service.create(alice())
+    const gate = Promise.withResolvers<void>()
+    const entered = Promise.withResolvers<void>()
+    let retained: TenantAgentRuntime | undefined
+    const use = test.service.withAgent(alice(), agent.id, async runtime => {
+      retained = runtime
+      entered.resolve()
+      await gate.promise
+    })
+    await entered.promise
+    const closing = test.service.close()
+    expectExpired(retained!)
+    gate.resolve()
+    await Promise.all([use, closing])
   })
 })

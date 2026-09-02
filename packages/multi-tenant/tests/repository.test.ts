@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
 import { InMemoryTenantAgentRepository } from '../src/repository.ts'
@@ -26,7 +27,6 @@ function input(suffix: string): NewTenantAgentRecord {
     tenantId: 'acme',
     principalId: 'alice',
     sessionId: `internal-${suffix}`,
-    policyRevision: 'policy-v1',
     capabilityRevision: 'capability-v1',
     mcpServers: ['shared'],
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -108,10 +108,39 @@ describe('TenantAgentRepository contract', () => {
       })
       expect(deleted).toEqual(expect.objectContaining({
         sessionId: `deleted:${created.id}`,
-        policyRevision: '',
         capabilityRevision: '',
         mcpServers: [],
       }))
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('rejects the unpublished schema that still contains policy_revision', async () => {
+    const path = await temporaryDatabase()
+    const database = new DatabaseSync(path)
+    database.exec(`
+      CREATE TABLE tenant_agents_v04 (
+        agent_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        principal_id TEXT NOT NULL,
+        session_id TEXT NOT NULL UNIQUE,
+        state TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        policy_revision TEXT NOT NULL,
+        capability_revision TEXT NOT NULL,
+        mcp_servers TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        deleted_at TEXT
+      ) STRICT;
+    `)
+    database.close()
+
+    const ctx = new Context()
+    try {
+      expect(() => new SQLiteTenantAgentRepository(ctx, { path }))
+        .toThrow(/recreate the Agent directory database/)
     } finally {
       await ctx.fiber.dispose()
     }

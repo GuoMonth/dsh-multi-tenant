@@ -96,7 +96,6 @@ export class InMemoryTenantAgentRepository extends TenantAgentRepository {
       revision: current.revision + 1,
       updatedAt: transition.at,
       sessionId: transition.to === 'deleted' ? `deleted:${current.id}` : current.sessionId,
-      policyRevision: transition.to === 'deleted' ? '' : current.policyRevision,
       capabilityRevision: transition.to === 'deleted'
         ? ''
         : transition.capabilityRevision ?? current.capabilityRevision,
