@@ -7,23 +7,33 @@ allowBuilds:
   # esbuild's binary ships via the platform-specific optional dependency
   # (`@esbuild/linux-x64` etc.), so its postinstall is redundant — deny it.
   esbuild: false
+  # Required only by the official JSONL session backend used in lifecycle tests.
+  koffi: true
 
+minimumReleaseAge: 1440
+
+# Every exception is an exact package/version from the manually reviewed DSH
+# alpha.5 source identity pinned in scripts/dsh-target.mjs.
 minimumReleaseAgeExclude:
-  - '@deepseek-ai/dsh-agent@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-attachment@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-brand@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-code-runtime@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-invariants@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-llm@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-mcp-client@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-scope@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-session-projection@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-session@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-subprocess@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-system-prompt@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-timeout@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-tools@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-typert-protocol@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-user-approval@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-util-crypto@0.1.2-alpha.4'
-  - '@deepseek-ai/dsh-util-values@0.1.2-alpha.4'
+  - '@deepseek-ai/dsh-agent-loop@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-agent@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-attachment@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-brand@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-code-runtime@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-invariants@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-llm@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-mcp-client@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-scope@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session-persistence-jsonl@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session-persistence@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session-projection@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-session@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-settings@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-subprocess@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-system-prompt@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-timeout@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-tools@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-typert-protocol@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-user-approval@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-util-crypto@0.1.2-alpha.5'
+  - '@deepseek-ai/dsh-util-values@0.1.2-alpha.5'

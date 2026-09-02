@@ -8,8 +8,8 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
 const errors = []
 const expectedVersion = '0.4.0-alpha.1'
-const expectedDsh = '0.1.2-alpha.4'
-const expectedCommit = '4e84901e6471b79ec0338099867ebb4606d12bb5'
+const expectedDsh = '0.1.2-alpha.5'
+const expectedCommit = 'db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5'
 const expectedExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
 const dshPackages = [
   '@deepseek-ai/dsh-agent',
@@ -21,7 +21,7 @@ const dshPackages = [
 if (pkg.version !== expectedVersion) errors.push(`package version must be ${expectedVersion}`)
 if (pkg.publishConfig?.tag !== 'alpha') errors.push('publishConfig.tag must be alpha')
 if (DSH_TARGET.version !== expectedDsh || DSH_TARGET.commit !== expectedCommit) {
-  errors.push('DSH target identity drifted from alpha.4')
+  errors.push('DSH target identity drifted from alpha.5')
 }
 if (JSON.stringify(Object.keys(pkg.exports)) !== JSON.stringify(expectedExports)) {
   errors.push(`public exports must be exactly ${expectedExports.join(', ')}`)
@@ -29,6 +29,11 @@ if (JSON.stringify(Object.keys(pkg.exports)) !== JSON.stringify(expectedExports)
 for (const name of dshPackages) {
   if (pkg.peerDependencies?.[name] !== expectedDsh) errors.push(`${name} peer must be exact ${expectedDsh}`)
   if (pkg.devDependencies?.[name] !== expectedDsh) errors.push(`${name} dev dependency must be exact ${expectedDsh}`)
+}
+for (const [name, version] of Object.entries(pkg.devDependencies ?? {})) {
+  if (name.startsWith('@deepseek-ai/dsh-') && version !== expectedDsh) {
+    errors.push(`${name} dev dependency must be exact ${expectedDsh}`)
+  }
 }
 
 for (const path of [
@@ -73,6 +78,17 @@ for (const [path, source] of sourceFiles) {
   for (const retired of ['TenantSessionStore', 'RuntimeComposition', 'CapabilityToken']) {
     if (source.includes(retired)) errors.push(`${path}: contains retired symbol ${retired}`)
   }
+}
+
+const nativeLifecycle = readFileSync(
+  join(root, 'packages/multi-tenant/tests/dsh-mcp.integration.test.ts'),
+  'utf8',
+)
+if (nativeLifecycle.includes('setFactory(')) {
+  errors.push('native lifecycle integration must not replace the DSH Agent factory')
+}
+for (const required of ['AgentLoop', 'JsonlSessionPersistence', 'SessionProjectionRegistry']) {
+  if (!nativeLifecycle.includes(required)) errors.push(`native lifecycle integration must use ${required}`)
 }
 
 if (errors.length > 0) {

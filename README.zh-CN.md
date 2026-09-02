@@ -2,9 +2,9 @@
 
 `dsh-multi-tenant` 是 DeepSeek Harness 的多租户插件。它把宿主认证得到的 `(tenantId, principalId)` 转换为有明确所有者的 Agent 资源，不接受也不暴露底层 DSH session identity。
 
-当前版本：**`dsh-multi-tenant@0.4.0-alpha.1`**，精确固定 DSH **`0.1.2-alpha.4`**。
+当前版本：**`dsh-multi-tenant@0.4.0-alpha.1`**，精确固定 DSH **`0.1.2-alpha.5`**。
 
-发布前状态：`0.4.0-alpha.1` milestone 已重新打开进行修正。当前阻断项是 [#45](https://github.com/GuoMonth/dsh-multi-tenant/issues/45)、[#51](https://github.com/GuoMonth/dsh-multi-tenant/issues/51)、[#52](https://github.com/GuoMonth/dsh-multi-tenant/issues/52) 和 [#53](https://github.com/GuoMonth/dsh-multi-tenant/issues/53)，完成后进入复盘门禁 [#48](https://github.com/GuoMonth/dsh-multi-tenant/issues/48)。目前没有发布任何 `0.4` 包。
+发布前状态：runtime scope、Web authority 和原生 DSH alpha.5 生命周期证据已经完成。剩余阻断项是 [#53](https://github.com/GuoMonth/dsh-multi-tenant/issues/53)，完成后进入复盘门禁 [#48](https://github.com/GuoMonth/dsh-multi-tenant/issues/48)。目前没有发布任何 `0.4` 包。
 
 插件负责 Principal-scoped Agent 授权、持久 SQLite Agent Directory、能力租约，以及 DSH Agent/MCP 生命周期。宿主仍负责认证、Secret 存储，以及需要时的进程/容器级强隔离。
 

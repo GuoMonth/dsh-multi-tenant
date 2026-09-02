@@ -2,7 +2,7 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.4.0-alpha.1` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 `@deepseek-ai/*@0.1.2-alpha.4`。
+`dsh-multi-tenant@0.4.0-alpha.1` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 `@deepseek-ai/*@0.1.2-alpha.5`。
 
 ## 安装
 
@@ -44,7 +44,7 @@ await ctx.multiTenant.delete(principal, agent.id)
 
 `withAgent()` 是唯一可信运行入口。回调只有 `followup/steer/inject/cancel/whenIdle/executeTool`，拿不到 DSH session id、原始 Agent handle、Cordis context 或 disposer。
 
-runtime view 的设计语义是 callback-scoped。当前尚未发布的候选代码还没有强制阻止调用方在回调结束后继续持有该对象；[#51](https://github.com/GuoMonth/dsh-multi-tenant/issues/51) 是这项保证的发布阻断任务。
+每个 runtime view 都是 callback-scoped：回调 resolve/reject、delete、能力撤销/刷新或 service shutdown 时立即失效。保留的旧 view 再调用任何方法都会得到 `CapabilityUnavailableError`。
 
 ## 真实 MCP
 

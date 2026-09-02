@@ -2,7 +2,7 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.4.0-alpha.1` is a DSH multi-tenant plugin for Node 22.19+ and Node 24. It is pinned to `@deepseek-ai/*@0.1.2-alpha.4`.
+`dsh-multi-tenant@0.4.0-alpha.1` is a DSH multi-tenant plugin for Node 22.19+ and Node 24. It is pinned to `@deepseek-ai/*@0.1.2-alpha.5`.
 
 ## Install
 
@@ -47,7 +47,7 @@ await ctx.multiTenant.delete(principal, agent.id)
 
 `withAgent()` is the only trusted execution entry. Its callback receives `followup`, `steer`, `inject`, `cancel`, `whenIdle`, and `executeTool`; it cannot obtain a DSH session id, Agent handle, Cordis context, or disposer.
 
-The runtime view is intended to be callback-scoped. The unpublished candidate does not yet enforce expiry against a caller that retains that object; [#51](https://github.com/GuoMonth/dsh-multi-tenant/issues/51) is a release blocker for that guarantee.
+Each runtime view is callback-scoped. It expires when the callback resolves or rejects, and also on delete, capability revocation/refresh, and service shutdown. Retained views reject every operation with `CapabilityUnavailableError`.
 
 ## Real MCP configuration
 

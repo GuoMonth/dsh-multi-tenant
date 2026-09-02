@@ -1,4 +1,4 @@
-# DSH alpha.4 bundle layer. The plugin supplies its SQLite Agent directory and
+# DSH alpha.5 bundle layer. The plugin supplies its SQLite Agent directory and
 # shared logical runtime provider unless the host registers replacements first.
 - insert:
     - id: multi-tenant
