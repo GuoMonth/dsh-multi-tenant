@@ -86,6 +86,14 @@ function opaque(value: unknown, label: string): string {
   return value
 }
 
+function allowKeys(value: object, allowed: readonly string[], label: string): void {
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.includes(key)) {
+      throw new ValidationError(`${label} contains an unknown field`)
+    }
+  }
+}
+
 /** Mint a server-side authority object after the host has authenticated the subject. */
 export function createPrincipalContext(identity: PrincipalIdentity): PrincipalContext {
   if (typeof identity !== 'object' || identity === null) {
@@ -120,27 +128,55 @@ export function createInternalSessionId(): string {
 
 export function validateCreateAgentOptions(value: CreateAgentOptions | undefined): CreateAgentOptions {
   if (value === undefined) return Object.freeze({})
-  if (typeof value !== 'object' || value === null) throw new ValidationError('Agent options must be an object')
-  const agentOptions = value.agentOptions
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new ValidationError('Agent options must be an object')
+  }
+  allowKeys(value, ['agentOptions', 'meta'], 'Agent options')
+  const agentOptions = Reflect.get(value, 'agentOptions') as CreateAgentOptions['agentOptions']
+  let normalizedAgentOptions: NonNullable<CreateAgentOptions['agentOptions']> | undefined
   if (agentOptions !== undefined) {
-    if (typeof agentOptions !== 'object' || agentOptions === null) throw new ValidationError('agentOptions must be an object')
-    for (const key of ['provider', 'model', 'reasoningEffort'] as const) {
-      const field = agentOptions[key]
-      if (field !== undefined) opaque(field, `agentOptions.${key}`)
+    if (typeof agentOptions !== 'object' || agentOptions === null || Array.isArray(agentOptions)) {
+      throw new ValidationError('agentOptions must be an object')
     }
+    allowKeys(agentOptions, ['provider', 'model', 'reasoningEffort', 'maxTokens'], 'agentOptions')
+    const provider = agentOptions.provider === undefined
+      ? undefined
+      : opaque(agentOptions.provider, 'agentOptions.provider')
+    const model = agentOptions.model === undefined
+      ? undefined
+      : opaque(agentOptions.model, 'agentOptions.model')
+    const reasoningEffort = agentOptions.reasoningEffort === undefined
+      ? undefined
+      : opaque(agentOptions.reasoningEffort, 'agentOptions.reasoningEffort')
     if (agentOptions.maxTokens !== undefined
       && (!Number.isSafeInteger(agentOptions.maxTokens) || agentOptions.maxTokens <= 0)) {
       throw new ValidationError('agentOptions.maxTokens must be a positive integer')
     }
+    normalizedAgentOptions = Object.freeze({
+      ...(provider === undefined ? {} : { provider }),
+      ...(model === undefined ? {} : { model }),
+      ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+      ...(agentOptions.maxTokens === undefined ? {} : { maxTokens: agentOptions.maxTokens }),
+    })
   }
-  const meta = value.meta
+  const meta = Reflect.get(value, 'meta') as CreateAgentOptions['meta']
+  let normalizedMeta: NonNullable<CreateAgentOptions['meta']> | undefined
   if (meta !== undefined) {
-    if (typeof meta !== 'object' || meta === null) throw new ValidationError('meta must be an object')
-    if (meta.cwd !== undefined) opaque(meta.cwd, 'meta.cwd')
-    if (meta.agentPreset !== undefined) opaque(meta.agentPreset, 'meta.agentPreset')
+    if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) {
+      throw new ValidationError('meta must be an object')
+    }
+    allowKeys(meta, ['cwd', 'agentPreset'], 'meta')
+    const cwd = meta.cwd === undefined ? undefined : opaque(meta.cwd, 'meta.cwd')
+    const agentPreset = meta.agentPreset === undefined
+      ? undefined
+      : opaque(meta.agentPreset, 'meta.agentPreset')
+    normalizedMeta = Object.freeze({
+      ...(cwd === undefined ? {} : { cwd }),
+      ...(agentPreset === undefined ? {} : { agentPreset }),
+    })
   }
   return Object.freeze({
-    ...(agentOptions === undefined ? {} : { agentOptions: Object.freeze({ ...agentOptions }) }),
-    ...(meta === undefined ? {} : { meta: Object.freeze({ ...meta }) }),
+    ...(normalizedAgentOptions === undefined ? {} : { agentOptions: normalizedAgentOptions }),
+    ...(normalizedMeta === undefined ? {} : { meta: normalizedMeta }),
   })
 }

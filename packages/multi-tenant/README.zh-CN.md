@@ -86,10 +86,18 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
       return identity && createPrincipalContext(identity)
     },
   },
+  resolveAgentProfile(principal, profile) {
+    if (profile === 'coding') {
+      return {
+        agentOptions: { provider: 'trusted-provider', model: 'trusted-coder' },
+        meta: { cwd: trustedWorkspaceFor(principal) },
+      }
+    }
+  },
 })
 ```
 
-路由为 `POST/GET /_dsh-multi-tenant/agents` 和 `GET/DELETE /_dsh-multi-tenant/agents/:id`。Body 不能指定 Tenant、Principal、Agent 或 session identity。认证、输入、隐藏资源、能力/隔离不可用、DSH provisioning 失败分别返回 401、400、404、503、502。
+路由为 `POST/GET /_dsh-multi-tenant/agents` 和 `GET/DELETE /_dsh-multi-tenant/agents/:id`。创建 body 只能是使用宿主默认值的 `{}`，或 `{ "profile": "coding" }`；只有已认证宿主的 resolver 能把名称转换成可信 DSH options。身份、session、原始 Agent options、metadata 和任何未知字段都会被拒绝。认证、输入、隐藏资源、能力/隔离不可用、DSH provisioning 失败分别返回 401、400、404、503、502。
 
 ## 保证与边界
 

@@ -94,10 +94,18 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
       return identity && createPrincipalContext(identity)
     },
   },
+  resolveAgentProfile(principal, profile) {
+    if (profile === 'coding') {
+      return {
+        agentOptions: { provider: 'trusted-provider', model: 'trusted-coder' },
+        meta: { cwd: trustedWorkspaceFor(principal) },
+      }
+    }
+  },
 })
 ```
 
-Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tenant/agents/:id`. Bodies cannot set Tenant, Principal, Agent, or session identity. Responses use 401, 400, 404, 503, and 502 for authentication, input, hidden resource, unavailable capability/isolation, and DSH provisioning failure respectively.
+Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tenant/agents/:id`. A create body is exactly `{}` for host defaults or `{ "profile": "coding" }`; the authenticated host resolver is the only place a name can become trusted DSH options. Identity, session, raw Agent options, metadata, and unknown fields are rejected. Responses use 401, 400, 404, 503, and 502 for authentication, input, hidden resource, unavailable capability/isolation, and DSH provisioning failure respectively.
 
 ## Guarantees and boundaries
 

@@ -10,8 +10,8 @@ import {
   parseAgentId,
 } from '../src/index.ts'
 import type { MultiTenantService } from '../src/service.ts'
-import type { AgentId, PrincipalContext, TenantAgent } from '../src/types.ts'
-import { mountMultiTenantWeb } from '../src/web.ts'
+import type { AgentId, CreateAgentOptions, PrincipalContext, TenantAgent } from '../src/types.ts'
+import { mountMultiTenantWeb, type AgentProfileResolver } from '../src/web.ts'
 
 interface Route {
   readonly kind: 'exact' | 'prefix'
@@ -25,7 +25,7 @@ afterEach(async () => {
   await Promise.allSettled(cleanups.splice(0).map(cleanup => cleanup()))
 })
 
-async function webHarness() {
+async function webHarness(resolveAgentProfile?: AgentProfileResolver) {
   const routes: Route[] = []
   const ctx = new Context()
   cleanups.push(() => ctx.fiber.dispose())
@@ -50,12 +50,14 @@ async function webHarness() {
   let createFailure: Error | undefined
   let deleted = false
   let createCalls = 0
+  const receivedCreateOptions: Array<CreateAgentOptions | undefined> = []
   let lastPrincipal: PrincipalContext | undefined
   const service = {
-    async create(principal: PrincipalContext): Promise<TenantAgent> {
+    async create(principal: PrincipalContext, options?: CreateAgentOptions): Promise<TenantAgent> {
       assertPrincipalContext(principal)
       lastPrincipal = principal
       createCalls += 1
+      receivedCreateOptions.push(options)
       if (createFailure !== undefined) throw createFailure
       return known
     },
@@ -76,6 +78,7 @@ async function webHarness() {
   } as unknown as MultiTenantService
 
   const handle = mountMultiTenantWeb(ctx, service, {
+    ...(resolveAgentProfile === undefined ? {} : { resolveAgentProfile }),
     principalProvider: {
       authenticate(request) {
         if (request.headers.authorization !== 'Bearer alice') return undefined
@@ -111,6 +114,7 @@ async function webHarness() {
     knownId,
     setCreateFailure(error: Error | undefined) { createFailure = error },
     get createCalls() { return createCalls },
+    get receivedCreateOptions() { return receivedCreateOptions },
     get lastPrincipal() { return lastPrincipal },
   }
 }
@@ -141,6 +145,7 @@ describe('authenticated Web adapter', () => {
     expect(createdText).toContain(test.knownId)
     expect(createdText).not.toMatch(/session|secret|tenantId|principalId/i)
     expect(test.lastPrincipal).toEqual({ tenantId: 'acme', principalId: 'alice' })
+    expect(test.receivedCreateOptions).toEqual([undefined])
 
     const listed = await fetch(`${test.base}/agents`, { headers: authenticated })
     expect(listed.status).toBe(200)
@@ -156,6 +161,94 @@ describe('authenticated Web adapter', () => {
     expect(deleted.status).toBe(204)
     const missing = await fetch(`${test.base}/agents/${test.knownId}`, { headers: authenticated })
     expect(missing.status).toBe(404)
+  })
+
+  it('resolves a named profile only through the authenticated host resolver', async () => {
+    let resolvedPrincipal: PrincipalContext | undefined
+    const test = await webHarness((principal, profile) => {
+      resolvedPrincipal = principal
+      if (profile !== 'coding') return undefined
+      return {
+        agentOptions: { provider: 'trusted', model: 'coder', maxTokens: 4096 },
+        meta: { cwd: '/srv/workspaces/alice', agentPreset: 'minimal' },
+      }
+    })
+    const response = await fetch(`${test.base}/agents`, {
+      method: 'POST',
+      headers: { ...authenticated, 'content-type': 'application/json' },
+      body: JSON.stringify({ profile: 'coding' }),
+    })
+    expect(response.status).toBe(201)
+    expect(resolvedPrincipal).toEqual({ tenantId: 'acme', principalId: 'alice' })
+    expect(test.receivedCreateOptions).toEqual([{
+      agentOptions: { provider: 'trusted', model: 'coder', maxTokens: 4096 },
+      meta: { cwd: '/srv/workspaces/alice', agentPreset: 'minimal' },
+    }])
+  })
+
+  it('rejects absent and unknown profile resolvers without reaching the service', async () => {
+    const withoutResolver = await webHarness()
+    const unavailable = await fetch(`${withoutResolver.base}/agents`, {
+      method: 'POST', headers: authenticated, body: JSON.stringify({ profile: 'coding' }),
+    })
+    expect(unavailable.status).toBe(400)
+    expect(withoutResolver.createCalls).toBe(0)
+
+    const unknownProfile = await webHarness(() => undefined)
+    const unknown = await fetch(`${unknownProfile.base}/agents`, {
+      method: 'POST', headers: authenticated, body: JSON.stringify({ profile: 'unknown' }),
+    })
+    expect(unknown.status).toBe(400)
+    expect(unknownProfile.createCalls).toBe(0)
+  })
+
+  it('accepts no wire field other than a non-empty profile', async () => {
+    const test = await webHarness(() => ({}))
+    const rejectedBodies: readonly Record<string, unknown>[] = [
+      { profile: '' },
+      { profile: ' ' },
+      { profile: 1 },
+      { tenantId: 'globex' },
+      { principalId: 'mallory' },
+      { userId: 'mallory' },
+      { sessionId: 'chosen' },
+      { agentId: 'chosen' },
+      { agentOptions: {} },
+      { meta: {} },
+      { cwd: '/tmp' },
+      { preset: 'unsafe' },
+      { provider: 'unsafe' },
+      { parent: 'other-agent' },
+      { delegation: {} },
+      { unknown: true },
+      { profile: 'coding', meta: { cwd: '/tmp' } },
+    ]
+    for (const body of rejectedBodies) {
+      const response = await fetch(`${test.base}/agents`, {
+        method: 'POST', headers: authenticated, body: JSON.stringify(body),
+      })
+      expect(response.status, JSON.stringify(body)).toBe(400)
+    }
+    expect(test.createCalls).toBe(0)
+  })
+
+  it('maps resolver failures and invalid trusted options to a non-leaking 503', async () => {
+    const failed = await webHarness(() => { throw new Error('private resolver detail') })
+    const failure = await fetch(`${failed.base}/agents`, {
+      method: 'POST', headers: authenticated, body: JSON.stringify({ profile: 'coding' }),
+    })
+    expect(failure.status).toBe(503)
+    expect(await failure.text()).not.toContain('private resolver detail')
+    expect(failed.createCalls).toBe(0)
+
+    const malformed = await webHarness(() => ({
+      agentOptions: { model: 'coder', temperature: 1 } as never,
+    }))
+    const invalid = await fetch(`${malformed.base}/agents`, {
+      method: 'POST', headers: authenticated, body: JSON.stringify({ profile: 'coding' }),
+    })
+    expect(invalid.status).toBe(503)
+    expect(malformed.createCalls).toBe(0)
   })
 
   it('authenticates before parsing resource ids and applies the stable error mapping', async () => {

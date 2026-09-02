@@ -242,6 +242,19 @@ describe('MultiTenantService authority kernel', () => {
     await expect(test.repository.list({ tenantId: 'acme', principalId: 'alice' })).resolves.toEqual([])
   })
 
+  it('strictly rebuilds trusted create options and rejects unknown nested fields', async () => {
+    const test = await harness()
+    await expect(test.service.create(alice(), {
+      agentOptions: { model: 'coder', temperature: 1 } as never,
+    })).rejects.toThrow(ValidationError)
+    await expect(test.service.create(alice(), {
+      meta: { cwd: '/srv/workspace', owner: 'alice' } as never,
+    })).rejects.toThrow(ValidationError)
+    await expect(test.service.create(alice(), { profile: 'coding' } as never))
+      .rejects.toThrow(ValidationError)
+    expect(test.driver.createSpecifications).toHaveLength(0)
+  })
+
   it('makes unknown, cross-Principal, cross-Tenant, failed and deleted resources indistinguishable', async () => {
     const test = await harness()
     const owner = alice()
@@ -504,7 +517,9 @@ describe('MultiTenantService authority kernel', () => {
   it('fails closed on insufficient isolation before creating a DSH Agent', async () => {
     const test = await harness('strong')
     await expect(test.service.create(alice(), { minimumIsolation: 'logical' } as never))
-      .rejects.toThrow(IsolationUnavailableError)
+      .rejects.toThrow(ValidationError)
+    expect(test.partitions.requests).toHaveLength(0)
+    await expect(test.service.create(alice())).rejects.toThrow(IsolationUnavailableError)
     expect(test.partitions.requests[0]?.requiredIsolation).toBe('strong')
     expect(test.driver.createSpecifications).toHaveLength(0)
     await expect(test.repository.list({ tenantId: 'acme', principalId: 'alice' })).resolves.toEqual([])

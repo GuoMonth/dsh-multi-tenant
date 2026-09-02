@@ -14,7 +14,13 @@ import {
 } from './errors.ts'
 import type { PrincipalProvider } from './protocols.ts'
 import type { MultiTenantService } from './service.ts'
-import { assertPrincipalContext, parseAgentId, type CreateAgentOptions, type PrincipalContext } from './types.ts'
+import {
+  assertPrincipalContext,
+  parseAgentId,
+  validateCreateAgentOptions,
+  type CreateAgentOptions,
+  type PrincipalContext,
+} from './types.ts'
 
 const DEFAULT_BASE_PATH = '/_dsh-multi-tenant'
 const MAX_BODY_BYTES = 64 * 1024
@@ -29,9 +35,19 @@ interface WebServerLike {
   register(route: WebRoute): () => void
 }
 
+export interface CreateAgentRequest {
+  readonly profile?: string
+}
+
+export type AgentProfileResolver = (
+  principal: PrincipalContext,
+  profile: string,
+) => CreateAgentOptions | undefined | PromiseLike<CreateAgentOptions | undefined>
+
 export interface MultiTenantWebOptions {
   readonly principalProvider: PrincipalProvider<IncomingMessage>
   readonly basePath?: string
+  readonly resolveAgentProfile?: AgentProfileResolver
 }
 
 export interface MultiTenantWebHandle {
@@ -82,22 +98,32 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   return value as Record<string, unknown>
 }
 
-function createOptions(body: Record<string, unknown>): CreateAgentOptions {
-  for (const forbidden of ['tenantId', 'principalId', 'userId', 'sessionId', 'agentId']) {
-    if (Object.hasOwn(body, forbidden)) throw new ValidationError(`${forbidden} is not accepted at this boundary`)
+async function createOptions(
+  principal: PrincipalContext,
+  body: Record<string, unknown>,
+  resolver: AgentProfileResolver | undefined,
+): Promise<CreateAgentOptions | undefined> {
+  for (const key of Reflect.ownKeys(body)) {
+    if (key !== 'profile') throw new ValidationError('request body contains an unknown field')
   }
-  for (const key of Object.keys(body)) {
-    if (key !== 'agentOptions' && key !== 'meta') throw new ValidationError(`unknown create option ${key}`)
+  if (!Object.hasOwn(body, 'profile')) return undefined
+  const profile = body.profile
+  if (typeof profile !== 'string' || profile.length === 0 || profile !== profile.trim()) {
+    throw new ValidationError('profile must be a non-empty trimmed string')
   }
-  const options: {
-    agentOptions?: NonNullable<CreateAgentOptions['agentOptions']>
-    meta?: NonNullable<CreateAgentOptions['meta']>
-  } = {}
-  if (body.agentOptions !== undefined) {
-    options.agentOptions = body.agentOptions as NonNullable<CreateAgentOptions['agentOptions']>
+  if (resolver === undefined) throw new ValidationError('Agent profiles are not configured')
+  let resolved: CreateAgentOptions | undefined
+  try {
+    resolved = await resolver(principal, profile)
+  } catch (error) {
+    throw new CapabilityUnavailableError('Agent profile resolution is unavailable.', { cause: error })
   }
-  if (body.meta !== undefined) options.meta = body.meta as NonNullable<CreateAgentOptions['meta']>
-  return options
+  if (resolved === undefined) throw new ValidationError('unknown Agent profile')
+  try {
+    return validateCreateAgentOptions(resolved)
+  } catch (error) {
+    throw new CapabilityUnavailableError('Agent profile resolution is unavailable.', { cause: error })
+  }
 }
 
 async function requirePrincipal(
@@ -166,7 +192,10 @@ export function mountMultiTenantWeb(
       return
     }
     if (req.method === 'POST') {
-      const agent = await service.create(principal, createOptions(await readJson(req)))
+      const optionsForAgent = await createOptions(principal, await readJson(req), options.resolveAgentProfile)
+      const agent = optionsForAgent === undefined
+        ? await service.create(principal)
+        : await service.create(principal, optionsForAgent)
       writeJson(res, 201, { agent })
       return
     }
