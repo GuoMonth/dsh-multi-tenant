@@ -1,46 +1,60 @@
-/**
- * Error types for the multi-tenant core.
- *
- * @module dsh-multi-tenant/errors
- */
+/** Stable, non-enumerating errors for the product boundary. */
 
-/** Base class for all multi-tenant errors. */
 export class MultiTenantError extends Error {
-  constructor(message: string) {
-    super(message)
+  constructor(
+    readonly code: string,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options)
     this.name = new.target.name
   }
 }
 
-/**
- * Public authorization denial.
- *
- * Deliberately uniform and non-enumerating: the message carries no session
- * existence, no owner tenant/user, and no internal reason. Unknown sessions,
- * tenant mismatches, and user mismatches all surface as this same error, so the
- * public API cannot be used to probe session existence or ownership.
- */
-export class SessionAccessDeniedError extends MultiTenantError {
-  constructor() {
-    super('Access to session denied.')
-  }
-}
-
-/**
- * Claim conflict: the session is already owned by another principal.
- *
- * The message does not reveal the existing owner's identity. This is thrown by
- * `claimSession` (a server-side operation), not by the authorization path.
- */
-export class SessionOwnershipConflictError extends MultiTenantError {
-  constructor() {
-    super('Session is already owned.')
-  }
-}
-
-/** Invalid principal / session input rejected at a runtime boundary. */
 export class ValidationError extends MultiTenantError {
-  constructor(message: string) {
-    super(message)
+  constructor(message: string, options?: ErrorOptions) {
+    super('INVALID_INPUT', message, options)
+  }
+}
+
+export class AuthenticationRequiredError extends MultiTenantError {
+  constructor(options?: ErrorOptions) {
+    super('AUTHENTICATION_REQUIRED', 'Authentication is required.', options)
+  }
+}
+
+export class AgentNotFoundError extends MultiTenantError {
+  constructor(options?: ErrorOptions) {
+    super('AGENT_NOT_FOUND', 'Agent not found.', options)
+  }
+}
+
+export class AgentRecordConflictError extends MultiTenantError {
+  constructor(options?: ErrorOptions) {
+    super('AGENT_RECORD_CONFLICT', 'Agent record conflict.', options)
+  }
+}
+
+export class CapabilityUnavailableError extends MultiTenantError {
+  constructor(message = 'A required Agent capability is unavailable.', options?: ErrorOptions) {
+    super('CAPABILITY_UNAVAILABLE', message, options)
+  }
+}
+
+export class IsolationUnavailableError extends MultiTenantError {
+  constructor(options?: ErrorOptions) {
+    super('ISOLATION_UNAVAILABLE', 'The configured runtime cannot satisfy the required isolation level.', options)
+  }
+}
+
+export class AgentProvisioningError extends MultiTenantError {
+  constructor(options?: ErrorOptions) {
+    super('AGENT_PROVISIONING_FAILED', 'Agent provisioning failed.', options)
+  }
+}
+
+export class ServiceClosedError extends MultiTenantError {
+  constructor(options?: ErrorOptions) {
+    super('SERVICE_CLOSED', 'The multi-tenant service is closed.', options)
   }
 }

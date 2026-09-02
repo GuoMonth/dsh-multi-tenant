@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Post-publication verification for the exact published v0.3 artifact. */
+/** Post-publication verification for the exact alpha artifact. */
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -42,9 +42,9 @@ for (let attempt = 1; attempt <= 10; attempt++) {
 }
 if (registryVersion !== version) throw new Error(`registry did not resolve ${PACKAGE_NAME}@${version}`)
 
-const latestVersion = npmJson(['view', `${PACKAGE_NAME}@latest`, 'version'])
-if (latestVersion !== version) {
-  throw new Error(`npm latest dist-tag resolves to ${String(latestVersion)}, expected ${version}`)
+const alphaVersion = npmJson(['view', `${PACKAGE_NAME}@alpha`, 'version'])
+if (alphaVersion !== version) {
+  throw new Error(`npm alpha dist-tag resolves to ${String(alphaVersion)}, expected ${version}`)
 }
 
 const repository = npmJson(['view', `${PACKAGE_NAME}@${version}`, 'repository.url'])
@@ -56,9 +56,7 @@ const integrity = npmJson(['view', `${PACKAGE_NAME}@${version}`, 'dist.integrity
 if (!integrity) throw new Error('registry artifact is missing dist.integrity')
 
 // Reuse the exact same installed-consumer contract that validates a local
-// tarball before publication. This keeps pre- and post-publication semantics in
-// one place: RuntimeComposition, Product Ingress, Principal Credentials, Tenant
-// MCP config, packaged M5 MCP-client resolution, Session ownership and denial.
+// tarball before publication, including the Principal-scoped Agent contract.
 execFileSync('node', [
   'scripts/artifact-consumer-smoke.mjs',
   `${PACKAGE_NAME}@${version}`,
@@ -67,4 +65,4 @@ execFileSync('node', [
   stdio: ['ignore', 'inherit', 'inherit'],
 })
 
-console.log(`registry smoke passed: ${PACKAGE_NAME}@${version}; latest=${version}; integrity=${integrity.slice(0, 20)}…`)
+console.log(`registry smoke passed: ${PACKAGE_NAME}@${version}; alpha=${version}; integrity=${integrity.slice(0, 20)}…`)

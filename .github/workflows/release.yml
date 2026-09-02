@@ -1,4 +1,4 @@
-name: Publish latest package
+name: Publish alpha package
 
 run-name: Publish dsh-multi-tenant from main
 
@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: write
   id-token: write
 
@@ -37,6 +38,24 @@ jobs:
         with:
           install: false
 
+      - name: Require successful CI for release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONCLUSION=$(gh run list \
+            --workflow ci.yml \
+            --commit "$GITHUB_SHA" \
+            --event push \
+            --limit 1 \
+            --json conclusion \
+            --jq '.[0].conclusion // ""')
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "CI for release commit $GITHUB_SHA is not successful (conclusion: ${CONCLUSION:-missing})" >&2
+            exit 1
+          fi
+
       - name: Resolve release identity
         shell: bash
         run: |
@@ -47,7 +66,7 @@ jobs:
           fi
           RELEASE_VERSION=$(node -p "require('./packages/multi-tenant/package.json').version")
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> "$GITHUB_ENV"
-          echo "Publishing dsh-multi-tenant@$RELEASE_VERSION as npm latest"
+          echo "Publishing dsh-multi-tenant@$RELEASE_VERSION as npm alpha"
 
           node - <<'NODE'
           const { execFileSync } = require('node:child_process')
@@ -72,9 +91,9 @@ jobs:
       - name: Publish to npm via Trusted Publishing
         if: steps.registry.outputs.publish_needed == 'true'
         working-directory: packages/multi-tenant
-        run: npm publish --access public --provenance
+        run: npm publish --access public --provenance --tag alpha
 
-      - name: Verify registry artifact and latest tag
+      - name: Verify registry artifact and alpha tag
         run: node scripts/registry-smoke.mjs "$RELEASE_VERSION"
 
       - name: Create matching Git tag and GitHub release

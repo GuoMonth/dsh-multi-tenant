@@ -1,25 +1,36 @@
+/** Opt-in local Web proof. Never use its demo cookies as production authentication. */
+
 import type { Context } from '@deepseek-ai/cordis'
-import { apply as applyStarter, type Config } from './starter.ts'
+import { createPrincipalContext } from './types.ts'
+import { mountMultiTenantWeb, readCookie } from './web.ts'
 
-/** Stable Cordis plugin name for the opt-in First Product Experience. */
 export const name = 'multi-tenant-starter'
+export const inject = ['webServer', 'multiTenant']
 
-/**
- * Every service the runnable proof depends on is declared at the Cordis plugin
- * boundary. Loader therefore owns ordering, and the demo cannot silently boot
- * against a partial/non-Web DSH composition.
- */
-export const inject = [
-  'webServer',
-  'tenantRuntime',
-  'multiTenant',
-  'agents',
-  'tools',
-  'sessionPersistence',
-]
-
-export type { Config }
-
-export function apply(ctx: Context, config: Config = {}): Promise<void> {
-  return applyStarter(ctx, config)
+export interface Config {
+  readonly enabled?: boolean
+  readonly basePath?: string
+  readonly cookieName?: string
 }
+
+export function apply(ctx: Context, config: Config = {}): void {
+  if (config.enabled !== true) return
+  const cookieName = config.cookieName ?? 'dsh_mt_demo'
+  const identities = new Map([
+    ['acme-alice', createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })],
+    ['acme-bob', createPrincipalContext({ tenantId: 'acme', principalId: 'bob' })],
+    ['globex-alice', createPrincipalContext({ tenantId: 'globex', principalId: 'alice' })],
+  ])
+  const handle = mountMultiTenantWeb(ctx, ctx.multiTenant, {
+    ...(config.basePath === undefined ? {} : { basePath: config.basePath }),
+    principalProvider: {
+      authenticate(request) {
+        const token = readCookie(request.headers, cookieName)
+        return token === undefined ? undefined : identities.get(token)
+      },
+    },
+  })
+  ctx.effect(() => () => handle.dispose(), 'dsh-multi-tenant: unmount starter Web routes')
+}
+
+export default apply

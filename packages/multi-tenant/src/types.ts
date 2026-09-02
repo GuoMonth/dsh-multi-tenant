@@ -1,63 +1,148 @@
-/**
- * Core multi-tenant identity, ownership, and decision types.
- *
- * Identifier semantics: `sessionId`, `tenantId`, and `userId` are all OPAQUE
- * strings. The core never parses structure out of them — no UUID or numeric-id
- * assumptions, no `tenantId:userId` join rules, no prefix-based authorization.
- * Identity is an exact-match on the authenticated value.
- *
- * @module dsh-multi-tenant/types
- */
+/** Public authority and Agent-resource vocabulary. */
 
-/**
- * The minimal authenticated identity required by the ownership kernel.
- *
- * A `TenantPrincipal` is established by a server-side authentication boundary;
- * it is never assembled from client-supplied tenant fields. Roles, permissions,
- * admin flags, and other policy attributes are deliberately NOT part of this
- * contract. If the ecosystem later needs same-tenant sharing or RBAC, that
- * belongs to a separate policy plane rather than the ownership identity.
- */
-export interface TenantPrincipal {
-  /** Opaque tenant identifier. Never parsed out of a session id. */
-  tenantId: string
-  /** User identifier, unique within the tenant. */
-  userId: string
+import { randomUUID } from 'node:crypto'
+import { ValidationError } from './errors.ts'
+
+declare const agentIdBrand: unique symbol
+declare const principalContextBrand: unique symbol
+
+export type AgentId = string & { readonly [agentIdBrand]: 'AgentId' }
+
+export interface PrincipalContext {
+  readonly tenantId: string
+  readonly principalId: string
+  readonly [principalContextBrand]: true
 }
 
-/**
- * The recorded owner of a session — the minimal authorization binding.
- */
-export interface SessionOwner {
-  tenantId: string
-  userId: string
+export interface PrincipalIdentity {
+  readonly tenantId: string
+  readonly principalId: string
 }
 
-/**
- * Result of an atomic ownership claim.
- *
- * `claim` returns one of these; it never throws on a conflicting owner (the
- * service maps `'conflict'` to a public error). A plain discriminated string
- * keeps the seam from leaking the existing owner back to the caller.
- */
-export type ClaimResult =
-  | 'created'
-  | 'idempotent'
-  | 'conflict'
+export type IsolationLevel = 'logical' | 'strong'
+export type AgentRecordState = 'provisioning' | 'ready' | 'failed' | 'deleted'
 
-/**
- * Internal diagnostic reason for an access denial.
- *
- * This is an INTERNAL value for tests, audit, and observability. It is never
- * returned through the public authorization API, which deliberately collapses
- * all denials into a single non-enumerating error.
- */
-export type AccessDenialReason =
-  | 'UNKNOWN_SESSION'
-  | 'TENANT_MISMATCH'
-  | 'USER_MISMATCH'
+export interface CreateAgentOptions {
+  readonly agentOptions?: {
+    readonly provider?: string
+    readonly model?: string
+    readonly reasoningEffort?: string
+    readonly maxTokens?: number
+  }
+  readonly meta?: {
+    readonly cwd?: string
+    readonly agentPreset?: string
+  }
+}
 
-/** Internal authorization decision. */
-export type AccessDecision =
-  | { allowed: true }
-  | { allowed: false; reason: AccessDenialReason }
+export interface TenantAgent {
+  readonly id: AgentId
+  readonly state: 'ready'
+  readonly mcpServers: readonly string[]
+  readonly createdAt: string
+  readonly updatedAt: string
+}
+
+/** Repository-only record. `sessionId` never crosses a product-facing boundary. */
+export interface TenantAgentRecord {
+  readonly id: AgentId
+  readonly tenantId: string
+  readonly principalId: string
+  readonly sessionId: string
+  readonly state: AgentRecordState
+  readonly revision: number
+  readonly policyRevision: string
+  readonly capabilityRevision: string
+  readonly mcpServers: readonly string[]
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly deletedAt?: string
+}
+
+export interface NewTenantAgentRecord {
+  readonly id: AgentId
+  readonly tenantId: string
+  readonly principalId: string
+  readonly sessionId: string
+  readonly policyRevision: string
+  readonly capabilityRevision: string
+  readonly mcpServers: readonly string[]
+  readonly createdAt: string
+}
+
+export interface AgentRecordTransition {
+  readonly from: AgentRecordState
+  readonly to: AgentRecordState
+  readonly capabilityRevision?: string
+  readonly mcpServers?: readonly string[]
+  readonly at: string
+}
+
+const principalContexts = new WeakSet<object>()
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function opaque(value: unknown, label: string): string {
+  if (typeof value !== 'string' || value.length === 0 || value !== value.trim()) {
+    throw new ValidationError(`${label} must be a non-empty trimmed string`)
+  }
+  return value
+}
+
+/** Mint a server-side authority object after the host has authenticated the subject. */
+export function createPrincipalContext(identity: PrincipalIdentity): PrincipalContext {
+  if (typeof identity !== 'object' || identity === null) {
+    throw new ValidationError('principal identity must be an object')
+  }
+  const principal = {
+    tenantId: opaque(identity.tenantId, 'tenantId'),
+    principalId: opaque(identity.principalId, 'principalId'),
+  }
+  principalContexts.add(principal)
+  return Object.freeze(principal) as PrincipalContext
+}
+
+export function assertPrincipalContext(value: unknown): asserts value is PrincipalContext {
+  if (typeof value !== 'object' || value === null || !principalContexts.has(value)) {
+    throw new ValidationError('a server-established PrincipalContext is required')
+  }
+}
+
+export function parseAgentId(value: unknown): AgentId {
+  if (typeof value !== 'string' || !UUID.test(value)) throw new ValidationError('agentId must be a UUID')
+  return value as AgentId
+}
+
+export function createAgentId(): AgentId {
+  return randomUUID() as AgentId
+}
+
+export function createInternalSessionId(): string {
+  return `dsh-mt-${randomUUID()}`
+}
+
+export function validateCreateAgentOptions(value: CreateAgentOptions | undefined): CreateAgentOptions {
+  if (value === undefined) return Object.freeze({})
+  if (typeof value !== 'object' || value === null) throw new ValidationError('Agent options must be an object')
+  const agentOptions = value.agentOptions
+  if (agentOptions !== undefined) {
+    if (typeof agentOptions !== 'object' || agentOptions === null) throw new ValidationError('agentOptions must be an object')
+    for (const key of ['provider', 'model', 'reasoningEffort'] as const) {
+      const field = agentOptions[key]
+      if (field !== undefined) opaque(field, `agentOptions.${key}`)
+    }
+    if (agentOptions.maxTokens !== undefined
+      && (!Number.isSafeInteger(agentOptions.maxTokens) || agentOptions.maxTokens <= 0)) {
+      throw new ValidationError('agentOptions.maxTokens must be a positive integer')
+    }
+  }
+  const meta = value.meta
+  if (meta !== undefined) {
+    if (typeof meta !== 'object' || meta === null) throw new ValidationError('meta must be an object')
+    if (meta.cwd !== undefined) opaque(meta.cwd, 'meta.cwd')
+    if (meta.agentPreset !== undefined) opaque(meta.agentPreset, 'meta.agentPreset')
+  }
+  return Object.freeze({
+    ...(agentOptions === undefined ? {} : { agentOptions: Object.freeze({ ...agentOptions }) }),
+    ...(meta === undefined ? {} : { meta: Object.freeze({ ...meta }) }),
+  })
+}

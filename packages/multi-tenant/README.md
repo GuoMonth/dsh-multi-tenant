@@ -1,276 +1,112 @@
+[简体中文](./README.zh-CN.md) | English
+
 # dsh-multi-tenant
 
-**Run DeepSeek Harness safely behind a multi-tenant SaaS product.**
-
-Use this package when one DSH runtime must serve many organizations and users without mixing Tenant configuration, Principal credentials, Session ownership or Agent-scoped MCP Tools.
-
-> **`dsh-multi-tenant@0.3.0-rc.3` — Durable Local Experience**
->
-> Compatible DSH baseline: `0.1.1-rc.2`.
-
-## The problem
-
-A single-user Agent can look like:
-
-```text
-request -> Agent -> MCP -> backend
-```
-
-A SaaS runtime has to keep this safe instead:
-
-```text
-Acme / Alice   -> Acme MCP + Alice credential + Alice Sessions
-Acme / Bob     -> Acme MCP + Bob credential   + Bob Sessions
-Globex / Alice -> Globex MCP + Globex/Alice credential + Globex Sessions
-```
-
-`dsh-multi-tenant` turns the repeated glue into one product path:
-
-```text
-already-authenticated product subject
-  -> Tenant / Principal
-  -> Tenant MCP config
-  -> Principal credentials
-  -> fail-closed Session ownership
-  -> Principal-aware Agent create/resume
-  -> native DSH MCP Tools
-```
-
-Authentication stays product-owned. The framework starts after your JWT, Cookie, OIDC session, API key or other login mechanism has already produced a trusted user/subject.
+`dsh-multi-tenant@0.4.0-alpha.1` is a DSH multi-tenant plugin for Node 22.19+ and Node 24. It is pinned to `@deepseek-ai/*@0.1.2-alpha.4`.
 
 ## Install
 
-Inside a compatible DSH profile:
-
-```sh
-dsh plugin --profile <profile> add dsh-multi-tenant
+```bash
+pnpm add dsh-multi-tenant@0.4.0-alpha.1
 ```
 
-Or from framework code that already owns the compatible DSH installation:
-
-```sh
-pnpm add dsh-multi-tenant
-```
-
-The MCP path reuses the official `@deepseek-ai/dsh-mcp-client` supplied by DSH. This package does not vendor or fork MCP.
-
-## Durable local ownership
-
-A normal DSH plugin install now uses the package's SQLite provider by default. It is backed by Node's built-in `node:sqlite`, so individual developers do not need PostgreSQL, Docker, a native addon or another database dependency just to prove restart-safe Session ownership.
-
-```text
-Alice claims Session s1
-        ↓
-<cwd>/.dsh-multi-tenant/session-ownership.sqlite
-        ↓ restart DSH / Node
-Alice -> s1          allowed
-Bob   -> s1          denied
-Globex/Alice -> s1   denied
-```
-
-Override the path with `DSH_MULTI_TENANT_SQLITE_PATH`, or mount the provider directly:
+Load the plugin after the DSH `agents` and `tools` services. With no host replacements it uses `.dsh-multi-tenant/agents.sqlite`, an empty MCP declaration, and DSH's shared in-process runtime:
 
 ```ts
-import SQLiteTenantSessionStore from 'dsh-multi-tenant/sqlite-store'
+import * as MultiTenant from 'dsh-multi-tenant'
 
-await ctx.plugin(SQLiteTenantSessionStore, {
-  path: './state/session-ownership.sqlite',
+await ctx.plugin(MultiTenant, {
+  minimumIsolation: 'logical',
 })
 ```
 
-SQLite is the **local durable / single-node adoption provider**, not a horizontally scaled production database claim. `InMemoryTenantSessionStore` remains available for hermetic tests. Future PostgreSQL/other providers should implement the same `TenantSessionStore` contract.
+Set `DSH_MULTI_TENANT_DB_PATH` or `sqlite.path` to change the SQLite file. Existing `0.3` ownership data is deliberately ignored.
 
-## First Product Experience
+## Minimal API
 
-Before integrating your own product, run the opt-in starter on the real shipped DSH Web profile:
-
-```sh
-dsh plugin --profile web add dsh-multi-tenant
-DSH_MULTI_TENANT_STARTER=1 dsh web
-```
-
-Open the printed DSH URL plus `/_dsh-multi-tenant`.
-
-The starter is dormant by default and gives you three identities:
-
-```text
-Acme / Alice
-Acme / Bob
-Globex / Alice
-```
-
-It uses a real DSH Agent, the official DSH MCP client and a real stdio MCP JSON-RPC Tool. You can observe:
-
-- Acme/Alice resolving to the correct Tenant / Principal;
-- real MCP `tools/list` + `tools/call`;
-- Principal credential propagation proven as `credentialAccepted: true` without returning the raw credential;
-- owner Session resume;
-- Acme/Bob denied Alice's Session;
-- a second Tenant through Globex/Alice.
-
-The starter panel is mounted beside the existing DSH Web app on the same `ctx.webServer`; it is not another chat frontend or another HTTP server.
-
-## Quick start
-
-`createMcpSaaSRuntime()` is the opinionated MCP-specific product facade over the existing Core:
+The host authenticates first, then mints a `PrincipalContext`. Request JSON is never a Principal.
 
 ```ts
-import { createMcpSaaSRuntime } from 'dsh-multi-tenant'
+import { createPrincipalContext } from 'dsh-multi-tenant'
 
-const app = await createMcpSaaSRuntime(ctx, {
-  identity(subject: TrustedSubject) {
-    return {
-      tenantId: subject.organizationId,
-      userId: subject.userId,
-    }
-  },
-  mcp: {
-    load({ tenantId }) {
-      return {
-        servers: [{
-          transport: 'streamable-http',
-          serverName: 'erp',
-          url: endpointForTenant(tenantId),
-          credentialHeaders: {
-            Authorization: { credential: 'erpToken', prefix: 'Bearer ' },
-          },
-        }],
-      }
-    },
-  },
-  credentials: {
-    create({ principal }) {
-      return loadPrincipalCredentials(principal)
-    },
-  },
+const principal = createPrincipalContext({
+  tenantId: authenticated.tenantId,
+  principalId: authenticated.subjectId,
 })
 
-const principal = await app.resolve(trustedSubject)
-const handle = await principal.create({ sessionId })
+const agent = await ctx.multiTenant.create(principal)
+
+const result = await ctx.multiTenant.withAgent(principal, agent.id, runtime =>
+  runtime.executeTool('mcp__erp__find_customer', { customerId: 'C-42' }),
+)
+
+await ctx.multiTenant.delete(principal, agent.id)
 ```
 
-The facade composes the existing `CompositionPlan`, `RuntimeComposition`, Product Ingress and `createMcpAgentIntegration()` primitives. It is not a second Runtime or DI system.
+`create()` generates both the public `AgentId` and a separate internal DSH session id. `get`, `list`, `withAgent`, and `delete` scope every lookup by Agent, Tenant, and Principal. Unknown, foreign, failed, and deleted resources all appear as `AgentNotFoundError`.
 
-When `create()` resolves, the official MCP client has completed initial connection, `tools/list` synchronization and Tool registration. `resume()` checks Session ownership before DSH persistence/setup runs.
+`withAgent()` is the only trusted execution entry. Its callback receives `followup`, `steer`, `inject`, `cancel`, `whenIdle`, and `executeTool`; it cannot obtain a DSH session id, Agent handle, Cordis context, or disposer.
 
-### Existing JWT / Cookie / req.user
+## Real MCP configuration
 
-The Web bridge consumes the result of your existing authentication stack:
+Register host providers before the root plugin. The official `dsh-mcp-client` is loaded inside each unpublished Agent setup, so two Agents may use the same logical `serverName` without hashing it:
 
 ```ts
 import {
-  mountMcpSaaSWebBridge,
-  readBearerToken,
-  readCookie,
+  StaticSecretProvider,
+  StaticTenantMcpProvider,
 } from 'dsh-multi-tenant'
 
-mountMcpSaaSWebBridge(ctx, app, {
-  async authenticate(req) {
-    const jwt = readBearerToken(req.headers)
-    if (jwt) return verifyExistingJwt(jwt)
+await ctx.plugin(StaticTenantMcpProvider, {
+  revision: 'erp-v1',
+  servers: [{
+    transport: 'stdio',
+    serverName: 'erp',
+    command: process.execPath,
+    args: ['/opt/my-erp-mcp/server.mjs'],
+    secretEnv: {
+      API_TOKEN: { secret: 'erp-token', prefix: 'Bearer ' },
+    },
+  }],
+})
+await ctx.plugin(StaticSecretProvider, {
+  revision: 'dev-secrets-v1',
+  values: { 'erp-token': process.env.ERP_TOKEN! },
+})
+await ctx.plugin(MultiTenant)
+```
 
-    const sessionId = readCookie(req.headers, 'product_session')
-    if (sessionId) return lookupExistingServerSession(sessionId)
+The static providers are development conveniences. Production hosts normally implement `TenantMcpProvider` and `SecretProvider`; a `SecretLease` keeps values in memory and supplies a revision, revocation signal, and disposer. Revocation cancels and disposes the live Agent. The next authorized use acquires a new lease and resumes the same internal session.
 
-    return undefined
+## Web adapter
+
+`dsh-multi-tenant/web` mounts authenticated CRUD through the existing DSH `ctx.webServer.register()` seam:
+
+```ts
+import { mountMultiTenantWeb } from 'dsh-multi-tenant/web'
+
+mountMultiTenantWeb(ctx, ctx.multiTenant, {
+  principalProvider: {
+    async authenticate(request) {
+      const identity = await authenticateProductRequest(request)
+      return identity && createPrincipalContext(identity)
+    },
   },
 })
 ```
 
-`readBearerToken()` and `readCookie()` are transport extractors, not authentication. JWT verification, OIDC, server-session validation, refresh and user lookup stay in the product.
+Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tenant/agents/:id`. Bodies cannot set Tenant, Principal, Agent, or session identity. Responses use 401, 400, 404, 503, and 502 for authentication, input, hidden resource, unavailable capability/isolation, and DSH provisioning failure respectively.
 
-## What 0.3 provides
+## Guarantees and boundaries
 
-- canonical Tenant / Principal resolution from trusted product identity;
-- exact `CompositionPlan -> RuntimeComposition` binding;
-- Principal-scoped replaceable credentials;
-- Tenant-scoped MCP configuration;
-- Principal-bound Agent `create()` / `resume()`;
-- immutable, fail-closed Session ownership;
-- zero-external-service SQLite ownership persistence across local restarts;
-- deterministic per-Session MCP namespaces;
-- Principal-owned long-lived Agents;
-- official DSH MCP Tools integration;
-- MCP-specific product facade;
-- same-server DSH Web identity/admission bridge;
-- structured secret-safe first-use diagnostics;
-- opt-in real-DSH-Web starter;
-- permanent executable FPE + durable-local evidence;
-- clean installed-artifact and post-publication registry verification.
+- SQLite records use CAS revisions and Principal-scoped SQL. Delete revokes access first and retains only a scrubbed tombstone.
+- Provisioning is unpublished until DSH setup and the database ready transition both succeed.
+- Per-Agent create/resume/refresh/delete is serialized; concurrent opens single-flight; plugin shutdown cancels and drains every owned handle.
+- A configured `strong` minimum fails closed before DSH Agent creation when the provider offers only `logical` isolation.
+- `TenantAgentRepository`, `TenantMcpProvider`, `SecretProvider`, `RuntimePartitionProvider`, and `DshRuntimeDriver` are the host replacement protocols. They compose through Cordis services; there is no second DI system.
+- The bundled shared provider is process-local logical separation. It does not isolate hostile plugins, tools, filesystem access, subprocesses, memory, or network traffic.
+- SQLite is a local/single-node default, not a multi-replica database claim. Replace `TenantAgentRepository` when the deployment requires that property.
+- Delete does not claim physical erasure of DSH persistent logs.
+- No Typert public adapter is shipped because stock Typert does not establish a trusted Principal binding. Keep stock DSH `/api` private/administrative.
 
-## Architecture
-
-```text
-Product authentication
-  -> trusted subject
-  -> Product Web bridge / Product Ingress
-  -> RuntimeComposition
-  -> canonical Tenant / Principal
-  -> Tenant MCP config + Principal credentials
-  -> one-shot create/resume Operation
-  -> Principal-owned DSH Agent
-  -> official @deepseek-ai/dsh-mcp-client
-  -> native Agent-scoped MCP Tools
-```
-
-The responsibility split stays small:
-
-- Product owns authentication.
-- Core owns identity, composition and lifecycle.
-- Integration owns downstream protocol/configuration.
-- Principal owns long-lived Agents.
-- DSH owns MCP wire behavior and Tool discovery.
-
-## Diagnostics
-
-Product-facing errors expose stable layers without serializing arbitrary underlying auth/vendor/credential errors:
-
-```json
-{
-  "code": "SESSION_ACCESS_DENIED",
-  "stage": "session-ownership",
-  "message": "This Session belongs to another Principal."
-}
-```
-
-The pinned official MCP client reports initial connect/discovery/register as one activation failure, so the package does not guess a finer failure stage that upstream cannot prove.
-
-## Security boundary
-
-Cordis Context provides trusted same-process identity/lifecycle separation, not hostile-code isolation. Strong secret/process/filesystem/network isolation belongs to process/container/Pod/sidecar/remote boundaries.
-
-The pinned DSH Web carrier also does not currently materialize a product-authenticated Principal Context for every stock Web RPC business method. rc.3 guarantees product-aware identity + Agent create/resume admission + Session ownership; it does not claim that every stock DSH Web RPC becomes tenant-authorized automatically. This boundary is tracked in #41.
-
-For production Web exposure, keep DSH Web private behind a Product Gateway/BFF that authenticates the request, resolves the same canonical Tenant/Principal, and authorizes protected Session/Agent resources before forwarding. Public clients must not be able to bypass the gateway and reach stock DSH `/api` directly.
-
-SQLite is similarly scoped: it gives individual developers and single-node deployments durable ownership across restart, not multi-replica production persistence.
-
-The starter's demo cookie is not a production authentication mechanism.
-
-## Compatibility
-
-- Node: `^22.19.0 || >=24.0.0`
-- Cordis: `>=4.0.1 <5`
-- DSH: `0.1.1-rc.2`
-
-`pnpm release:check` includes both the real-Web First Product Experience proof and the separate-process SQLite restart/competition proof before publication.
-
-## Public subpaths
-
-```text
-dsh-multi-tenant
-dsh-multi-tenant/runtime
-dsh-multi-tenant/operation
-dsh-multi-tenant/composition
-dsh-multi-tenant/runtime-composition
-dsh-multi-tenant/ingress
-dsh-multi-tenant/credentials
-dsh-multi-tenant/mcp
-dsh-multi-tenant/product
-dsh-multi-tenant/web
-dsh-multi-tenant/diagnostics
-dsh-multi-tenant/starter
-dsh-multi-tenant/store
-dsh-multi-tenant/sqlite-store
-dsh-multi-tenant/testing
-```
+Public subpaths are exactly `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`.

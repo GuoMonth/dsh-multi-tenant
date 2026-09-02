@@ -3,19 +3,10 @@ import { defineConfig } from 'tsdown'
 export default defineConfig({
   entry: [
     'src/index.ts',
-    'src/runtime.ts',
-    'src/operation.ts',
-    'src/composition.ts',
-    'src/runtime-composition.ts',
-    'src/ingress.ts',
-    'src/credentials.ts',
     'src/mcp.ts',
-    'src/product.ts',
     'src/web.ts',
-    'src/diagnostics.ts',
     'src/starter-plugin.ts',
-    'src/store.ts',
-    'src/sqlite-store.ts',
+    'src/sqlite.ts',
     'src/testing.ts',
   ],
   format: ['esm'],
@@ -24,6 +15,12 @@ export default defineConfig({
   clean: true,
   outDir: 'dist',
   deps: {
-    neverBundle: ['@deepseek-ai/cordis'],
+    neverBundle: [
+      '@deepseek-ai/cordis',
+      '@deepseek-ai/dsh-agent',
+      '@deepseek-ai/dsh-mcp-client',
+      '@deepseek-ai/dsh-session',
+      '@deepseek-ai/dsh-tools',
+    ],
   },
 })

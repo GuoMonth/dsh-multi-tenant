@@ -1,25 +1,10 @@
-# DeepSeek Harness bundle layer.
-#
-# The ownership kernel and Tenant Runtime stay deployment-global. Product
-# capability providers are materialized later inside canonical Runtime scopes.
-#
-# The bundled store is the zero-external-service SQLite provider so a normal
-# plugin install keeps Session ownership across local restarts. Set
-# DSH_MULTI_TENANT_SQLITE_PATH to override its default working-directory path.
-#
-# The First Product Experience starter is deliberately present as a dormant
-# row only. It publishes demo identities/routes exclusively when the operator
-# explicitly launches with DSH_MULTI_TENANT_STARTER=1.
+# DSH alpha.4 bundle layer. The plugin supplies its SQLite Agent directory and
+# shared logical runtime provider unless the host registers replacements first.
 - insert:
-    - id: tenant-session-store
-      name: dsh-multi-tenant/sqlite-store
-
     - id: multi-tenant
       name: dsh-multi-tenant
 
-    - id: tenant-runtime
-      name: dsh-multi-tenant/runtime
-
+    # Opt-in, local-only example identity boundary and Agent CRUD routes.
     - id: multi-tenant-starter
       name: dsh-multi-tenant/starter
       config:

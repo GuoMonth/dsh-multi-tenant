@@ -18,117 +18,48 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout project
-        uses: actions/checkout@v7
-
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           package-manager-cache: false
-
-      - name: Resolve pinned DSH identity
+      - name: Resolve target
         id: target
         shell: bash
         run: |
-          set -euo pipefail
           node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
           import { DSH_TARGET } from './scripts/dsh-target.mjs'
           console.log(`repository=${DSH_TARGET.repository}`)
           console.log(`version=${DSH_TARGET.version}`)
           console.log(`commit=${DSH_TARGET.commit}`)
           NODE
-
-      - name: Checkout exact upstream DSH release
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           repository: ${{ steps.target.outputs.repository }}
           ref: ${{ steps.target.outputs.commit }}
           path: .upstream/deepseek-harness
           persist-credentials: false
-
-      - name: Verify upstream source identity
+      - name: Verify exact source
         shell: bash
         run: |
-          set -euo pipefail
-          ACTUAL_COMMIT=$(git -C .upstream/deepseek-harness rev-parse HEAD)
-          ACTUAL_VERSION=$(node -p "require('./.upstream/deepseek-harness/package.json').version")
-          test "$ACTUAL_COMMIT" = "${{ steps.target.outputs.commit }}"
-          test "$ACTUAL_VERSION" = "${{ steps.target.outputs.version }}"
-          echo "DSH source identity verified: $ACTUAL_VERSION @ $ACTUAL_COMMIT"
+          test "$(git -C .upstream/deepseek-harness rev-parse HEAD)" = "${{ steps.target.outputs.commit }}"
+          test "$(node -p "require('./.upstream/deepseek-harness/package.json').version")" = "${{ steps.target.outputs.version }}"
 
   quality:
-    name: Package contract (Node ${{ matrix.node }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        node: ['22.19.0', '24']
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/setup@v2
-        with:
-          runtime: node@${{ matrix.node }}
-          install: false
-
-      - name: Install dependencies (frozen)
-        run: pnpm install --frozen-lockfile
-
-      - name: Verify current package and architecture contract
-        run: pnpm verify
-
-      - name: Verify release tree
-        run: pnpm release:preflight
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
-
-      - name: Prove durable local SQLite ownership across process restart
-        run: pnpm probe:sqlite
-
-      - name: Installed artifact smoke
-        run: pnpm smoke
-
-  platform-compat:
-    name: Real DSH integration (Node ${{ matrix.node }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        node: ['22.19.0', '24']
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/setup@v2
-        with:
-          runtime: node@${{ matrix.node }}
-          install: false
-
-      - name: Run DSH, Cordis and MCP executable proofs
-        run: pnpm probe:platform
-
-  first-product-experience:
-    name: First Product Experience (real DSH Web)
+    name: Release contract (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.19.0', '24']
     steps:
       - uses: actions/checkout@v7
-
       - uses: pnpm/setup@v2
         with:
-          runtime: node@24
+          runtime: node@${{ matrix.node }}
           install: false
-
-      - name: Install dependencies (frozen)
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Boot real DSH Web and prove identity, MCP and Session isolation
-        run: pnpm probe:fpe
+      - name: Run complete release evidence
+        run: pnpm release:check

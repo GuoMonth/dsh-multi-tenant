@@ -1,212 +1,110 @@
-/**
- * dsh-multi-tenant — context-native multi-tenant runtime and v0.3 SaaS
- * Framework Core primitives for DeepSeek Harness.
- *
- * @module dsh-multi-tenant
- */
+/** dsh-multi-tenant — a DSH-native multi-tenant Agent plugin. */
 
-import { MultiTenantService } from './service.ts'
+import type { Context } from '@deepseek-ai/cordis'
+import { EmptyTenantMcpProvider } from './mcp.ts'
+import { UnavailableSecretProvider } from './secrets.ts'
+import { InMemoryTenantAgentRepository } from './repository.ts'
+import { SharedDshRuntimePartitionProvider } from './runtime-driver.ts'
+import { MultiTenantService, type MultiTenantConfig } from './service.ts'
+import { SQLiteTenantAgentRepository, type SQLiteTenantAgentRepositoryConfig } from './sqlite.ts'
 
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    multiTenant: MultiTenantService
-  }
+export const name = 'multi-tenant'
+export const inject = ['agents', 'tools']
+
+export interface Config extends MultiTenantConfig {
+  /** Default SQLite repository configuration. Ignored when the host registered its own repository. */
+  readonly sqlite?: SQLiteTenantAgentRepositoryConfig
+  /** Use the ephemeral repository instead of SQLite. Intended for tests only. */
+  readonly ephemeral?: boolean
 }
 
-export { MultiTenantService }
-export default MultiTenantService
+/**
+ * Install missing reference providers, then publish `ctx.multiTenant`.
+ * A host replaces any provider by registering the same Cordis service before this plugin.
+ */
+export async function apply(ctx: Context, config: Config = {}): Promise<void> {
+  if (ctx.get('tenantAgentRepository') === undefined) {
+    if (config.ephemeral === true) await ctx.plugin(InMemoryTenantAgentRepository)
+    else await ctx.plugin(SQLiteTenantAgentRepository, config.sqlite)
+  }
+  if (ctx.get('tenantMcp') === undefined) await ctx.plugin(EmptyTenantMcpProvider)
+  if (ctx.get('multiTenantSecrets') === undefined) await ctx.plugin(UnavailableSecretProvider)
+  if (ctx.get('runtimePartitions') === undefined) await ctx.plugin(SharedDshRuntimePartitionProvider)
+  await ctx.plugin(MultiTenantService, {
+    ...(config.minimumIsolation === undefined ? {} : { minimumIsolation: config.minimumIsolation }),
+    ...(config.policyRevision === undefined ? {} : { policyRevision: config.policyRevision }),
+  })
+}
+
+export default apply
+
+export { MultiTenantService } from './service.ts'
+export type { MultiTenantConfig } from './service.ts'
 
 export {
-  defineCapability,
-  assertCapabilityToken,
-  provideCapability,
-  getCapability,
-} from './capability.ts'
+  createPrincipalContext,
+  assertPrincipalContext,
+  parseAgentId,
+} from './types.ts'
 export type {
-  CapabilityScope,
-  CapabilityToken,
-  CapabilityValue,
-} from './capability.ts'
+  AgentId,
+  PrincipalContext,
+  PrincipalIdentity,
+  TenantAgent,
+  TenantAgentRecord,
+  AgentRecordState,
+  AgentRecordTransition,
+  CreateAgentOptions,
+  IsolationLevel,
+} from './types.ts'
 
+export { TenantAgentRepository, InMemoryTenantAgentRepository } from './repository.ts'
 export {
-  TenantRuntimeService,
-  MultiTenantRuntimeError,
-  RuntimeDefinitionConflictError,
-  RuntimeRegistryClosedError,
-  runtimeIdentityOf,
-  tenantIdOf,
-  principalOf,
-} from './runtime.ts'
+  SecretProvider,
+  RuntimePartitionProvider,
+} from './protocols.ts'
 export type {
-  TenantIdentity,
-  RuntimeContextIdentity,
-  RuntimeScopeState,
-  RuntimeScopeSetupCommit,
-  RuntimeScopePreparation,
-  RuntimeScopeSetup,
-  RuntimeScopeDefinition,
-  RuntimeScope,
-  RuntimeScopeRegistry,
-  TenantRuntimeScope,
-  PrincipalRuntimeScope,
-  TenantScopeDefinition,
-  PrincipalScopeDefinition,
-} from './runtime.ts'
+  PrincipalProvider,
+  SecretLease,
+  TenantAgentRuntime,
+  ExecuteToolOptions,
+  DshRuntimeDriver,
+  DshRuntimeAgentHandle,
+  DshAgentSpecification,
+  RuntimePartitionRequest,
+  RuntimePartitionLease,
+} from './protocols.ts'
+export {
+  StaticSecretProvider,
+  UnavailableSecretProvider,
+} from './secrets.ts'
+export type { StaticSecretProviderConfig } from './secrets.ts'
+export { SharedDshRuntimePartitionProvider } from './runtime-driver.ts'
 
 export {
-  PrincipalOperationError,
-  OperationRegistryClosedError,
-  OperationDependencyUnavailableError,
-  OperationCancelledError,
-} from './operation.ts'
-export type {
-  PrincipalOperationState,
-  PrincipalOperationIdentity,
-  OperationScopeSetupCommit,
-  OperationScopePreparation,
-  OperationScopeSetup,
-  OperationScopeDefinition,
-  OperationCapabilitySnapshot,
-  PrincipalOperationExecution,
-  PrincipalOperationDefinition,
-  PrincipalOperation,
-  PrincipalOperationRegistry,
-} from './operation.ts'
-
-export {
-  compileSaaSDefinition,
-  bootstrapDeploymentComposition,
-  tenantDefinitionFromPlan,
-  principalDefinitionFromPlan,
-  operationDefinitionFromPlan,
-  CompositionError,
-  DuplicateCapabilityError,
-  DuplicateProviderDefinitionError,
-  UnknownCapabilityError,
-  MissingCapabilityProviderError,
-  AmbiguousCapabilityProviderError,
-  InvalidProviderSelectionError,
-  CapabilityScopeMismatchError,
-  CapabilityDependencyError,
-  CapabilityDependencyVisibilityError,
-  CapabilityDependencyCycleError,
-  CapabilityProviderUnavailableError,
-} from './composition.ts'
-export type {
-  CapabilityDefinition,
-  CapabilityProviderSetupCommit,
-  CapabilityProviderPreparation,
-  CapabilityProviderSetup,
-  CapabilityProviderDefinition,
-  CapabilityProviderSelection,
-  SaaSDefinition,
-  PlannedCapability,
-  PlannedProvider,
-  CompositionScopeFingerprints,
-  CompositionPlan,
-  DeploymentComposition,
-} from './composition.ts'
-
-export {
-  materializeRuntimeComposition,
-  RuntimeCompositionError,
-  RuntimeCompositionConflictError,
-  RuntimeCompositionClosedError,
-  RuntimeCompositionCapabilityError,
-} from './runtime-composition.ts'
-export type {
-  RuntimeCompositionAttestation,
-  RuntimeCompositionOperationDefinition,
-  ComposedOperationRegistry,
-  ComposedPrincipal,
-  ComposedPrincipalRegistry,
-  ComposedTenant,
-  ComposedTenantRegistry,
-  RuntimeComposition,
-} from './runtime-composition.ts'
-
-export { createProductIngress } from './ingress.ts'
-export type { ProductIdentityResolver, ProductIngress } from './ingress.ts'
-
-export {
-  principalCredentials,
-  InMemoryPrincipalCredentials,
-  CredentialUnavailableError,
-  definePrincipalCredentialsProvider,
-} from './credentials.ts'
-export type {
-  PrincipalCredentials,
-  PrincipalCredentialsFactoryPreparation,
-  PrincipalCredentialsProviderOptions,
-} from './credentials.ts'
-
-export {
-  tenantMcpConfig,
-  normalizeTenantMcpConfig,
-  defineTenantMcpConfigProvider,
-  runtimeMcpServerName,
-  createMcpAgentIntegration,
-  McpIntegrationError,
-  McpIntegrationDependencyError,
-  McpAgentServiceUnavailableError,
+  TenantMcpProvider,
+  EmptyTenantMcpProvider,
+  StaticTenantMcpProvider,
 } from './mcp.ts'
 export type {
-  McpCredentialBinding,
-  McpReconnectConfig,
+  TenantMcpSnapshot,
+  TenantMcpServer,
   TenantMcpStdioServer,
   TenantMcpHttpServer,
-  TenantMcpServer,
-  TenantMcpConfig,
-  TenantMcpConfigFactoryPreparation,
-  TenantMcpConfigProviderOptions,
-  McpAgentOptions,
-  McpAgentCreateMeta,
-  McpAgentSetupCommit,
-  McpAgentSetup,
-  McpAgentCreateOptions,
-  McpAgentResumeOptions,
-  McpRuntimeServer,
-  McpAgentLike,
-  McpAgentHandle,
-  McpAgentIntegration,
+  McpSecretBinding,
+  McpReconnectConfig,
+  ResolvedMcpServer,
+  StaticTenantMcpProviderConfig,
 } from './mcp.ts'
 
-export { createMcpSaaSRuntime } from './product.ts'
-export type {
-  McpSaaSTenantMcpOptions,
-  McpSaaSCredentialsOptions,
-  McpSaaSRuntimeOptions,
-  McpSaaSPrincipal,
-  McpSaaSRuntime,
-} from './product.ts'
-
-export {
-  mountMcpSaaSWebBridge,
-  readBearerToken,
-  readCookie,
-} from './web.ts'
-export type {
-  TrustedWebSubjectResolver,
-  McpSaaSWebBridgeOptions,
-  McpSaaSWebBridge,
-} from './web.ts'
-
-export {
-  ProductExperienceError,
-  productExperienceError,
-  toProductDiagnostic,
-} from './diagnostics.ts'
-export type {
-  ProductExperienceStage,
-  ProductExperienceErrorCode,
-  ProductDiagnostic,
-} from './diagnostics.ts'
-
-export { TenantSessionStore, InMemoryTenantSessionStore } from './store.ts'
-export type { TenantPrincipal, SessionOwner, ClaimResult } from './types.ts'
 export {
   MultiTenantError,
-  SessionAccessDeniedError,
-  SessionOwnershipConflictError,
   ValidationError,
+  AuthenticationRequiredError,
+  AgentNotFoundError,
+  AgentRecordConflictError,
+  CapabilityUnavailableError,
+  IsolationUnavailableError,
+  AgentProvisioningError,
+  ServiceClosedError,
 } from './errors.ts'

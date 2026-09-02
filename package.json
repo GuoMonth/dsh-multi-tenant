@@ -7,15 +7,12 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "verify": "node scripts/verify-packages.mjs && node scripts/verify-v03.mjs",
-    "probe:dsh": "node scripts/session-genesis-probe.mjs && node scripts/agent-owner-context-probe.mjs",
-    "probe:cordis": "node scripts/cordis-operation-lifecycle-probe.mjs",
-    "probe:mcp": "node scripts/mcp-agent-integration-probe.mjs",
-    "probe:fpe": "node scripts/first-product-experience-probe.mjs",
-    "probe:sqlite": "node scripts/sqlite-session-store-probe.mjs",
-    "probe:platform": "pnpm probe:dsh && pnpm probe:cordis && pnpm probe:mcp",
+    "peers:check": "pnpm peers check",
+    "verify": "node scripts/verify-packages.mjs && node scripts/verify-v04.mjs",
+    "probe:sqlite": "node scripts/sqlite-agent-repository-probe.mjs",
+    "probe:platform": "pnpm --filter dsh-multi-tenant exec vitest run tests/dsh-mcp.integration.test.ts",
     "smoke": "node scripts/artifact-consumer-smoke.mjs --local",
     "release:preflight": "node scripts/release-preflight.mjs",
-    "release:check": "pnpm verify && pnpm release:preflight && pnpm typecheck && pnpm test && pnpm build && pnpm probe:sqlite && pnpm smoke && pnpm probe:platform && pnpm probe:fpe"
+    "release:check": "pnpm verify && pnpm release:preflight && pnpm peers:check && pnpm typecheck && pnpm test && pnpm build && pnpm probe:sqlite && pnpm smoke"
   }
 }
