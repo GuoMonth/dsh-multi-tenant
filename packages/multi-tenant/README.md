@@ -47,6 +47,8 @@ await ctx.multiTenant.delete(principal, agent.id)
 
 `withAgent()` is the only trusted execution entry. Its callback receives `followup`, `steer`, `inject`, `cancel`, `whenIdle`, and `executeTool`; it cannot obtain a DSH session id, Agent handle, Cordis context, or disposer.
 
+The runtime view is intended to be callback-scoped. The unpublished candidate does not yet enforce expiry against a caller that retains that object; [#51](https://github.com/GuoMonth/dsh-multi-tenant/issues/51) is a release blocker for that guarantee.
+
 ## Real MCP configuration
 
 Register host providers before the root plugin. The official `dsh-mcp-client` is loaded inside each unpublished Agent setup, so two Agents may use the same logical `serverName` without hashing it:
@@ -105,7 +107,7 @@ Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tena
 - A configured `strong` minimum fails closed before DSH Agent creation when the provider offers only `logical` isolation.
 - `TenantAgentRepository`, `TenantMcpProvider`, `SecretProvider`, `RuntimePartitionProvider`, and `DshRuntimeDriver` are the host replacement protocols. They compose through Cordis services; there is no second DI system.
 - The bundled shared provider is process-local logical separation. It does not isolate hostile plugins, tools, filesystem access, subprocesses, memory, or network traffic.
-- SQLite is a local/single-node default, not a multi-replica database claim. Replace `TenantAgentRepository` when the deployment requires that property.
+- SQLite is a local, single-node, single-process default. It is not a multi-process or multi-replica ownership claim. Replace `TenantAgentRepository` when the deployment requires a different persistence boundary; enforceable local process ownership is tracked in [#49](https://github.com/GuoMonth/dsh-multi-tenant/issues/49).
 - Delete does not claim physical erasure of DSH persistent logs.
 - No Typert public adapter is shipped because stock Typert does not establish a trusted Principal binding. Keep stock DSH `/api` private/administrative.
 

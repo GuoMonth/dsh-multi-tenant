@@ -4,6 +4,8 @@
 
 Current line: **`dsh-multi-tenant@0.4.0-alpha.1`**, pinned to DSH **`0.1.2-alpha.4`**.
 
+Pre-publication status: the `0.4.0-alpha.1` milestone is open for a correction wave. The current blockers are [#45](https://github.com/GuoMonth/dsh-multi-tenant/issues/45), [#51](https://github.com/GuoMonth/dsh-multi-tenant/issues/51), [#52](https://github.com/GuoMonth/dsh-multi-tenant/issues/52), and [#53](https://github.com/GuoMonth/dsh-multi-tenant/issues/53), followed by the review gate [#48](https://github.com/GuoMonth/dsh-multi-tenant/issues/48). No `0.4` package has been published.
+
 The plugin owns Principal-scoped Agent authorization, a durable SQLite Agent directory, capability leases, and DSH Agent/MCP lifecycle. The host still owns authentication, secret storage, and any strong process/container isolation.
 
 - [Usage and API](./packages/multi-tenant/README.md)

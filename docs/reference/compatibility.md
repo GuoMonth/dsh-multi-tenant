@@ -6,4 +6,4 @@
 
 Supported public subpaths are the package root, `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`. Anything else is private.
 
-Node 22.19 and Node 24 run the same typecheck, tests, build, SQLite restart probe, real DSH/MCP integration, and installed-tarball smoke in CI.
+Node 22.19 and Node 24 run the same typecheck, tests, build, SQLite restart probe, DSH AgentRegistry/official MCP seam integration, and installed-tarball smoke in CI. A full native DSH Agent/session lifecycle test without an overridden Agent factory is a pre-publication requirement tracked by [#45](https://github.com/GuoMonth/dsh-multi-tenant/issues/45).

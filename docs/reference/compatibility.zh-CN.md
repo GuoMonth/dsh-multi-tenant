@@ -6,4 +6,4 @@
 
 支持的公共子路径只有 package root、`/mcp`、`/sqlite`、`/web`、`/testing`、`/starter`；其余内容都是 private。
 
-CI 会在 Node 22.19 和 Node 24 上执行相同的 typecheck、test、build、SQLite restart probe、真实 DSH/MCP integration 和安装后 tarball smoke。
+CI 会在 Node 22.19 和 Node 24 上执行相同的 typecheck、test、build、SQLite restart probe、DSH AgentRegistry/官方 MCP seam integration 和安装后 tarball smoke。不替换 Agent factory 的完整原生 DSH Agent/session 生命周期测试是发布前要求，由 [#45](https://github.com/GuoMonth/dsh-multi-tenant/issues/45) 跟踪。

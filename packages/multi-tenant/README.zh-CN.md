@@ -44,6 +44,8 @@ await ctx.multiTenant.delete(principal, agent.id)
 
 `withAgent()` 是唯一可信运行入口。回调只有 `followup/steer/inject/cancel/whenIdle/executeTool`，拿不到 DSH session id、原始 Agent handle、Cordis context 或 disposer。
 
+runtime view 的设计语义是 callback-scoped。当前尚未发布的候选代码还没有强制阻止调用方在回调结束后继续持有该对象；[#51](https://github.com/GuoMonth/dsh-multi-tenant/issues/51) 是这项保证的发布阻断任务。
+
 ## 真实 MCP
 
 在根插件之前注册宿主 provider。官方 `dsh-mcp-client` 会在 unpublished Agent setup 内加载，因此不同 Agent 可以直接复用同一个逻辑 `serverName`，无需哈希改名：
@@ -97,7 +99,7 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
 - 最低隔离配置为 `strong` 时，共享逻辑 provider 会在创建 DSH Agent 前 fail closed。
 - `TenantAgentRepository`、`TenantMcpProvider`、`SecretProvider`、`RuntimePartitionProvider`、`DshRuntimeDriver` 是宿主替换协议，统一通过 Cordis service 组合。
 - 默认 shared provider 只是进程内逻辑隔离，不能隔离 hostile plugin/tool、filesystem、subprocess、内存或网络。
-- SQLite 是 local/single-node 默认实现，不宣称 multi-replica；需要时替换 Repository。
+- SQLite 默认只支持 local、single-node、single-process，不宣称 multi-process 或 multi-replica ownership；需要不同持久化边界时替换 Repository。本地进程唯一所有权由 [#49](https://github.com/GuoMonth/dsh-multi-tenant/issues/49) 跟踪。
 - 删除不承诺物理擦除 DSH 持久日志。
 - 本版本不提供 Typert 公网 adapter，因为 stock Typert 不能建立可信 Principal 绑定。Stock DSH `/api` 必须保持私有/管理用途。
 
