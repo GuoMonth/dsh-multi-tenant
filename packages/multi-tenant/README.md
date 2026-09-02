@@ -20,7 +20,7 @@ await ctx.plugin(MultiTenant, {
 })
 ```
 
-Set `DSH_MULTI_TENANT_DB_PATH` or `sqlite.path` to change the SQLite file. Existing `0.3` ownership data is deliberately ignored.
+On Unix, the default directory is enforced as `0700` and its database as `0600`, including when they already exist; inability to enforce either mode fails startup. Set `DSH_MULTI_TENANT_DB_PATH` or `sqlite.path` to use a host-managed path. The plugin does not chmod a configured path or its parent: its ACL, backups, and encryption are the host's responsibility. Windows deployments must apply an equivalent host ACL. Existing `0.3` ownership data and unpublished candidate schemas are deliberately not migrated.
 
 ## Minimal API
 

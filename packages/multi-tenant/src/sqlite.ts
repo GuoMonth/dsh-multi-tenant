@@ -1,6 +1,6 @@
 /** Zero-service durable Agent directory backed by Node's built-in SQLite. */
 
-import { mkdirSync } from 'node:fs'
+import { chmodSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { Context } from '@deepseek-ai/cordis'
@@ -36,12 +36,22 @@ export function defaultSQLiteTenantAgentRepositoryPath(cwd = process.cwd()): str
   return join(cwd, DEFAULT_DIRECTORY, DEFAULT_FILENAME)
 }
 
-function databasePath(configured: string | undefined): string {
-  const value = configured ?? process.env.DSH_MULTI_TENANT_DB_PATH ?? defaultSQLiteTenantAgentRepositoryPath()
+interface DatabaseLocation {
+  readonly path: string
+  readonly secureDefault: boolean
+}
+
+function databaseLocation(configured: string | undefined): DatabaseLocation {
+  const environmentPath = process.env.DSH_MULTI_TENANT_DB_PATH
+  const secureDefault = configured === undefined && environmentPath === undefined
+  const value = configured ?? environmentPath ?? defaultSQLiteTenantAgentRepositoryPath()
   if (typeof value !== 'string' || value.length === 0 || value !== value.trim()) {
     throw new TypeError('SQLite Agent repository path must be a non-empty trimmed string')
   }
-  return value === ':memory:' ? value : resolve(value)
+  return {
+    path: value === ':memory:' ? value : resolve(value),
+    secureDefault,
+  }
 }
 
 function busyTimeout(value: number | undefined): number {
@@ -103,10 +113,16 @@ export class SQLiteTenantAgentRepository extends TenantAgentRepository {
 
   constructor(ctx: Context, config: SQLiteTenantAgentRepositoryConfig = {}) {
     super(ctx)
-    this.path = databasePath(config.path)
-    if (this.path !== ':memory:') mkdirSync(dirname(this.path), { recursive: true })
+    const location = databaseLocation(config.path)
+    this.path = location.path
+    if (this.path !== ':memory:') {
+      const directory = dirname(this.path)
+      mkdirSync(directory, { recursive: true, ...(location.secureDefault ? { mode: 0o700 } : {}) })
+      if (location.secureDefault && process.platform !== 'win32') chmodSync(directory, 0o700)
+    }
     const database = new DatabaseSync(this.path)
     try {
+      if (location.secureDefault && process.platform !== 'win32') chmodSync(this.path, 0o600)
       database.exec(`
         PRAGMA busy_timeout = ${busyTimeout(config.busyTimeoutMs)};
         PRAGMA journal_mode = WAL;

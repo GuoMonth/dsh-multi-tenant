@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
@@ -9,6 +9,13 @@ const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const errors = []
 const version = '0.4.0-alpha.1'
 const requiredExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
+
+function filesBelow(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const path = join(directory, entry.name)
+    return entry.isDirectory() ? filesBelow(path) : [path]
+  })
+}
 
 if (pkg.name !== 'dsh-multi-tenant' || pkg.version !== version) errors.push('release identity mismatch')
 if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.tag !== 'alpha' || pkg.publishConfig?.provenance !== true) {
@@ -53,6 +60,21 @@ for (const marker of ["'22.19.0'", "'24'", 'pnpm install --frozen-lockfile', 'pn
 const release = readFileSync(join(root, '.github/workflows/release.yml'), 'utf8')
 for (const marker of ['workflow_dispatch:', 'environment: npm-release', 'actions: read', 'id-token: write', 'Require successful CI for release commit', 'pnpm release:check', 'npm publish --access public --provenance --tag alpha']) {
   if (!release.includes(marker)) errors.push(`manual release workflow missing ${marker}`)
+}
+
+for (const workflow of filesBelow(join(root, '.github/workflows'))
+  .filter(path => path.endsWith('.yml') || path.endsWith('.yaml'))) {
+  const content = readFileSync(workflow, 'utf8')
+  const references = content.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+)/gm)
+  for (const match of references) {
+    const reference = match[1]?.replace(/^['"]|['"]$/g, '') ?? ''
+    if (reference.startsWith('./')) continue
+    const separator = reference.lastIndexOf('@')
+    const revision = separator < 0 ? '' : reference.slice(separator + 1)
+    if (!/^[0-9a-f]{40}$/i.test(revision)) {
+      errors.push(`${workflow.slice(root.length + 1)} has mutable or unpinned uses: ${reference}`)
+    }
+  }
 }
 
 for (const retired of [

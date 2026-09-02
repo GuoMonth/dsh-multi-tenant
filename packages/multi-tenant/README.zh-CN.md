@@ -18,7 +18,7 @@ import * as MultiTenant from 'dsh-multi-tenant'
 await ctx.plugin(MultiTenant, { minimumIsolation: 'logical' })
 ```
 
-可通过 `DSH_MULTI_TENANT_DB_PATH` 或 `sqlite.path` 修改 SQLite 路径。插件不会迁移或读取 `0.3` ownership 数据。
+在 Unix 上，默认目录会被强制设为 `0700`，数据库为 `0600`；已有路径也会收紧，无法设置权限时启动失败。通过 `DSH_MULTI_TENANT_DB_PATH` 或 `sqlite.path` 指定的路径由宿主管理，插件不会 chmod 该路径或父目录；ACL、备份和加密由宿主负责。Windows 部署必须由宿主配置等价 ACL。插件不会迁移 `0.3` ownership 数据或未发布候选 schema。
 
 ## 最小 API
 
