@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
 const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const errors = []
-const version = '0.4.0-alpha.1'
+const version = '0.4.0-alpha.2'
 const requiredExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
 
 function filesBelow(directory) {
@@ -37,7 +37,16 @@ for (const [path, markers] of Object.entries({
   'docs/reference/compatibility.zh-CN.md': [version, '0.1.2-alpha.5', './cordis.patch.yml'],
   'docs/reference/release.md': [version, 'pnpm release:check'],
   'docs/reference/release.zh-CN.md': [version, 'pnpm release:check'],
-  [`docs/releases/v${version}.md`]: [version, '## Retrospective', '## Explicit limits'],
+  [`docs/releases/v${version}.md`]: [
+    version,
+    '## Abandoned provisioning',
+    '## Cooperative provider lifecycle',
+    'issues/49',
+    'issues/50',
+    'issues/54',
+    '## Explicit limits',
+    '## 中文复盘',
+  ],
 })) {
   const absolute = join(root, path)
   if (!existsSync(absolute)) {

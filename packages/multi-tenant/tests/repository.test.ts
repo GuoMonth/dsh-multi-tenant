@@ -69,6 +69,53 @@ describe('TenantAgentRepository contract', () => {
     }
   })
 
+  it('atomically reconciles abandoned provisioning before a restarted repository is exposed', async () => {
+    const path = await temporaryDatabase()
+    const owner = { tenantId: 'acme', principalId: 'alice' }
+    const abandoned = input('abandoned')
+    const ready = input('ready')
+    const failed = input('failed')
+    const first = new Context()
+    const firstRepository = new SQLiteTenantAgentRepository(first, { path })
+    await firstRepository.insert(abandoned)
+    await firstRepository.insert(ready)
+    await firstRepository.insert(failed)
+    await firstRepository.transition(owner, ready.id, 0, {
+      from: 'provisioning', to: 'ready', at: '2026-01-02T00:00:00.000Z',
+    })
+    await firstRepository.transition(owner, failed.id, 0, {
+      from: 'provisioning', to: 'failed', at: '2026-01-03T00:00:00.000Z',
+    })
+    await first.fiber.dispose()
+
+    const second = new Context()
+    try {
+      const repository = new SQLiteTenantAgentRepository(second, { path })
+      const records = await repository.list(owner)
+      expect(records.find(record => record.id === abandoned.id)).toEqual(expect.objectContaining({
+        state: 'failed', revision: 1, sessionId: 'internal-abandoned',
+      }))
+      expect(records.find(record => record.id === ready.id)).toEqual(expect.objectContaining({
+        state: 'ready', revision: 1, updatedAt: '2026-01-02T00:00:00.000Z',
+      }))
+      expect(records.find(record => record.id === failed.id)).toEqual(expect.objectContaining({
+        state: 'failed', revision: 1, updatedAt: '2026-01-03T00:00:00.000Z',
+      }))
+
+      const inspection = new DatabaseSync(path)
+      try {
+        const plan = inspection.prepare(
+          "EXPLAIN QUERY PLAN SELECT agent_id FROM tenant_agents_v04 WHERE state = 'provisioning'",
+        ).all()
+        expect(JSON.stringify(plan)).toContain('tenant_agents_v04_provisioning')
+      } finally {
+        inspection.close()
+      }
+    } finally {
+      await second.fiber.dispose()
+    }
+  })
+
   it('uses database CAS across competing SQLite connections', async () => {
     const path = await temporaryDatabase()
     const owner = { tenantId: 'acme', principalId: 'alice' }

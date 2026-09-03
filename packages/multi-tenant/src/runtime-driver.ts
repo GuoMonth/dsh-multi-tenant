@@ -33,7 +33,7 @@ function requireService<T extends object>(ctx: Context, key: string): T {
 function setupMcp(specification: DshAgentSpecification): (ctx: Context) => Promise<void> {
   return async (agentCtx) => {
     for (const server of specification.mcpServers) {
-      specification.signal?.throwIfAborted()
+      specification.signal.throwIfAborted()
       await agentCtx.plugin(McpClient, server as McpClient.Config)
     }
   }
@@ -84,7 +84,7 @@ class SharedDshRuntimeDriver implements DshRuntimeDriver {
     mode: 'create' | 'resume',
     specification: DshAgentSpecification,
   ): Promise<DshRuntimeAgentHandle> {
-    specification.signal?.throwIfAborted()
+    specification.signal.throwIfAborted()
     const common = {
       signal: specification.signal,
       setup: setupMcp(specification),
@@ -116,7 +116,7 @@ export class SharedDshRuntimePartitionProvider extends RuntimePartitionProvider 
   }
 
   override async acquire(request: RuntimePartitionRequest): Promise<RuntimePartitionLease> {
-    request.signal?.throwIfAborted()
+    request.signal.throwIfAborted()
     return Object.freeze({
       isolation: 'logical' as const,
       driver: this.driver,

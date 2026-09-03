@@ -12,7 +12,14 @@ const path = join(directory, 'agents.sqlite')
 const moduleUrl = pathToFileURL(join(packageDirectory, 'dist/sqlite.mjs')).href
 const cordisUrl = pathToFileURL(join(packageDirectory, 'node_modules/@deepseek-ai/cordis/lib/index.js')).href
 const agentId = '123e4567-e89b-42d3-a456-426614174000'
-const common = { ...process.env, DSH_MT_DB: path, DSH_MT_MODULE: moduleUrl, DSH_MT_AGENT: agentId }
+const abandonedId = '123e4567-e89b-42d3-a456-426614174001'
+const common = {
+  ...process.env,
+  DSH_MT_DB: path,
+  DSH_MT_MODULE: moduleUrl,
+  DSH_MT_AGENT: agentId,
+  DSH_MT_ABANDONED: abandonedId,
+}
 
 const run = source => execFileSync(process.execPath, ['--input-type=module', '-e', source], {
   cwd: packageDirectory,
@@ -37,6 +44,12 @@ try {
       from: 'provisioning', to: 'ready', at: '2026-01-01T00:00:01.000Z',
     })
     if (ready?.state !== 'ready') throw new Error('first process did not publish ready record')
+    await repository.insert({
+      id: process.env.DSH_MT_ABANDONED,
+      tenantId: 'acme', principalId: 'alice', sessionId: 'internal-abandoned-proof',
+      capabilityRevision: 'c-abandoned', mcpServers: ['abandoned'],
+      createdAt: '2026-01-01T00:00:02.000Z',
+    })
     await ctx.fiber.dispose()
   `)
   if (process.platform !== 'win32') {
@@ -51,6 +64,11 @@ try {
     const owner = { tenantId: 'acme', principalId: 'alice' }
     const ready = await repository.get(owner, process.env.DSH_MT_AGENT)
     if (ready?.sessionId !== 'internal-restart-proof') throw new Error('restart lost internal session')
+    const abandoned = await repository.get(owner, process.env.DSH_MT_ABANDONED)
+    if (abandoned?.state !== 'failed' || abandoned.revision !== 1
+      || abandoned.sessionId !== 'internal-abandoned-proof') {
+      throw new Error('restart did not deterministically fail abandoned provisioning')
+    }
     if (await repository.get({ tenantId: 'acme', principalId: 'bob' }, process.env.DSH_MT_AGENT)) {
       throw new Error('cross-Principal lookup succeeded')
     }
@@ -103,7 +121,7 @@ try {
       throw new Error('default SQLite database is not mode 0600')
     }
   }
-  console.log('SQLite Agent directory probe passed restart, CAS boundary, and default permission checks')
+  console.log('SQLite Agent directory probe passed restart recovery, CAS boundary, and default permission checks')
 } finally {
   rmSync(directory, { recursive: true, force: true })
 }

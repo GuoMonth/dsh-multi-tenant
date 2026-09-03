@@ -16,7 +16,12 @@ export function emptySecretLease(): SecretLease {
 }
 
 export class UnavailableSecretProvider extends SecretProvider {
-  override async acquire(): Promise<SecretLease> {
+  override async acquire(
+    _principal: PrincipalContext,
+    _names: readonly string[],
+    signal: AbortSignal,
+  ): Promise<SecretLease> {
+    signal.throwIfAborted()
     throw new CapabilityUnavailableError('This deployment has no SecretProvider.')
   }
 }
@@ -37,7 +42,12 @@ export class StaticSecretProvider extends SecretProvider {
     this.values = Object.freeze({ ...(config.values ?? {}) })
   }
 
-  override async acquire(_principal: PrincipalContext, names: readonly string[]): Promise<SecretLease> {
+  override async acquire(
+    _principal: PrincipalContext,
+    names: readonly string[],
+    signal: AbortSignal,
+  ): Promise<SecretLease> {
+    signal.throwIfAborted()
     const values: Record<string, string> = {}
     for (const name of names) {
       const value = this.values[name]

@@ -29,7 +29,8 @@ import type { AgentId, PrincipalContext } from '../src/types.ts'
 const fixture = fileURLToPath(new URL('./fixtures/mcp-server.mjs', import.meta.url))
 
 class PrincipalMcpProvider extends TenantMcpProvider {
-  override async load(principal: PrincipalContext): Promise<TenantMcpSnapshot> {
+  override async load(principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot> {
+    signal.throwIfAborted()
     return {
       revision: 'fixture-v1',
       servers: [{
@@ -50,7 +51,12 @@ class PrincipalMcpProvider extends TenantMcpProvider {
 }
 
 class PrincipalSecretProvider extends SecretProvider {
-  override async acquire(principal: PrincipalContext): Promise<SecretLease> {
+  override async acquire(
+    principal: PrincipalContext,
+    _names: readonly string[],
+    signal: AbortSignal,
+  ): Promise<SecretLease> {
+    signal.throwIfAborted()
     return {
       revision: `secret:${principal.tenantId}:${principal.principalId}`,
       values: { 'api-token': `${principal.tenantId}/${principal.principalId}` },

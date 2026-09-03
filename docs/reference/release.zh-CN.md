@@ -1,13 +1,13 @@
 # 发布检查
 
-当前候选版本是 npm `alpha` tag 下的 `dsh-multi-tenant@0.4.0-alpha.1`。
+当前候选版本是 npm `alpha` tag 下的 `dsh-multi-tenant@0.4.0-alpha.2`。
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm release:check
 ```
 
-`release:check` 会验证 `0.4` 公共面和精确 DSH target、release metadata、peer dependency 一致性、类型声明、unit/contract/Web/真实 MCP 测试、build 产物、跨进程 SQLite restart、Secret 泄漏探针，以及全新安装 tarball 的 consumer。
+`release:check` 会验证 `0.4` 公共面和精确 DSH target、release metadata、peer dependency 一致性、类型声明、unit/contract/Web/真实 MCP 测试、build 产物、SQLite restart 与遗留 provisioning 恢复、lifecycle abort、Secret 泄漏探针，以及带 provider contract typecheck 的全新安装 tarball consumer。
 
 CI 在 Node 22.19 和 Node 24 上重复执行，并单独 checkout DSH commit `db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5` 核对源码身份。
 

@@ -62,8 +62,62 @@ try {
     `@deepseek-ai/dsh-mcp-client@${DSH_TARGET.version}`,
     `@deepseek-ai/dsh-session@${DSH_TARGET.version}`,
     `@deepseek-ai/dsh-tools@${DSH_TARGET.version}`,
+    'typescript@6.0.3',
     packageSpec,
   ], { cwd: consumer, stdio: 'ignore' })
+
+  writeFileSync(join(consumer, 'tsconfig.json'), JSON.stringify({
+    compilerOptions: {
+      target: 'ES2024', module: 'NodeNext', moduleResolution: 'NodeNext',
+      strict: true, noEmit: true, skipLibCheck: true,
+    },
+    include: ['provider-contract.ts'],
+  }))
+  writeFileSync(join(consumer, 'provider-contract.ts'), `
+    import {
+      RuntimePartitionProvider, SecretProvider, TenantMcpProvider,
+      type DshAgentSpecification, type PrincipalContext,
+      type RuntimePartitionLease, type RuntimePartitionRequest, type SecretLease,
+      type TenantMcpSnapshot,
+    } from 'dsh-multi-tenant'
+
+    export class McpProvider extends TenantMcpProvider {
+      async load(_principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot> {
+        signal.throwIfAborted()
+        return { revision: 'consumer-v1', servers: [] }
+      }
+    }
+    export class Secrets extends SecretProvider {
+      async acquire(
+        _principal: PrincipalContext,
+        _names: readonly string[],
+        signal: AbortSignal,
+      ): Promise<SecretLease> {
+        signal.throwIfAborted()
+        return { revision: 'consumer-v1', values: {}, signal, dispose() {} }
+      }
+    }
+    export class Partitions extends RuntimePartitionProvider {
+      async acquire(request: RuntimePartitionRequest): Promise<RuntimePartitionLease> {
+        request.signal.throwIfAborted()
+        return {
+          isolation: 'logical',
+          driver: {
+            async create(specification: DshAgentSpecification) {
+              specification.signal.throwIfAborted()
+              throw new Error('type-only consumer')
+            },
+            async resume(specification: DshAgentSpecification) {
+              specification.signal.throwIfAborted()
+              throw new Error('type-only consumer')
+            },
+          },
+          dispose() {},
+        }
+      }
+    }
+  `)
+  execFileSync('pnpm', ['exec', 'tsc'], { cwd: consumer, stdio: 'ignore' })
 
   writeFileSync(join(consumer, 'smoke.mjs'), `
     import { Context } from '@deepseek-ai/cordis'

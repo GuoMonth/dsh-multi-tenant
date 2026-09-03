@@ -2,12 +2,12 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.4.0-alpha.1` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 `@deepseek-ai/*@0.1.2-alpha.5`。
+`dsh-multi-tenant@0.4.0-alpha.2` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 `@deepseek-ai/*@0.1.2-alpha.5`。
 
 ## 安装
 
 ```bash
-pnpm add dsh-multi-tenant@0.4.0-alpha.1
+pnpm add dsh-multi-tenant@0.4.0-alpha.2
 ```
 
 在 DSH 的 `agents` 和 `tools` service 之后加载。宿主没有提供替代实现时，插件使用 `.dsh-multi-tenant/agents.sqlite`、空 MCP 声明和 DSH 进程内 shared runtime：
@@ -19,6 +19,8 @@ await ctx.plugin(MultiTenant, { minimumIsolation: 'logical' })
 ```
 
 在 Unix 上，默认目录会被强制设为 `0700`，数据库为 `0600`；已有路径也会收紧，无法设置权限时启动失败。通过 `DSH_MULTI_TENANT_DB_PATH` 或 `sqlite.path` 指定的路径由宿主管理，插件不会 chmod 该路径或父目录；ACL、备份和加密由宿主负责。Windows 部署必须由宿主配置等价 ACL。插件不会迁移 `0.3` ownership 数据或未发布候选 schema。
+
+内置 SQLite Repository 打开时，会在 service 安装前原子地把所有遗留 `provisioning` 转为终态 `failed`，完成 [#49](https://github.com/GuoMonth/dsh-multi-tenant/issues/49)。这些资源在产品 API 中仍是 not-found，永远不会 resume；重试会获得全新的 Agent 和 session identity。该行为假定宿主保证此数据库只有一个活动进程。
 
 ## 最小 API
 
@@ -72,6 +74,16 @@ await ctx.plugin(MultiTenant)
 
 Static provider 只用于开发。生产宿主通常实现 `TenantMcpProvider` 和 `SecretProvider`；`SecretLease` 的 value 只在内存中，同时提供 revision、撤销 signal 和 disposer。撤销会 cancel/dispose 当前 live Agent；下次授权使用会获取新 lease，并用同一内部 session resume。
 
+宿主 provider acquisition 会收到必填 lifecycle signal，完成 [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50)。MCP 和 Secret provider 接收 service signal；runtime partition 和 DSH driver 接收它与 SecretLease revoke signal 的组合：
+
+```ts
+load(principal, signal: AbortSignal): Promise<TenantMcpSnapshot>
+acquire(principal, names, signal: AbortSignal): Promise<SecretLease>
+acquire({ principal, agentId, requiredIsolation, signal }): Promise<RuntimePartitionLease>
+```
+
+Provider 应在工作前检查 signal、在可行时及时停止、提供稳定 revision，并保证 dispose 幂等。插件会在 DSH 工作前校验并冻结 provider 返回的能力视图。Abort 仍是合作式协议，不能强制终止任意宿主代码。
+
 ## Web adapter
 
 `dsh-multi-tenant/web` 使用现有 DSH `ctx.webServer.register()` 挂载认证后的 CRUD：
@@ -104,11 +116,11 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
 - SQLite 使用 CAS revision 和 Principal-scoped SQL；已授权删除会立即使 active callback view 失效并预留串行屏障，后发 `withAgent()` 不能越过删除，只会在已清理的 tombstone 提交后得到 not-found。
 - DSH setup 和数据库 ready transition 都成功后，Agent 才会公开。
 - 每个 Agent 的 create/resume/refresh/delete 串行；并发打开 single-flight；插件关闭会 cancel 并 drain 全部 handle。
-- Alpha.1 的 drain 是 cooperative 的：永不结束的 callback 或宿主 provider acquisition 可能无限延迟 delete/shutdown。Lifecycle abort 传递和 provider 契约验证继续由 [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) 跟踪；强制中断和任意默认 timeout 不在范围内。
+- Alpha.2 会把 lifecycle abort 传入 MCP、Secret、RuntimePartition 和 DSH setup，并在使用前校验 provider 结果。Drain 仍是 cooperative 的：忽略 abort 或永不结束的代码可能无限延迟 delete/shutdown；强制中断和任意默认 timeout 不在范围内。
 - 最低隔离配置为 `strong` 时，共享逻辑 provider 会在创建 DSH Agent 前 fail closed。
 - `TenantAgentRepository`、`TenantMcpProvider`、`SecretProvider`、`RuntimePartitionProvider`、`DshRuntimeDriver` 是宿主替换协议，统一通过 Cordis service 组合。
 - 默认 shared provider 只是进程内逻辑隔离，不能隔离 hostile plugin/tool、filesystem、subprocess、内存或网络。
-- SQLite 默认只支持 local、single-node、single-active-process；宿主部署必须维持这个约束，插件不会用 lock、heartbeat 或 fencing 强制证明。[#49](https://github.com/GuoMonth/dsh-multi-tenant/issues/49) 只在该受支持拓扑内增加确定性的遗留 provisioning 恢复。需要多进程协调或不同持久化边界时替换 `TenantAgentRepository`。
+- SQLite 默认只支持 local、single-node、single-active-process；宿主部署必须维持这个约束，插件不会用 lock、heartbeat 或 fencing 强制证明。启动时会在 Agent 操作前确定性地失败遗留 provisioning。自定义 `TenantAgentRepository` 必须在注册前完成其拓扑需要的恢复；需要多进程协调或不同持久化边界时应替换该实现。
 - 删除不承诺物理擦除 DSH 持久日志。
 - 本版本不提供 Typert 公网 adapter，因为 stock Typert 不能建立可信 Principal 绑定。Stock DSH `/api` 必须保持私有/管理用途。
 

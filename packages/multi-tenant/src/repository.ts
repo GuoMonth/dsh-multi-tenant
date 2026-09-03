@@ -32,6 +32,16 @@ export abstract class TenantAgentRepository extends Service {
   ): Promise<TenantAgentRecord | undefined>
 }
 
+export function assertLegalAgentRecordTransition(value: unknown): asserts value is AgentRecordTransition {
+  if (typeof value === 'object' && value !== null) {
+    const from = Reflect.get(value, 'from')
+    const to = Reflect.get(value, 'to')
+    if ((from === 'provisioning' && (to === 'ready' || to === 'failed'))
+      || (from === 'ready' && (to === 'ready' || to === 'deleted'))) return
+  }
+  throw new TypeError('Illegal Agent record transition.')
+}
+
 function clone(record: TenantAgentRecord): TenantAgentRecord {
   return Object.freeze({
     ...record,
@@ -48,7 +58,10 @@ function initial(record: NewTenantAgentRecord): TenantAgentRecord {
   })
 }
 
-/** Hermetic provider used by tests and explicitly ephemeral deployments. */
+/**
+ * Hermetic provider used by tests and explicitly ephemeral deployments.
+ * Persistent replacements must finish topology-specific recovery before registration.
+ */
 export class InMemoryTenantAgentRepository extends TenantAgentRepository {
   private readonly records = new Map<AgentId, TenantAgentRecord>()
   private readonly sessions = new Set<string>()
@@ -84,6 +97,7 @@ export class InMemoryTenantAgentRepository extends TenantAgentRepository {
     expectedRevision: number,
     transition: AgentRecordTransition,
   ): Promise<TenantAgentRecord | undefined> {
+    assertLegalAgentRecordTransition(transition)
     const current = this.records.get(id)
     if (current === undefined
       || current.tenantId !== principal.tenantId

@@ -7,7 +7,7 @@ import { DSH_TARGET } from './dsh-target.mjs'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
 const errors = []
-const expectedVersion = '0.4.0-alpha.1'
+const expectedVersion = '0.4.0-alpha.2'
 const expectedDsh = '0.1.2-alpha.5'
 const expectedCommit = 'db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5'
 const expectedExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
@@ -77,6 +77,25 @@ const sourceFiles = [
 for (const [path, source] of sourceFiles) {
   for (const retired of ['TenantSessionStore', 'RuntimeComposition', 'CapabilityToken']) {
     if (source.includes(retired)) errors.push(`${path}: contains retired symbol ${retired}`)
+  }
+}
+
+for (const [path, markers] of Object.entries({
+  'packages/multi-tenant/src/service.ts': ['AbortSignal.any([lifecycle, secret.signal])'],
+  'packages/multi-tenant/src/provider-results.ts': [
+    'normalizeSecretLease',
+    'normalizeRuntimePartition',
+    'normalizeRuntimeHandle',
+  ],
+  'packages/multi-tenant/src/sqlite.ts': [
+    'tenant_agents_v04_provisioning',
+    "SET state = 'failed', revision = revision + 1",
+  ],
+  'packages/multi-tenant/src/repository.ts': ['assertLegalAgentRecordTransition'],
+})) {
+  const source = readFileSync(join(root, path), 'utf8')
+  for (const marker of markers) {
+    if (!source.includes(marker)) errors.push(`${path}: missing alpha.2 invariant ${marker}`)
   }
 }
 

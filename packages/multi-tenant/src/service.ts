@@ -16,6 +16,12 @@ import {
   type TenantMcpProvider,
   type TenantMcpSnapshot,
 } from './mcp.ts'
+import {
+  normalizeAcquired,
+  normalizeRuntimeHandle,
+  normalizeRuntimePartition,
+  normalizeSecretLease,
+} from './provider-results.ts'
 import type {
   RuntimePartitionLease,
   RuntimePartitionProvider,
@@ -54,6 +60,7 @@ interface PreparedCapabilities {
   readonly snapshot: TenantMcpSnapshot
   readonly secret: SecretLease
   readonly partition: RuntimePartitionLease
+  readonly signal: AbortSignal
   readonly capabilityRevision: string
 }
 
@@ -150,6 +157,7 @@ async function settleDisposers(disposers: Array<() => void | PromiseLike<void>>,
 
 export class MultiTenantService extends Service {
   private readonly minimumIsolation: IsolationLevel
+  private readonly lifecycle = new AbortController()
   private readonly live = new Map<AgentId, LiveAgent>()
   private readonly tails = new Map<AgentId, Promise<void>>()
   private accepting = true
@@ -176,6 +184,7 @@ export class MultiTenantService extends Service {
       let record: TenantAgentRecord | undefined
       let handle: DshRuntimeAgentHandle | undefined
       try {
+        prepared.signal.throwIfAborted()
         const resolved = resolveMcpServers(prepared.snapshot, prepared.secret)
         record = await this.repository.insert({
           id,
@@ -186,13 +195,13 @@ export class MultiTenantService extends Service {
           mcpServers: prepared.snapshot.servers.map(server => server.serverName),
           createdAt: now,
         })
-        handle = await prepared.partition.driver.create({
+        handle = await normalizeAcquired(await prepared.partition.driver.create({
           sessionId,
           mcpServers: resolved,
-          signal: prepared.secret.signal,
+          signal: prepared.signal,
           ...normalized,
-        })
-        prepared.secret.signal.throwIfAborted()
+        }), normalizeRuntimeHandle)
+        prepared.signal.throwIfAborted()
         const ready = await this.repository.transition(principal, id, record.revision, {
           from: 'provisioning',
           to: 'ready',
@@ -215,6 +224,7 @@ export class MultiTenantService extends Service {
         ]
         if (handle !== undefined) cleanup.unshift(() => handle!.dispose())
         await settleDisposers(cleanup, 'failed Agent provisioning cleanup failed').catch(() => undefined)
+        if (this.lifecycle.signal.aborted) throw new ServiceClosedError()
         if (error instanceof CapabilityUnavailableError || error instanceof IsolationUnavailableError) throw error
         if (prepared.secret.signal.aborted) throw new CapabilityUnavailableError('Agent capabilities were revoked.')
         throw new AgentProvisioningError({ cause: error })
@@ -287,6 +297,7 @@ export class MultiTenantService extends Service {
   close(): Promise<void> {
     if (this.closing !== undefined) return this.closing
     this.accepting = false
+    this.lifecycle.abort(new ServiceClosedError())
     for (const entry of this.live.values()) this.invalidateLive(entry, 'multi-tenant service disposed')
     this.closing = (async () => {
       await Promise.allSettled([...this.tails.values()])
@@ -342,35 +353,52 @@ export class MultiTenantService extends Service {
   }
 
   private async prepareCapabilities(principal: PrincipalContext, id: AgentId): Promise<PreparedCapabilities> {
+    this.assertLifecycle()
+    const lifecycle = this.lifecycle.signal
     let snapshot: TenantMcpSnapshot
     try {
-      snapshot = normalizeTenantMcpSnapshot(await this.mcp.load(principal))
+      snapshot = normalizeTenantMcpSnapshot(await this.mcp.load(principal, lifecycle))
+      this.assertLifecycle()
     } catch (error) {
+      if (lifecycle.aborted) throw new ServiceClosedError()
       if (error instanceof CapabilityUnavailableError) throw error
       throw new CapabilityUnavailableError('Tenant MCP configuration is unavailable.', { cause: error })
     }
     const names = requiredSecretNames(snapshot)
     let secret: SecretLease
     try {
-      secret = names.length === 0 ? emptySecretLease() : await this.secrets.acquire(principal, names)
+      secret = names.length === 0
+        ? normalizeSecretLease(emptySecretLease())
+        : await normalizeAcquired(
+          await this.secrets.acquire(principal, names, lifecycle),
+          normalizeSecretLease,
+        )
+      this.assertLifecycle()
     } catch (error) {
+      if (lifecycle.aborted) throw new ServiceClosedError()
       if (error instanceof CapabilityUnavailableError) throw error
       throw new CapabilityUnavailableError('Required Agent secrets are unavailable.', { cause: error })
     }
+    const signal = AbortSignal.any([lifecycle, secret.signal])
     let partition: RuntimePartitionLease | undefined
     try {
-      secret.signal.throwIfAborted()
-      partition = await this.partitions.acquire({
-        principal,
-        agentId: id,
-        requiredIsolation: this.minimumIsolation,
-        signal: secret.signal,
-      })
+      signal.throwIfAborted()
+      partition = await normalizeAcquired(
+        await this.partitions.acquire({
+          principal,
+          agentId: id,
+          requiredIsolation: this.minimumIsolation,
+          signal,
+        }),
+        normalizeRuntimePartition,
+      )
+      signal.throwIfAborted()
       if (!meets(partition.isolation, this.minimumIsolation)) throw new IsolationUnavailableError()
       return {
         snapshot,
         secret,
         partition,
+        signal,
         capabilityRevision: capabilityRevision(snapshot, secret, partition.isolation),
       }
     } catch (error) {
@@ -378,6 +406,8 @@ export class MultiTenantService extends Service {
       if (partition !== undefined) cleanup.push(() => partition!.dispose())
       cleanup.push(() => secret.dispose())
       await settleDisposers(cleanup, 'capability preparation cleanup failed').catch(() => undefined)
+      if (lifecycle.aborted) throw new ServiceClosedError()
+      if (secret.signal.aborted) throw new CapabilityUnavailableError('Agent capabilities were revoked.')
       if (error instanceof CapabilityUnavailableError || error instanceof IsolationUnavailableError) throw error
       throw new CapabilityUnavailableError('A runtime partition is unavailable.', { cause: error })
     }
@@ -398,12 +428,12 @@ export class MultiTenantService extends Service {
     if (current !== undefined) await this.disposeLive(record.id)
     let handle: DshRuntimeAgentHandle | undefined
     try {
-      handle = await prepared.partition.driver.resume({
+      handle = await normalizeAcquired(await prepared.partition.driver.resume({
         sessionId: record.sessionId,
         mcpServers: resolveMcpServers(prepared.snapshot, prepared.secret),
-        signal: prepared.secret.signal,
-      })
-      prepared.secret.signal.throwIfAborted()
+        signal: prepared.signal,
+      }), normalizeRuntimeHandle)
+      prepared.signal.throwIfAborted()
       const updated = await this.repository.transition(principal, record.id, record.revision, {
         from: 'ready',
         to: 'ready',
@@ -420,6 +450,7 @@ export class MultiTenantService extends Service {
       ]
       if (handle !== undefined) cleanup.unshift(() => handle!.dispose())
       await settleDisposers(cleanup, 'failed Agent resume cleanup failed').catch(() => undefined)
+      if (this.lifecycle.signal.aborted) throw new ServiceClosedError()
       if (error instanceof AgentNotFoundError || error instanceof CapabilityUnavailableError) throw error
       if (prepared.secret.signal.aborted) throw new CapabilityUnavailableError('Agent capabilities were revoked.')
       throw new AgentProvisioningError({ cause: error })
@@ -451,6 +482,10 @@ export class MultiTenantService extends Service {
     this.live.set(id, entry)
     if (prepared.secret.signal.aborted) revoked()
     return entry
+  }
+
+  private assertLifecycle(): void {
+    if (this.lifecycle.signal.aborted) throw new ServiceClosedError()
   }
 
   private invalidateLive(entry: LiveAgent, reason: string): void {

@@ -68,13 +68,17 @@ export interface NewTenantAgentRecord {
   readonly createdAt: string
 }
 
-export interface AgentRecordTransition {
-  readonly from: AgentRecordState
-  readonly to: AgentRecordState
+interface AgentRecordTransitionBase {
   readonly capabilityRevision?: string
   readonly mcpServers?: readonly string[]
   readonly at: string
 }
+
+/** The complete legal state graph for plugin-owned Agent records. */
+export type AgentRecordTransition = AgentRecordTransitionBase & (
+  | { readonly from: 'provisioning'; readonly to: 'ready' | 'failed' }
+  | { readonly from: 'ready'; readonly to: 'ready' | 'deleted' }
+)
 
 const principalContexts = new WeakSet<object>()
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i

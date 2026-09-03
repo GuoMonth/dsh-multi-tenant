@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { Context } from '@deepseek-ai/cordis'
 import { AgentRecordConflictError } from './errors.ts'
-import { TenantAgentRepository } from './repository.ts'
+import { assertLegalAgentRecordTransition, TenantAgentRepository } from './repository.ts'
 import { parseAgentId, type AgentRecordState, type PrincipalIdentity, type TenantAgentRecord } from './types.ts'
 import type { AgentId, AgentRecordTransition, NewTenantAgentRecord } from './types.ts'
 
@@ -103,6 +103,7 @@ function readRecord(row: unknown): TenantAgentRecord | undefined {
   })
 }
 
+/** Built-in repository for a host-enforced local, single-active-process topology. */
 export class SQLiteTenantAgentRepository extends TenantAgentRepository {
   readonly path: string
   private readonly database: DatabaseSync
@@ -152,6 +153,15 @@ export class SQLiteTenantAgentRepository extends TenantAgentRepository {
           + 'Back up and recreate the Agent directory database; candidate schemas are not migrated.',
         )
       }
+      database.exec(`
+        CREATE INDEX IF NOT EXISTS tenant_agents_v04_provisioning
+          ON tenant_agents_v04 (agent_id) WHERE state = 'provisioning';
+      `)
+      database.prepare(`
+        UPDATE tenant_agents_v04
+        SET state = 'failed', revision = revision + 1, updated_at = ?
+        WHERE state = 'provisioning'
+      `).run(new Date().toISOString())
       this.insertRecord = database.prepare(`
         INSERT INTO tenant_agents_v04 (
           agent_id, tenant_id, principal_id, session_id, state, revision,
@@ -230,6 +240,7 @@ export class SQLiteTenantAgentRepository extends TenantAgentRepository {
     expectedRevision: number,
     transition: AgentRecordTransition,
   ): Promise<TenantAgentRecord | undefined> {
+    assertLegalAgentRecordTransition(transition)
     const current = readRecord(this.selectOwned.get(id, principal.tenantId, principal.principalId))
     if (current === undefined || current.revision !== expectedRevision || current.state !== transition.from) {
       return undefined

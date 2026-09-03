@@ -81,12 +81,14 @@ export abstract class TenantMcpProvider extends Service {
     super(ctx, 'tenantMcp')
   }
 
-  abstract load(principal: PrincipalContext, signal?: AbortSignal): Promise<TenantMcpSnapshot>
+  /** The revision must change whenever the effective declaration changes. */
+  abstract load(principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot>
 }
 
 /** Default: a valid Agent with no tenant-specific MCP servers. */
 export class EmptyTenantMcpProvider extends TenantMcpProvider {
-  override async load(): Promise<TenantMcpSnapshot> {
+  override async load(_principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot> {
+    signal.throwIfAborted()
     return Object.freeze({ revision: 'empty-v1', servers: Object.freeze([]) })
   }
 }
@@ -108,7 +110,8 @@ export class StaticTenantMcpProvider extends TenantMcpProvider {
     })
   }
 
-  override async load(): Promise<TenantMcpSnapshot> {
+  override async load(_principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot> {
+    signal.throwIfAborted()
     return this.snapshot
   }
 }
@@ -154,12 +157,36 @@ function bindingRecord(
 function reconnect(value: McpReconnectConfig | undefined): McpReconnectConfig | undefined {
   if (value === undefined) return undefined
   if (typeof value !== 'object' || value === null) throw new ValidationError('MCP reconnect must be an object')
+  const allowed = new Set(['enabled', 'initialDelayMs', 'maxDelayMs', 'maxAttempts'])
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.has(key)) throw new ValidationError('MCP reconnect contains an unknown field')
+  }
   if (value.enabled !== undefined && typeof value.enabled !== 'boolean') throw new ValidationError('MCP reconnect.enabled must be boolean')
-  for (const [key, item] of Object.entries(value)) {
-    if (key === 'enabled') continue
+  for (const key of ['initialDelayMs', 'maxDelayMs', 'maxAttempts'] as const) {
+    const item = value[key]
+    if (item === undefined) continue
     if (!Number.isSafeInteger(item) || Number(item) <= 0) throw new ValidationError(`MCP reconnect.${key} must be a positive integer`)
   }
-  return Object.freeze({ ...value })
+  return Object.freeze({
+    ...(value.enabled === undefined ? {} : { enabled: value.enabled }),
+    ...(value.initialDelayMs === undefined ? {} : { initialDelayMs: value.initialDelayMs }),
+    ...(value.maxDelayMs === undefined ? {} : { maxDelayMs: value.maxDelayMs }),
+    ...(value.maxAttempts === undefined ? {} : { maxAttempts: value.maxAttempts }),
+  })
+}
+
+function stringList(value: readonly string[] | undefined, label: string): readonly string[] {
+  if (value === undefined) return Object.freeze([])
+  if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) {
+    throw new ValidationError(`${label} must be an array of strings`)
+  }
+  return Object.freeze([...value])
+}
+
+function optionalString(value: unknown, label: string): string {
+  if (value === undefined) return ''
+  if (typeof value !== 'string') throw new ValidationError(`${label} must be a string`)
+  return value
 }
 
 function timeout(value: number | undefined): number {
@@ -203,10 +230,10 @@ export function normalizeTenantMcpSnapshot(snapshot: TenantMcpSnapshot): TenantM
         ...common,
         transport: 'stdio',
         command: requiredString(server.command, `${server.serverName}.command`),
-        args: Object.freeze([...(server.args ?? [])]),
+        args: stringList(server.args, `${server.serverName}.args`),
         env,
         secretEnv,
-        cwd: server.cwd ?? '',
+        cwd: optionalString(server.cwd, `${server.serverName}.cwd`),
       })
     }
     if (server.transport === 'streamable-http') {

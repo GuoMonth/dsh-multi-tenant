@@ -13,6 +13,7 @@ import {
   MultiTenantService,
   RuntimePartitionProvider,
   SecretProvider,
+  ServiceClosedError,
   TenantMcpProvider,
   ValidationError,
 } from '../src/index.ts'
@@ -29,6 +30,13 @@ import type { TenantMcpServer, TenantMcpSnapshot } from '../src/mcp.ts'
 import type { IsolationLevel, PrincipalContext } from '../src/types.ts'
 import { createAgentId } from '../src/types.ts'
 import { SQLiteTenantAgentRepository } from '../src/sqlite.ts'
+
+function waitForAbort(signal: AbortSignal): Promise<never> {
+  if (signal.aborted) return Promise.reject(signal.reason)
+  return new Promise((_, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+  })
+}
 
 class FakeRuntime implements TenantAgentRuntime {
   readonly cancellations: string[] = []
@@ -63,26 +71,43 @@ class FakeDriver implements DshRuntimeDriver {
   readonly handles: FakeHandle[] = []
   failCreates = 0
   failResumes = 0
+  blockCreates = false
+  blockResumes = false
+  readonly createEntered = Promise.withResolvers<void>()
+  readonly resumeEntered = Promise.withResolvers<void>()
+  cleanupEvents: string[] = []
 
   async create(specification: DshAgentSpecification): Promise<DshRuntimeAgentHandle> {
     this.createSpecifications.push(specification)
     if (this.failCreates-- > 0) throw new Error('create failed')
+    if (this.blockCreates) {
+      this.createEntered.resolve()
+      await waitForAbort(specification.signal)
+    }
     return this.handle('create', specification)
   }
 
   async resume(specification: DshAgentSpecification): Promise<DshRuntimeAgentHandle> {
     this.resumeSpecifications.push(specification)
     if (this.failResumes-- > 0) throw new Error('resume failed')
+    if (this.blockResumes) {
+      this.resumeEntered.resolve()
+      await waitForAbort(specification.signal)
+    }
     return this.handle('resume', specification)
   }
 
   private handle(mode: 'create' | 'resume', specification: DshAgentSpecification): FakeHandle {
+    const thisDriver = this
     const handle: FakeHandle = {
       mode,
       specification,
       runtime: new FakeRuntime(),
       disposeCount: 0,
-      async dispose() { handle.disposeCount += 1 },
+      async dispose() {
+        handle.disposeCount += 1
+        thisDriver.cleanupEvents.push('handle')
+      },
     }
     this.handles.push(handle)
     return handle
@@ -93,9 +118,17 @@ class MutableMcpProvider extends TenantMcpProvider {
   revision = 'mcp-r1'
   servers: readonly TenantMcpServer[] = []
   error: Error | undefined
+  block = false
+  readonly entered = Promise.withResolvers<void>()
+  readonly signals: AbortSignal[] = []
 
-  override async load(): Promise<TenantMcpSnapshot> {
+  override async load(_principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot> {
+    this.signals.push(signal)
     if (this.error !== undefined) throw this.error
+    if (this.block) {
+      this.entered.resolve()
+      await waitForAbort(signal)
+    }
     return { revision: this.revision, servers: this.servers }
   }
 }
@@ -109,11 +142,21 @@ class MutableSecretProvider extends SecretProvider {
   revision = 'secret-r1'
   values: Readonly<Record<string, string>> = { token: 'secret-value' }
   readonly issued: IssuedSecretLease[] = []
+  readonly signals: AbortSignal[] = []
+  block = false
+  readonly entered = Promise.withResolvers<void>()
+  cleanupEvents: string[] = []
 
   override async acquire(
     _principal: PrincipalContext,
     names: readonly string[],
+    signal: AbortSignal,
   ): Promise<SecretLease> {
+    this.signals.push(signal)
+    if (this.block) {
+      this.entered.resolve()
+      await waitForAbort(signal)
+    }
     const selected: Record<string, string> = {}
     for (const name of names) {
       const value = this.values[name]
@@ -127,7 +170,10 @@ class MutableSecretProvider extends SecretProvider {
       signal: controller.signal,
       controller,
       disposed: 0,
-      dispose() { lease.disposed += 1 },
+      dispose: () => {
+        lease.disposed += 1
+        this.cleanupEvents.push('secret')
+      },
     }
     this.issued.push(lease)
     return lease
@@ -144,6 +190,9 @@ class FakePartitionProvider extends RuntimePartitionProvider {
   readonly driver: FakeDriver
   isolation: IsolationLevel
   disposed = 0
+  block = false
+  readonly entered = Promise.withResolvers<void>()
+  cleanupEvents: string[] = []
 
   constructor(ctx: Context, config: PartitionConfig) {
     super(ctx)
@@ -153,11 +202,18 @@ class FakePartitionProvider extends RuntimePartitionProvider {
 
   override async acquire(request: RuntimePartitionRequest): Promise<RuntimePartitionLease> {
     this.requests.push(request)
+    if (this.block) {
+      this.entered.resolve()
+      await waitForAbort(request.signal)
+    }
     const provider = this
     return {
       isolation: this.isolation,
       driver: this.driver,
-      dispose() { provider.disposed += 1 },
+      dispose() {
+        provider.disposed += 1
+        provider.cleanupEvents.push('partition')
+      },
     }
   }
 }
@@ -401,6 +457,50 @@ describe('MultiTenantService authority kernel', () => {
     await expect(second.service.get(restartedPrincipal, agent.id)).rejects.toThrow(AgentNotFoundError)
   })
 
+  it('hides abandoned provisioning after restart and retries with fresh identities without resuming DSH', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-abandoned-'))
+    temporaryDirectories.push(directory)
+    const path = join(directory, 'agents.sqlite')
+    const owner = alice()
+    const abandonedId = createAgentId()
+    const abandonedSession = 'dsh-mt-abandoned-session'
+
+    const first = new Context()
+    const repository = new SQLiteTenantAgentRepository(first, { path })
+    await repository.insert({
+      id: abandonedId,
+      tenantId: owner.tenantId,
+      principalId: owner.principalId,
+      sessionId: abandonedSession,
+      capabilityRevision: 'abandoned-capability',
+      mcpServers: ['abandoned'],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    })
+    await first.fiber.dispose()
+
+    const second = new Context()
+    contexts.push(second)
+    const driver = new FakeDriver()
+    await second.plugin(SQLiteTenantAgentRepository, { path })
+    await second.plugin(MutableMcpProvider)
+    await second.plugin(MutableSecretProvider)
+    await second.plugin(FakePartitionProvider, { driver })
+    await second.plugin(MultiTenantService)
+
+    await expect(second.multiTenant.get(owner, abandonedId)).rejects.toThrow(AgentNotFoundError)
+    await expect(second.multiTenant.withAgent(owner, abandonedId, async () => undefined))
+      .rejects.toThrow(AgentNotFoundError)
+    expect(driver.createSpecifications).toHaveLength(0)
+    expect(driver.resumeSpecifications).toHaveLength(0)
+    expect(await second.tenantAgentRepository.get(owner, abandonedId)).toEqual(expect.objectContaining({
+      state: 'failed', revision: 1, sessionId: abandonedSession,
+    }))
+
+    const retry = await second.multiTenant.create(owner)
+    expect(retry.id).not.toBe(abandonedId)
+    expect(driver.createSpecifications[0]?.sessionId).not.toBe(abandonedSession)
+  })
+
   it('cancels immediately and prevents a later withAgent from overtaking deletion', async () => {
     const test = await harness()
     const principal = alice()
@@ -446,6 +546,10 @@ describe('MultiTenantService authority kernel', () => {
 
   it('serializes concurrent deletes and disposes the live handle once', async () => {
     const test = await harness()
+    test.mcp.servers = [{
+      transport: 'stdio', serverName: 'private', command: 'node',
+      secretEnv: { TOKEN: { secret: 'token' } },
+    }]
     const principal = alice()
     const agent = await test.service.create(principal)
 
@@ -461,6 +565,8 @@ describe('MultiTenantService authority kernel', () => {
     }))
     expect(test.driver.resumeSpecifications).toHaveLength(0)
     expect(test.driver.handles[0]?.disposeCount).toBe(1)
+    expect(test.partitions.disposed).toBe(1)
+    expect(test.secrets.issued[0]?.disposed).toBe(1)
   })
 
   it('keeps a ready record usable when its durable delete transition fails', async () => {
@@ -584,6 +690,181 @@ describe('MultiTenantService authority kernel', () => {
     expect(test.partitions.requests[0]?.requiredIsolation).toBe('strong')
     expect(test.driver.createSpecifications).toHaveLength(0)
     await expect(test.repository.list({ tenantId: 'acme', principalId: 'alice' })).resolves.toEqual([])
+  })
+
+  it('passes the service lifecycle and combined secret-revocation signal through every provider seam', async () => {
+    const test = await harness()
+    test.mcp.servers = [{
+      transport: 'stdio',
+      serverName: 'private',
+      command: 'node',
+      secretEnv: { TOKEN: { secret: 'token' } },
+    }]
+
+    await test.service.create(alice())
+    const lifecycle = test.mcp.signals[0]
+    const combined = test.partitions.requests[0]?.signal
+    expect(lifecycle).toBeInstanceOf(AbortSignal)
+    expect(test.secrets.signals[0]).toBe(lifecycle)
+    expect(combined).toBeInstanceOf(AbortSignal)
+    expect(combined).not.toBe(lifecycle)
+    expect(test.driver.createSpecifications[0]?.signal).toBe(combined)
+    expect(combined?.aborted).toBe(false)
+
+    test.secrets.issued[0]!.controller.abort()
+    expect(combined?.aborted).toBe(true)
+  })
+
+  it.each(['mcp', 'secret', 'partition', 'driver'] as const)(
+    'aborts pending %s acquisition or setup and maps shutdown to ServiceClosedError',
+    async stage => {
+      const test = await harness()
+      if (stage === 'secret') {
+        test.mcp.servers = [{
+          transport: 'stdio', serverName: 'private', command: 'node',
+          secretEnv: { TOKEN: { secret: 'token' } },
+        }]
+      }
+      if (stage === 'mcp') test.mcp.block = true
+      if (stage === 'secret') test.secrets.block = true
+      if (stage === 'partition') test.partitions.block = true
+      if (stage === 'driver') test.driver.blockCreates = true
+
+      const creation = test.service.create(alice())
+      const entered = stage === 'mcp'
+        ? test.mcp.entered.promise
+        : stage === 'secret'
+          ? test.secrets.entered.promise
+          : stage === 'partition'
+            ? test.partitions.entered.promise
+            : test.driver.createEntered.promise
+      await entered
+      const signal = stage === 'mcp'
+        ? test.mcp.signals[0]!
+        : stage === 'secret'
+          ? test.secrets.signals[0]!
+          : stage === 'partition'
+            ? test.partitions.requests[0]!.signal
+            : test.driver.createSpecifications[0]!.signal
+
+      const closed = expect(creation).rejects.toThrow(ServiceClosedError)
+      const closing = test.service.close()
+      expect(signal.aborted).toBe(true)
+      await Promise.all([closed, closing])
+      expect(test.driver.createSpecifications).toHaveLength(stage === 'driver' ? 1 : 0)
+    },
+  )
+
+  it.each([
+    'mcp-revision',
+    'secret-values',
+    'secret-signal',
+    'partition-isolation',
+    'partition-driver',
+    'partition-disposer',
+  ] as const)('rejects malformed %s results before DSH work', async kind => {
+    const test = await harness()
+    let malformedDisposals = 0
+    if (kind.startsWith('secret')) {
+      test.mcp.servers = [{
+        transport: 'stdio', serverName: 'private', command: 'node',
+        secretEnv: { TOKEN: { secret: 'token' } },
+      }]
+    }
+    if (kind === 'mcp-revision') {
+      test.mcp.load = async () => ({ revision: '', servers: [] })
+    } else if (kind === 'secret-values') {
+      test.secrets.acquire = async () => ({
+        revision: 'secret-r1', values: { token: 7 }, signal: new AbortController().signal,
+        dispose() { malformedDisposals += 1 },
+      }) as never
+    } else if (kind === 'secret-signal') {
+      test.secrets.acquire = async () => ({
+        revision: 'secret-r1', values: { token: 'do-not-leak' }, signal: { aborted: false },
+        dispose() { malformedDisposals += 1 },
+      }) as never
+    } else if (kind === 'partition-isolation') {
+      test.partitions.acquire = async () => ({
+        isolation: 'sandbox', driver: test.driver,
+        dispose() { malformedDisposals += 1 },
+      }) as never
+    } else if (kind === 'partition-driver') {
+      test.partitions.acquire = async () => ({
+        isolation: 'logical', driver: {},
+        dispose() { malformedDisposals += 1 },
+      }) as never
+    } else {
+      test.partitions.acquire = async () => ({ isolation: 'logical', driver: test.driver }) as never
+    }
+
+    const error = await test.service.create(alice()).catch(reason => reason)
+    expect(error).toBeInstanceOf(CapabilityUnavailableError)
+    expect(`${error.message}:${String(error.cause)}`).not.toContain('do-not-leak')
+    expect(test.driver.createSpecifications).toHaveLength(0)
+    expect(malformedDisposals).toBe(kind === 'mcp-revision' || kind === 'partition-disposer' ? 0 : 1)
+  })
+
+  it.each(['runtime-method', 'handle-disposer'] as const)(
+    'rejects a DSH handle with a missing %s and does not publish it',
+    async kind => {
+      const test = await harness()
+      let malformedDisposals = 0
+      test.driver.create = async specification => {
+        test.driver.createSpecifications.push(specification)
+        return {
+          runtime: kind === 'runtime-method'
+            ? { followup() {}, steer() {}, inject() {}, cancel() {}, async whenIdle() {} }
+            : new FakeRuntime(),
+          ...(kind === 'handle-disposer' ? {} : {
+            async dispose() { malformedDisposals += 1 },
+          }),
+        } as never
+      }
+
+      const principal = alice()
+      await expect(test.service.create(principal)).rejects.toThrow(AgentProvisioningError)
+      expect(test.driver.createSpecifications).toHaveLength(1)
+      expect(malformedDisposals).toBe(kind === 'runtime-method' ? 1 : 0)
+      expect((await test.repository.list(principal))[0]?.state).toBe('failed')
+    },
+  )
+
+  it('aborts a pending resume when its SecretLease is revoked', async () => {
+    const test = await harness()
+    test.mcp.servers = [{
+      transport: 'stdio', serverName: 'private', command: 'node',
+      secretEnv: { TOKEN: { secret: 'token' } },
+    }]
+    const principal = alice()
+    const agent = await test.service.create(principal)
+    test.secrets.issued[0]!.controller.abort()
+    await new Promise(resolve => setImmediate(resolve))
+
+    test.driver.blockResumes = true
+    const use = test.service.withAgent(principal, agent.id, async () => undefined)
+    await test.driver.resumeEntered.promise
+    test.secrets.issued[1]!.controller.abort()
+
+    await expect(use).rejects.toThrow(CapabilityUnavailableError)
+    expect(test.driver.resumeSpecifications[0]?.signal.aborted).toBe(true)
+    expect((await test.repository.get(principal, agent.id))?.state).toBe('ready')
+  })
+
+  it('disposes live resources in handle, partition, secret order', async () => {
+    const test = await harness()
+    const events: string[] = []
+    test.driver.cleanupEvents = events
+    test.partitions.cleanupEvents = events
+    test.secrets.cleanupEvents = events
+    test.mcp.servers = [{
+      transport: 'stdio', serverName: 'private', command: 'node',
+      secretEnv: { TOKEN: { secret: 'token' } },
+    }]
+    const principal = alice()
+    const agent = await test.service.create(principal)
+
+    await test.service.delete(principal, agent.id)
+    expect(events).toEqual(['handle', 'partition', 'secret'])
   })
 
   it('maps MCP provider failure to capability unavailability before DSH work', async () => {

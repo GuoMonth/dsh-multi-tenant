@@ -2,12 +2,12 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.4.0-alpha.1` is a DSH multi-tenant plugin for Node 22.19+ and Node 24. It is pinned to `@deepseek-ai/*@0.1.2-alpha.5`.
+`dsh-multi-tenant@0.4.0-alpha.2` is a DSH multi-tenant plugin for Node 22.19+ and Node 24. It is pinned to `@deepseek-ai/*@0.1.2-alpha.5`.
 
 ## Install
 
 ```bash
-pnpm add dsh-multi-tenant@0.4.0-alpha.1
+pnpm add dsh-multi-tenant@0.4.0-alpha.2
 ```
 
 Load the plugin after the DSH `agents` and `tools` services. With no host replacements it uses `.dsh-multi-tenant/agents.sqlite`, an empty MCP declaration, and DSH's shared in-process runtime:
@@ -21,6 +21,8 @@ await ctx.plugin(MultiTenant, {
 ```
 
 On Unix, the default directory is enforced as `0700` and its database as `0600`, including when they already exist; inability to enforce either mode fails startup. Set `DSH_MULTI_TENANT_DB_PATH` or `sqlite.path` to use a host-managed path. The plugin does not chmod a configured path or its parent: its ACL, backups, and encryption are the host's responsibility. Windows deployments must apply an equivalent host ACL. Existing `0.3` ownership data and unpublished candidate schemas are deliberately not migrated.
+
+Opening the built-in SQLite repository atomically changes every abandoned `provisioning` record to terminal `failed` before the service is installed, completing [#49](https://github.com/GuoMonth/dsh-multi-tenant/issues/49). Such resources stay product-level not-found and are never resumed; a retry receives fresh Agent and session identities. This assumes the host guarantees one active process for the database.
 
 ## Minimal API
 
@@ -80,6 +82,16 @@ await ctx.plugin(MultiTenant)
 
 The static providers are development conveniences. Production hosts normally implement `TenantMcpProvider` and `SecretProvider`; a `SecretLease` keeps values in memory and supplies a revision, revocation signal, and disposer. Revocation cancels and disposes the live Agent. The next authorized use acquires a new lease and resumes the same internal session.
 
+Host provider acquisition receives a required lifecycle signal, completing [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50). MCP and Secret providers receive the service signal; runtime partitions and DSH drivers receive its combination with SecretLease revocation:
+
+```ts
+load(principal, signal: AbortSignal): Promise<TenantMcpSnapshot>
+acquire(principal, names, signal: AbortSignal): Promise<SecretLease>
+acquire({ principal, agentId, requiredIsolation, signal }): Promise<RuntimePartitionLease>
+```
+
+Providers should check the signal before work, stop promptly when practical, return stable revisions, and make disposal idempotent. The plugin validates and freezes their returned capability view before DSH work. Abort remains cooperative; it cannot forcibly terminate arbitrary host code.
+
 ## Web adapter
 
 `dsh-multi-tenant/web` mounts authenticated CRUD through the existing DSH `ctx.webServer.register()` seam:
@@ -112,11 +124,11 @@ Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tena
 - SQLite records use CAS revisions and Principal-scoped SQL. An authorized delete immediately invalidates active callback views and reserves a serialized barrier; later `withAgent()` calls cannot overtake it and see only not-found after the scrubbed tombstone is committed.
 - Provisioning is unpublished until DSH setup and the database ready transition both succeed.
 - Per-Agent create/resume/refresh/delete is serialized; concurrent opens single-flight; plugin shutdown cancels and drains every owned handle.
-- Alpha.1 drain is cooperative: a callback or host provider acquisition that never settles can delay delete or shutdown indefinitely. Lifecycle abort propagation and provider-contract validation remain tracked in [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50); forced interruption and arbitrary default timeouts are out of scope.
+- Alpha.2 propagates lifecycle abort through MCP, Secret, RuntimePartition, and DSH setup and validates provider results before use. Drain remains cooperative: code that ignores abort or never settles can delay delete or shutdown indefinitely; forced interruption and arbitrary default timeouts are out of scope.
 - A configured `strong` minimum fails closed before DSH Agent creation when the provider offers only `logical` isolation.
 - `TenantAgentRepository`, `TenantMcpProvider`, `SecretProvider`, `RuntimePartitionProvider`, and `DshRuntimeDriver` are the host replacement protocols. They compose through Cordis services; there is no second DI system.
 - The bundled shared provider is process-local logical separation. It does not isolate hostile plugins, tools, filesystem access, subprocesses, memory, or network traffic.
-- SQLite is a local, single-node, single-active-process default. The host deployment must maintain that invariant; the plugin does not enforce it with locks, heartbeats, or fencing. [#49](https://github.com/GuoMonth/dsh-multi-tenant/issues/49) adds deterministic abandoned-provisioning recovery within this supported topology. Replace `TenantAgentRepository` when the deployment requires multi-process coordination or a different persistence boundary.
+- SQLite is a local, single-node, single-active-process default. The host deployment must maintain that invariant; the plugin does not enforce it with locks, heartbeats, or fencing. Startup deterministically fails abandoned provisioning before Agent operations. A custom `TenantAgentRepository` must complete the recovery required by its own topology before registration; replace it when deployment requires multi-process coordination or a different persistence boundary.
 - Delete does not claim physical erasure of DSH persistent logs.
 - No Typert public adapter is shipped because stock Typert does not establish a trusted Principal binding. Keep stock DSH `/api` private/administrative.
 

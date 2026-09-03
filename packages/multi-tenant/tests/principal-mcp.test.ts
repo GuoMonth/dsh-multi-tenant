@@ -58,6 +58,20 @@ describe('tenant MCP declarations', () => {
     expect(() => normalizeTenantMcpSnapshot({ revision: 'bad', servers: [server, server] })).toThrow(ValidationError)
   })
 
+  it('rebuilds nested provider configuration from a closed schema', () => {
+    const server = { transport: 'stdio' as const, serverName: 'strict', command: 'node' }
+    expect(() => normalizeTenantMcpSnapshot({
+      revision: 'bad-args', servers: [{ ...server, args: [7] as never }],
+    })).toThrow(ValidationError)
+    expect(() => normalizeTenantMcpSnapshot({
+      revision: 'bad-cwd', servers: [{ ...server, cwd: 7 as never }],
+    })).toThrow(ValidationError)
+    expect(() => normalizeTenantMcpSnapshot({
+      revision: 'bad-reconnect',
+      servers: [{ ...server, reconnect: { enabled: false, unknown: 1 } as never }],
+    })).toThrow(ValidationError)
+  })
+
   it('fails closed when a required secret is absent or a lease is revoked', () => {
     const snapshot = normalizeTenantMcpSnapshot({
       revision: 'mcp-r1',

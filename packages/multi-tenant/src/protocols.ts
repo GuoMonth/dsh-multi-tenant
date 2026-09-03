@@ -19,10 +19,12 @@ export interface PrincipalProvider<Request> {
 }
 
 export interface SecretLease {
+  /** Must change whenever the effective secret capability changes. */
   readonly revision: string
   readonly values: Readonly<Record<string, string>>
   /** Aborted by the provider when these values must no longer power a live Agent. */
   readonly signal: AbortSignal
+  /** Must be safe to call more than once. */
   dispose(): void | PromiseLike<void>
 }
 
@@ -34,7 +36,8 @@ export abstract class SecretProvider extends Service {
   abstract acquire(
     principal: PrincipalContext,
     names: readonly string[],
-    signal?: AbortSignal,
+    /** Aborted when the owning MultiTenantService begins shutdown. */
+    signal: AbortSignal,
   ): Promise<SecretLease>
 }
 
@@ -60,7 +63,8 @@ export interface DshRuntimeAgentHandle {
 export interface DshAgentSpecification extends CreateAgentOptions {
   readonly sessionId: string
   readonly mcpServers: readonly ResolvedMcpServer[]
-  readonly signal?: AbortSignal
+  /** Combines service shutdown with SecretLease revocation. */
+  readonly signal: AbortSignal
 }
 
 export interface DshRuntimeDriver {
@@ -72,12 +76,15 @@ export interface RuntimePartitionRequest {
   readonly principal: PrincipalContext
   readonly agentId: AgentId
   readonly requiredIsolation: IsolationLevel
-  readonly signal?: AbortSignal
+  /** Combines service shutdown with SecretLease revocation. */
+  readonly signal: AbortSignal
 }
 
 export interface RuntimePartitionLease {
+  /** A host claim negotiated by the plugin, not proof of an isolation mechanism. */
   readonly isolation: IsolationLevel
   readonly driver: DshRuntimeDriver
+  /** Must be safe to call more than once. */
   dispose(): void | PromiseLike<void>
 }
 
@@ -88,4 +95,3 @@ export abstract class RuntimePartitionProvider extends Service {
 
   abstract acquire(request: RuntimePartitionRequest): Promise<RuntimePartitionLease>
 }
-
