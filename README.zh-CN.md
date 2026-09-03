@@ -24,4 +24,4 @@
 
 默认 shared runtime 只提供逻辑隔离，不是 hostile-code 安全边界。Stock DSH `/api` 保持私有/管理用途，不是公网多租户入口。
 
-Alpha.1 的 shutdown/delete drain 是 cooperative 的：永不结束的 callback 或宿主 provider acquisition 可能延迟完成；bounded、可取消的 provider 行为继续由 [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) 跟踪。
+Alpha.1 的 shutdown/delete drain 是 cooperative 的：永不结束的 callback 或宿主 provider acquisition 可能延迟完成。[#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) 会把 lifecycle abort 传入 provider seam 并验证契约，但不会强制终止任意宿主代码或增加默认 timeout。

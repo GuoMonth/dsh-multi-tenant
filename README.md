@@ -24,4 +24,4 @@ authenticated request
 
 The default shared runtime provides logical isolation, not a hostile-code security boundary. Stock DSH `/api` remains private/administrative and is not a public multi-tenant ingress.
 
-Alpha.1 shutdown/delete drain is cooperative: a callback or host provider acquisition that never settles can delay completion. Bounded and abortable provider behavior remains tracked in [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50).
+Alpha.1 shutdown/delete drain is cooperative: a callback or host provider acquisition that never settles can delay completion. [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) will propagate lifecycle abort through the provider seams and validate their contract; it will not forcibly terminate arbitrary host code or add a default timeout.

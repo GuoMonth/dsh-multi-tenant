@@ -112,11 +112,11 @@ Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tena
 - SQLite records use CAS revisions and Principal-scoped SQL. An authorized delete immediately invalidates active callback views and reserves a serialized barrier; later `withAgent()` calls cannot overtake it and see only not-found after the scrubbed tombstone is committed.
 - Provisioning is unpublished until DSH setup and the database ready transition both succeed.
 - Per-Agent create/resume/refresh/delete is serialized; concurrent opens single-flight; plugin shutdown cancels and drains every owned handle.
-- Alpha.1 drain is cooperative: a callback or host provider acquisition that never settles can delay delete or shutdown indefinitely. Bounded acquisition/callback outcomes and behavioral conformance remain tracked in [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50).
+- Alpha.1 drain is cooperative: a callback or host provider acquisition that never settles can delay delete or shutdown indefinitely. Lifecycle abort propagation and provider-contract validation remain tracked in [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50); forced interruption and arbitrary default timeouts are out of scope.
 - A configured `strong` minimum fails closed before DSH Agent creation when the provider offers only `logical` isolation.
 - `TenantAgentRepository`, `TenantMcpProvider`, `SecretProvider`, `RuntimePartitionProvider`, and `DshRuntimeDriver` are the host replacement protocols. They compose through Cordis services; there is no second DI system.
 - The bundled shared provider is process-local logical separation. It does not isolate hostile plugins, tools, filesystem access, subprocesses, memory, or network traffic.
-- SQLite is a local, single-node, single-process default. It is not a multi-process or multi-replica ownership claim. Replace `TenantAgentRepository` when the deployment requires a different persistence boundary; enforceable local process ownership is tracked in [#49](https://github.com/GuoMonth/dsh-multi-tenant/issues/49).
+- SQLite is a local, single-node, single-active-process default. The host deployment must maintain that invariant; the plugin does not enforce it with locks, heartbeats, or fencing. [#49](https://github.com/GuoMonth/dsh-multi-tenant/issues/49) adds deterministic abandoned-provisioning recovery within this supported topology. Replace `TenantAgentRepository` when the deployment requires multi-process coordination or a different persistence boundary.
 - Delete does not claim physical erasure of DSH persistent logs.
 - No Typert public adapter is shipped because stock Typert does not establish a trusted Principal binding. Keep stock DSH `/api` private/administrative.
 

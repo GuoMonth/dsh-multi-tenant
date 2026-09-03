@@ -31,8 +31,8 @@ for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'LICENSE', 'cordis.p
 for (const [path, markers] of Object.entries({
   'README.md': [version, 'logical isolation', 'DSH `/api`', 'issues/50'],
   'README.zh-CN.md': [version, '逻辑隔离', 'Stock DSH `/api`', 'issues/50'],
-  'packages/multi-tenant/README.md': [version, '## Minimal API', '## Real MCP configuration', '## Guarantees and boundaries', 'issues/50', './cordis.patch.yml'],
-  'packages/multi-tenant/README.zh-CN.md': [version, '## 最小 API', '## 真实 MCP', '## 保证与边界', 'issues/50', './cordis.patch.yml'],
+  'packages/multi-tenant/README.md': [version, '## Minimal API', '## Real MCP configuration', '## Guarantees and boundaries', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
+  'packages/multi-tenant/README.zh-CN.md': [version, '## 最小 API', '## 真实 MCP', '## 保证与边界', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
   'docs/reference/compatibility.md': [version, '0.1.2-alpha.5', './cordis.patch.yml'],
   'docs/reference/compatibility.zh-CN.md': [version, '0.1.2-alpha.5', './cordis.patch.yml'],
   'docs/reference/release.md': [version, 'pnpm release:check'],
