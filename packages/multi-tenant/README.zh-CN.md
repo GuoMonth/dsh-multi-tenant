@@ -2,23 +2,23 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.4.0-alpha.3` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 `@deepseek-ai/*@0.1.2-rc.1` 和上游 commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d`。
+`dsh-multi-tenant@0.4.0` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 `@deepseek-ai/*@0.1.2-rc.1` 和上游 commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d`。
 
-这个 alpha 用于宿主集成和契约反馈。它提供一条精简的 authority path：从服务端创建的 Principal，到有明确所有者的 DSH Agent、持久本地 Directory 和 Agent-scoped MCP 生命周期。它假定宿主已经提供可信认证，并负责强于默认逻辑边界的隔离。
+这是全新 `0.4` 插件公共面的首个不带 prerelease 标识的正式分发版本。它提供一条精简的 authority path：从服务端创建的 Principal，到有明确所有者的 DSH Agent、持久本地 Directory 和 Agent-scoped MCP 生命周期。它假定宿主已经提供可信认证，并负责强于默认逻辑边界的隔离。
 
 ## 安装
 
-npm 分发产物可用后，可以使用 alpha channel，或精确固定本次已审查的构建：
+npm 可以直接安装稳定通道，也可以精确固定本次已审查的版本：
 
 ```bash
-pnpm add dsh-multi-tenant@alpha
-# 或精确固定本次已审查的预发布版本
-pnpm add dsh-multi-tenant@0.4.0-alpha.3
+pnpm add dsh-multi-tenant
+# 或精确固定本次已审查的正式版本
+pnpm add dsh-multi-tenant@0.4.0
 ```
 
-在 `0.4.0` 稳定版之前，`alpha` channel 仍可能引入 provider 契约的源码破坏；需要可复现部署时应固定精确版本。对应的源码 tag 是 `v0.4.0-alpha.3`；npm artifact 和 GitHub prerelease 的发布仍是独立的显式 release 操作。
+对应源码 tag 是 `v0.4.0`，npm 使用 `latest` dist-tag。它是当前已审查、受支持的 `0.4` API 与生命周期契约入口，不等于 `1.0` 级别的永久兼容承诺；不兼容变更必须通过新版本和文档显式说明。DSH `0.1.2-rc.1` 本身仍是上游 RC，并保持 exact peer。升级到后续 DSH 版本需要新的插件兼容版本，不会静默发生。
 
-DSH RC.1 相对 alpha.5 只修改了 release metadata，但 alpha.3 有意只支持 RC.1。全部直接 DSH peer/dev dependency 都使用精确版本，未经审查的 Harness 构建不会静默进入 runtime graph。
+DSH RC.1 相对 alpha.5 只修改了 release metadata，但 `0.4.0` 有意只支持 RC.1。全部直接 DSH peer/dev dependency 都使用精确版本，未经审查的 Harness 构建不会静默进入 runtime graph。
 
 在 DSH 的 `agents` 和 `tools` service 之后加载。宿主没有提供替代实现时，插件使用 `.dsh-multi-tenant/agents.sqlite`、空 MCP 声明和 DSH 进程内 shared runtime：
 
@@ -126,7 +126,7 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
 - SQLite 使用 CAS revision 和 Principal-scoped SQL；已授权删除会立即使 active callback view 失效并预留串行屏障，后发 `withAgent()` 不能越过删除，只会在已清理的 tombstone 提交后得到 not-found。
 - DSH setup 和数据库 ready transition 都成功后，Agent 才会公开。
 - 每个 Agent 的 create/resume/refresh/delete 串行；并发打开 single-flight；插件关闭会 cancel 并 drain 全部 handle。
-- Alpha.3 保留 alpha.2 的生命周期契约：把 abort 传入 MCP、Secret、RuntimePartition 和 DSH setup，并在使用前校验 provider 结果。Drain 仍是 cooperative 的：忽略 abort 或永不结束的代码可能无限延迟 delete/shutdown；强制中断和任意默认 timeout 不在范围内。
+- 生命周期契约会把 abort 传入 MCP、Secret、RuntimePartition 和 DSH setup，并在使用前校验 provider 结果。Drain 仍是 cooperative 的：忽略 abort 或永不结束的代码可能无限延迟 delete/shutdown；强制中断和任意默认 timeout 不在范围内。
 - 最低隔离配置为 `strong` 时，共享逻辑 provider 会在创建 DSH Agent 前 fail closed。
 - `TenantAgentRepository`、`TenantMcpProvider`、`SecretProvider`、`RuntimePartitionProvider`、`DshRuntimeDriver` 是宿主替换协议，统一通过 Cordis service 组合。
 - 默认 shared provider 只是进程内逻辑隔离，不能隔离 hostile plugin/tool、filesystem、subprocess、内存或网络。

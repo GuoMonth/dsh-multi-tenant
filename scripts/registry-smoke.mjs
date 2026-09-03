@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Post-publication verification for the exact alpha artifact. */
+/** Post-publication verification for the exact artifact and npm dist-tag. */
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -7,9 +7,10 @@ const PACKAGE_NAME = 'dsh-multi-tenant'
 const EXPECTED_REPOSITORY = 'https://github.com/guomonth/dsh-multi-tenant'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const version = process.argv[2]
+const distTag = process.argv[3]
 
-if (!version) {
-  console.error('usage: node scripts/registry-smoke.mjs <version>')
+if (!version || !distTag) {
+  console.error('usage: node scripts/registry-smoke.mjs <version> <dist-tag>')
   process.exit(2)
 }
 
@@ -42,9 +43,9 @@ for (let attempt = 1; attempt <= 10; attempt++) {
 }
 if (registryVersion !== version) throw new Error(`registry did not resolve ${PACKAGE_NAME}@${version}`)
 
-const alphaVersion = npmJson(['view', `${PACKAGE_NAME}@alpha`, 'version'])
-if (alphaVersion !== version) {
-  throw new Error(`npm alpha dist-tag resolves to ${String(alphaVersion)}, expected ${version}`)
+const taggedVersion = npmJson(['view', `${PACKAGE_NAME}@${distTag}`, 'version'])
+if (taggedVersion !== version) {
+  throw new Error(`npm ${distTag} dist-tag resolves to ${String(taggedVersion)}, expected ${version}`)
 }
 
 const repository = npmJson(['view', `${PACKAGE_NAME}@${version}`, 'repository.url'])
@@ -65,4 +66,4 @@ execFileSync('node', [
   stdio: ['ignore', 'inherit', 'inherit'],
 })
 
-console.log(`registry smoke passed: ${PACKAGE_NAME}@${version}; alpha=${version}; integrity=${integrity.slice(0, 20)}…`)
+console.log(`registry smoke passed: ${PACKAGE_NAME}@${version}; ${distTag}=${version}; integrity=${integrity.slice(0, 20)}…`)

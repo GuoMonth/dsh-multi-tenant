@@ -1,6 +1,6 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.4.0-alpha.3",
+  "version": "0.4.0",
   "description": "A DSH-native multi-tenant plugin with trusted Principal contexts, Principal-scoped Agent resources, durable local ownership, and Agent-scoped MCP capabilities.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
@@ -14,7 +14,7 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "alpha",
+    "tag": "latest",
     "provenance": true
   },
   "sideEffects": false,
