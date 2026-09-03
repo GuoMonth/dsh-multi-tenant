@@ -4,11 +4,19 @@
 
 `dsh-multi-tenant@0.4.0-alpha.2` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 `@deepseek-ai/*@0.1.2-alpha.5`。
 
+这个 alpha 用于宿主集成和契约反馈。它提供一条精简的 authority path：从服务端创建的 Principal，到有明确所有者的 DSH Agent、持久本地 Directory 和 Agent-scoped MCP 生命周期。它假定宿主已经提供可信认证，并负责强于默认逻辑边界的隔离。
+
 ## 安装
 
+npm 分发产物可用后，可以使用 alpha channel，或精确固定本次已审查的构建：
+
 ```bash
+pnpm add dsh-multi-tenant@alpha
+# 或精确固定本次已审查的预发布版本
 pnpm add dsh-multi-tenant@0.4.0-alpha.2
 ```
+
+在 `0.4.0` 稳定版之前，`alpha` channel 仍可能引入 provider 契约的源码破坏；需要可复现部署时应固定精确版本。本次源码由 `v0.4.0-alpha.2` tag 标识；npm artifact 和 GitHub prerelease 的发布仍是独立的显式 release 操作。
 
 在 DSH 的 `agents` 和 `tools` service 之后加载。宿主没有提供替代实现时，插件使用 `.dsh-multi-tenant/agents.sqlite`、空 MCP 声明和 DSH 进程内 shared runtime：
 

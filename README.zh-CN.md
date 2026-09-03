@@ -2,11 +2,18 @@
 
 `dsh-multi-tenant` 是 DeepSeek Harness 的多租户插件。它把宿主认证得到的 `(tenantId, principalId)` 转换为有明确所有者的 Agent 资源，不接受也不暴露底层 DSH session identity。
 
-当前版本：**`dsh-multi-tenant@0.4.0-alpha.2`**，精确固定 DSH **`0.1.2-alpha.5`**。
+当前版本：**`dsh-multi-tenant@0.4.0-alpha.2`**，精确固定 DSH **`0.1.2-alpha.5`**。完成审查的源码版本由 **`v0.4.0-alpha.2`** 标识。
 
-状态：**源码已达到 release-ready，按计划保持未发布**。`0.4.0-alpha.2` 的实现和复盘门禁已经完成；发布仍是独立的显式操作。目前不存在 `0.4` npm 包、tag 或 GitHub Release。
+Alpha.2 是供 DSH 宿主集成和反馈使用的预发布版本，不承诺稳定兼容。适合已经由宿主负责认证，并接受文档所述 single-active-process 与逻辑隔离边界的产品接入。npm 分发只使用 `alpha` dist-tag，不移动 `latest`；npm 发布和 GitHub prerelease 是独立于源码 tag 的显式分发操作。
 
 插件负责 Principal-scoped Agent 授权、持久 SQLite Agent Directory、能力租约，以及 DSH Agent/MCP 生命周期。宿主仍负责认证、Secret 存储，以及需要时的进程/容器级强隔离。
+
+Alpha.2 在全新的 `0.4` 架构上补齐了两个运行契约：
+
+- 遗留的 SQLite `provisioning` 记录会在 service 对外可用前确定性地进入终态 `failed`；
+- MCP、Secret、runtime-partition 和 DSH setup provider 会收到合作式生命周期取消信号，返回结果在使用前经过校验。
+
+它不会扩张成公网认证入口、分布式所有权系统、sandbox 或进程管理器。这些职责继续由宿主承担，或通过明确的 provider 协议实现。
 
 - [中文使用与 API](./packages/multi-tenant/README.zh-CN.md)
 - [English](./README.md)

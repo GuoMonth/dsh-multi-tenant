@@ -4,11 +4,19 @@
 
 `dsh-multi-tenant@0.4.0-alpha.2` is a DSH multi-tenant plugin for Node 22.19+ and Node 24. It is pinned to `@deepseek-ai/*@0.1.2-alpha.5`.
 
+This alpha is for host integration and contract feedback. It provides a compact authority path from a server-minted Principal to an owned DSH Agent, durable local directory, and Agent-scoped MCP lifecycle. It assumes the host already provides trustworthy authentication and owns any isolation stronger than the bundled logical boundary.
+
 ## Install
 
+When the npm distribution is available, use the alpha channel or pin the reviewed build exactly:
+
 ```bash
+pnpm add dsh-multi-tenant@alpha
+# or pin the reviewed prerelease exactly
 pnpm add dsh-multi-tenant@0.4.0-alpha.2
 ```
+
+The `alpha` channel may introduce source-breaking provider contract changes before `0.4.0`. Use the exact version when reproducible deployments matter. The source corresponding to this release is tagged `v0.4.0-alpha.2`; publishing the npm artifact and GitHub prerelease are separate explicit release operations.
 
 Load the plugin after the DSH `agents` and `tools` services. With no host replacements it uses `.dsh-multi-tenant/agents.sqlite`, an empty MCP declaration, and DSH's shared in-process runtime:
 

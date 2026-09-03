@@ -1,6 +1,6 @@
 # Release checks
 
-The release candidate is `dsh-multi-tenant@0.4.0-alpha.2` on npm tag `alpha`.
+The reviewed source release is `dsh-multi-tenant@0.4.0-alpha.2`, identified by Git tag `v0.4.0-alpha.2`. npm distribution uses the `alpha` dist-tag; it must not update `latest`.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -13,4 +13,6 @@ CI repeats the checks on Node 22.19 and Node 24 and separately checks out DSH co
 
 Project workflows reject mutable third-party `uses:` references during preflight and pin reviewed actions to full commit SHAs. pnpm enforces a 1,440-minute release-age delay; only exact packages from the reviewed DSH alpha.5 source are excluded. The official JSONL test backend is dev-only, and its `koffi` install is the only allowed native dependency build besides the explicitly denied redundant `esbuild` postinstall.
 
-These commands do not publish npm or create a GitHub Release. Publication remains an explicit manual workflow action and requires a successful CI run for the exact `main` commit being released.
+These commands do not publish npm, create a Git tag, or create a GitHub Release. The source tag, npm artifact, and GitHub prerelease are independently verifiable release artifacts.
+
+Distribution remains an explicit manual workflow action and requires a successful CI run for the exact `main` commit being released. The workflow publishes with npm Trusted Publishing and provenance, verifies the registry artifact and `alpha` dist-tag, reuses a matching source tag or creates it when absent, and creates a matching GitHub prerelease. It fails if an existing tag identifies a different commit.

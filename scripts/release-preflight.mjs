@@ -8,6 +8,7 @@ const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.js
 const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const errors = []
 const version = '0.4.0-alpha.2'
+const releaseTag = `v${version}`
 const requiredExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
 
 function filesBelow(directory) {
@@ -29,16 +30,18 @@ for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'LICENSE', 'cordis.p
 }
 
 for (const [path, markers] of Object.entries({
-  'README.md': [version, 'logical isolation', 'DSH `/api`', 'issues/50'],
-  'README.zh-CN.md': [version, '逻辑隔离', 'Stock DSH `/api`', 'issues/50'],
-  'packages/multi-tenant/README.md': [version, '## Minimal API', '## Real MCP configuration', '## Guarantees and boundaries', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
-  'packages/multi-tenant/README.zh-CN.md': [version, '## 最小 API', '## 真实 MCP', '## 保证与边界', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
-  'docs/reference/compatibility.md': [version, '0.1.2-alpha.5', './cordis.patch.yml'],
-  'docs/reference/compatibility.zh-CN.md': [version, '0.1.2-alpha.5', './cordis.patch.yml'],
-  'docs/reference/release.md': [version, 'pnpm release:check'],
-  'docs/reference/release.zh-CN.md': [version, 'pnpm release:check'],
+  'README.md': [version, releaseTag, 'alpha` dist-tag', 'logical isolation', 'DSH `/api`', 'issues/50'],
+  'README.zh-CN.md': [version, releaseTag, 'alpha` dist-tag', '逻辑隔离', 'Stock DSH `/api`', 'issues/50'],
+  'packages/multi-tenant/README.md': [version, releaseTag, '## Minimal API', '## Real MCP configuration', '## Guarantees and boundaries', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
+  'packages/multi-tenant/README.zh-CN.md': [version, releaseTag, '## 最小 API', '## 真实 MCP', '## 保证与边界', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
+  'docs/reference/compatibility.md': [version, releaseTag, '0.1.2-alpha.5', './cordis.patch.yml'],
+  'docs/reference/compatibility.zh-CN.md': [version, releaseTag, '0.1.2-alpha.5', './cordis.patch.yml'],
+  'docs/reference/release.md': [version, releaseTag, 'pnpm release:check'],
+  'docs/reference/release.zh-CN.md': [version, releaseTag, 'pnpm release:check'],
   [`docs/releases/v${version}.md`]: [
     version,
+    releaseTag,
+    '## Who should use it',
     '## Abandoned provisioning',
     '## Cooperative provider lifecycle',
     'issues/49',
@@ -55,6 +58,24 @@ for (const [path, markers] of Object.entries({
   }
   const content = readFileSync(absolute, 'utf8')
   for (const marker of markers) if (!content.includes(marker)) errors.push(`${path} missing ${marker}`)
+}
+
+for (const path of [
+  'README.md',
+  'README.zh-CN.md',
+  'packages/multi-tenant/README.md',
+  'packages/multi-tenant/README.zh-CN.md',
+  `docs/releases/v${version}.md`,
+]) {
+  const content = readFileSync(join(root, path), 'utf8')
+  for (const staleStatus of [
+    'intentionally unpublished',
+    'No `0.4` package, tag, or GitHub Release exists',
+    '按计划保持未发布',
+    'npm、Git tag 和 GitHub Release 均未创建',
+  ]) {
+    if (content.includes(staleStatus)) errors.push(`${path} retains stale release status: ${staleStatus}`)
+  }
 }
 
 const releaseCheck = String(rootPkg.scripts?.['release:check'] ?? '')
