@@ -85,8 +85,11 @@ for (const marker of ["'22.19.0'", "'24'", 'pnpm install --frozen-lockfile', 'pn
   if (!ci.includes(marker)) errors.push(`CI missing ${marker}`)
 }
 const release = readFileSync(join(root, '.github/workflows/release.yml'), 'utf8')
-for (const marker of ['workflow_dispatch:', 'environment: npm-release', 'actions: read', 'id-token: write', 'Require successful CI for release commit', 'pnpm release:check', 'npm publish --access public --provenance --tag "$NPM_TAG"']) {
+for (const marker of ['workflow_dispatch:', 'registry_maintenance:', 'environment: npm-release', 'actions: read', 'id-token: write', 'Require successful CI for release commit', 'pnpm release:check', 'npm publish --access public --provenance --tag "$NPM_TAG"', 'registry-channel-cleanup.mjs']) {
   if (!release.includes(marker)) errors.push(`manual release workflow missing ${marker}`)
+}
+if (!existsSync(join(root, 'scripts/registry-channel-cleanup.mjs'))) {
+  errors.push('registry channel cleanup script is missing')
 }
 
 const workspace = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
