@@ -104,9 +104,9 @@ async function injectMarker(ctx: Context, principal: PrincipalContext, id: Agent
   })
 }
 
-describe('DSH alpha.5 native Agent/Session/MCP lifecycle', () => {
+describe('DSH 0.1.2-rc.1 native Agent/Session/MCP lifecycle', () => {
   it('creates, persists, restarts, resumes, and deletes real DSH Agents', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-alpha5-'))
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-rc1-'))
     const database = join(directory, 'agents.sqlite')
     const sessions = join(directory, 'sessions')
     let first: Context | undefined

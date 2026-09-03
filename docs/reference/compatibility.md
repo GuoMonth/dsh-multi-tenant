@@ -1,10 +1,12 @@
 # Compatibility
 
-`dsh-multi-tenant@0.4.0-alpha.2` targets Node `^22.19.0 || >=24.0.0` and exactly DSH `0.1.2-alpha.5` (release source commit `db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5`). Its DSH peer and development dependencies are exact, not ranges.
+`dsh-multi-tenant@0.4.0-alpha.3` targets Node `^22.19.0 || >=24.0.0` and exactly DSH `0.1.2-rc.1` (release source commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d`). Its DSH peer and development dependencies are exact, not ranges.
 
-Alpha.2 is an integration prerelease, identified in source by `v0.4.0-alpha.2` and distributed on npm only through the `alpha` dist-tag. It does not claim API stability and must not replace the npm `latest` channel.
+Alpha.3 is an integration prerelease with matching source tag `v0.4.0-alpha.3`, distributed on npm only through the `alpha` dist-tag. It does not claim API stability and must not replace the npm `latest` channel.
 
-The alpha.4-to-alpha.5 source review found functional changes in storage-domain compatibility, JSON storage, and persisted session-projection cache handling. The Agent registry/loop, core Session, MCP client, API/Web surfaces used here, and package entry points had no semantic API change. Because restart correctness is in scope, alpha.5 is the minimum and only supported DSH baseline.
+The exact [alpha.5-to-RC.1 upstream comparison](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.2-alpha.5...dsh-v0.1.2-rc.1) contains two release commits and only package-version metadata changes. Agent registry/loop, core Session, persistence, Session projection, MCP client, Tools, and API/Web source are unchanged. Even so, alpha.3 advances every direct DSH peer/development dependency and the source-identity gate together; RC.1 is its only supported DSH baseline.
+
+The earlier alpha.4-to-alpha.5 review found functional changes in storage-domain compatibility, JSON storage, and persisted session-projection cache handling. Those changes remain part of RC.1 and continue to be exercised by restart and real lifecycle tests.
 
 `0.4` is a clean product line. It has no source, data, or API compatibility promise with `0.3`: Session claims, credentials, Operations, RuntimeComposition, compatibility facades, and the old SQLite ownership table are not read or migrated.
 

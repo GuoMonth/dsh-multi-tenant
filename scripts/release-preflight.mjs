@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
 const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const errors = []
-const version = '0.4.0-alpha.2'
+const version = '0.4.0-alpha.3'
 const releaseTag = `v${version}`
 const requiredExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
 
@@ -34,19 +34,16 @@ for (const [path, markers] of Object.entries({
   'README.zh-CN.md': [version, releaseTag, 'alpha` dist-tag', '逻辑隔离', 'Stock DSH `/api`', 'issues/50'],
   'packages/multi-tenant/README.md': [version, releaseTag, '## Minimal API', '## Real MCP configuration', '## Guarantees and boundaries', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
   'packages/multi-tenant/README.zh-CN.md': [version, releaseTag, '## 最小 API', '## 真实 MCP', '## 保证与边界', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
-  'docs/reference/compatibility.md': [version, releaseTag, '0.1.2-alpha.5', './cordis.patch.yml'],
-  'docs/reference/compatibility.zh-CN.md': [version, releaseTag, '0.1.2-alpha.5', './cordis.patch.yml'],
+  'docs/reference/compatibility.md': [version, releaseTag, '0.1.2-rc.1', './cordis.patch.yml'],
+  'docs/reference/compatibility.zh-CN.md': [version, releaseTag, '0.1.2-rc.1', './cordis.patch.yml'],
   'docs/reference/release.md': [version, releaseTag, 'pnpm release:check'],
   'docs/reference/release.zh-CN.md': [version, releaseTag, 'pnpm release:check'],
   [`docs/releases/v${version}.md`]: [
     version,
     releaseTag,
-    '## Who should use it',
-    '## Abandoned provisioning',
-    '## Cooperative provider lifecycle',
-    'issues/49',
-    'issues/50',
-    'issues/54',
+    '## DSH RC baseline',
+    '## Compatibility decision',
+    '## Evidence',
     '## Explicit limits',
     '## 中文复盘',
   ],
@@ -90,6 +87,15 @@ for (const marker of ["'22.19.0'", "'24'", 'pnpm install --frozen-lockfile', 'pn
 const release = readFileSync(join(root, '.github/workflows/release.yml'), 'utf8')
 for (const marker of ['workflow_dispatch:', 'environment: npm-release', 'actions: read', 'id-token: write', 'Require successful CI for release commit', 'pnpm release:check', 'npm publish --access public --provenance --tag alpha']) {
   if (!release.includes(marker)) errors.push(`manual release workflow missing ${marker}`)
+}
+
+const workspace = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
+for (const marker of [
+  'minimumReleaseAge: 1440',
+  "'@deepseek-ai/dsh-agent': 0.1.2-rc.1",
+  "'@deepseek-ai/dsh-agent@0.1.2-rc.1'",
+]) {
+  if (!workspace.includes(marker)) errors.push(`pnpm RC baseline policy missing ${marker}`)
 }
 
 for (const workflow of filesBelow(join(root, '.github/workflows'))

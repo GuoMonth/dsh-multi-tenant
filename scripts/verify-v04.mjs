@@ -7,9 +7,9 @@ import { DSH_TARGET } from './dsh-target.mjs'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
 const errors = []
-const expectedVersion = '0.4.0-alpha.2'
-const expectedDsh = '0.1.2-alpha.5'
-const expectedCommit = 'db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5'
+const expectedVersion = '0.4.0-alpha.3'
+const expectedDsh = '0.1.2-rc.1'
+const expectedCommit = 'a66e4702047846cdaa10c66c9d3df3951f5ea70d'
 const expectedExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
 const dshPackages = [
   '@deepseek-ai/dsh-agent',
@@ -21,7 +21,7 @@ const dshPackages = [
 if (pkg.version !== expectedVersion) errors.push(`package version must be ${expectedVersion}`)
 if (pkg.publishConfig?.tag !== 'alpha') errors.push('publishConfig.tag must be alpha')
 if (DSH_TARGET.version !== expectedDsh || DSH_TARGET.commit !== expectedCommit) {
-  errors.push('DSH target identity drifted from alpha.5')
+  errors.push('DSH target identity drifted from 0.1.2-rc.1')
 }
 if (JSON.stringify(Object.keys(pkg.exports)) !== JSON.stringify(expectedExports)) {
   errors.push(`public exports must be exactly ${expectedExports.join(', ')}`)
@@ -34,6 +34,16 @@ for (const [name, version] of Object.entries(pkg.devDependencies ?? {})) {
   if (name.startsWith('@deepseek-ai/dsh-') && version !== expectedDsh) {
     errors.push(`${name} dev dependency must be exact ${expectedDsh}`)
   }
+}
+
+const lockfile = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8')
+const resolvedDshPackages = [
+  ...lockfile.matchAll(/^  '(@deepseek-ai\/dsh-[^@']+)@([^:(']+)(?:\([^']*)?':/gm),
+]
+if (resolvedDshPackages.length === 0) errors.push('lockfile contains no resolved DSH packages')
+for (const match of resolvedDshPackages) {
+  const [, name, version] = match
+  if (version !== expectedDsh) errors.push(`${name} lockfile resolution must be exact ${expectedDsh}, got ${version}`)
 }
 
 for (const path of [
