@@ -16,5 +16,3 @@ Project workflows reject mutable third-party `uses:` references during preflight
 These commands do not publish npm, create a Git tag, or create a GitHub Release. The source tag, npm artifact, and GitHub Release are independently verifiable release artifacts.
 
 Distribution remains an explicit manual workflow action and requires a successful CI run for the exact `main` commit being released. The workflow publishes with npm Trusted Publishing and provenance, verifies the registry artifact and `latest` dist-tag, reuses a matching source tag or creates it when absent, and creates a matching GitHub Release. It fails if an existing tag identifies a different commit.
-
-The same trusted workflow has a registry-maintenance mode for retiring `alpha` or `next` only when that channel points to a release line no newer than the current stable `latest`. It cannot publish, retag `latest`, remove an ahead prerelease channel, or rewrite an existing artifact.

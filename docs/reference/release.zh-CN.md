@@ -16,5 +16,3 @@ Preflight 会拒绝项目 workflow 中任何可变的第三方 `uses:`，已审�
 这些命令不会发布 npm、创建 Git tag 或创建 GitHub Release。源码 tag、npm artifact 和 GitHub Release 是可以分别核验的 release 产物。
 
 分发必须显式手动触发 workflow，并要求待发布的精确 `main` commit 已有成功的 CI 结果。该 workflow 通过 npm Trusted Publishing 和 provenance 发布，验证 registry artifact 与 `latest` dist-tag，复用指向同一提交的源码 tag（不存在时才创建），最后创建对应 GitHub Release；如果已有 tag 指向其他提交则直接失败。
-
-同一个可信 workflow 提供 registry maintenance 模式：只有当 `alpha` 或 `next` 指向不高于当前稳定版 `latest` 的版本线时，才会清理该过期通道。它不能发布新包、改写 `latest`、删除更靠前的预发布通道或修改已有 artifact。

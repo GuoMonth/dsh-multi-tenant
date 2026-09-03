@@ -4,12 +4,6 @@ run-name: Publish dsh-multi-tenant from main
 
 on:
   workflow_dispatch:
-    inputs:
-      registry_maintenance:
-        description: Retire prerelease dist-tags already superseded by latest
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   actions: read
@@ -109,12 +103,7 @@ jobs:
       - name: Verify registry artifact and dist-tag
         run: node scripts/registry-smoke.mjs "$RELEASE_VERSION" "$NPM_TAG"
 
-      - name: Retire superseded prerelease dist-tags
-        if: ${{ inputs.registry_maintenance }}
-        run: node scripts/registry-channel-cleanup.mjs "$RELEASE_VERSION"
-
       - name: Create matching Git tag and GitHub release
-        if: ${{ !inputs.registry_maintenance }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
