@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
 const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const errors = []
-const version = '0.4.0-alpha.3'
+const version = '0.4.0'
 const releaseTag = `v${version}`
 const requiredExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
 
@@ -19,8 +19,8 @@ function filesBelow(directory) {
 }
 
 if (pkg.name !== 'dsh-multi-tenant' || pkg.version !== version) errors.push('release identity mismatch')
-if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.tag !== 'alpha' || pkg.publishConfig?.provenance !== true) {
-  errors.push('publishConfig must be public alpha with provenance')
+if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.tag !== 'latest' || pkg.publishConfig?.provenance !== true) {
+  errors.push('publishConfig must be public latest with provenance')
 }
 if (pkg.license !== 'MIT') errors.push('license must be MIT')
 if (pkg.dsh?.bundle?.patch !== './cordis.patch.yml') errors.push('DSH bundle patch missing')
@@ -30,8 +30,8 @@ for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'LICENSE', 'cordis.p
 }
 
 for (const [path, markers] of Object.entries({
-  'README.md': [version, releaseTag, 'alpha` dist-tag', 'logical isolation', 'DSH `/api`', 'issues/50'],
-  'README.zh-CN.md': [version, releaseTag, 'alpha` dist-tag', '逻辑隔离', 'Stock DSH `/api`', 'issues/50'],
+  'README.md': [version, releaseTag, '`latest` dist-tag', 'DSH `0.1.2-rc.1`', 'logical isolation', 'DSH `/api`', 'issues/50'],
+  'README.zh-CN.md': [version, releaseTag, '`latest` dist-tag', 'DSH `0.1.2-rc.1`', '逻辑隔离', 'Stock DSH `/api`', 'issues/50'],
   'packages/multi-tenant/README.md': [version, releaseTag, '## Minimal API', '## Real MCP configuration', '## Guarantees and boundaries', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
   'packages/multi-tenant/README.zh-CN.md': [version, releaseTag, '## 最小 API', '## 真实 MCP', '## 保证与边界', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
   'docs/reference/compatibility.md': [version, releaseTag, '0.1.2-rc.1', './cordis.patch.yml'],
@@ -41,8 +41,8 @@ for (const [path, markers] of Object.entries({
   [`docs/releases/v${version}.md`]: [
     version,
     releaseTag,
-    '## DSH RC baseline',
-    '## Compatibility decision',
+    '## DSH compatibility baseline',
+    '## Stable release decision',
     '## Evidence',
     '## Explicit limits',
     '## 中文复盘',
@@ -85,7 +85,7 @@ for (const marker of ["'22.19.0'", "'24'", 'pnpm install --frozen-lockfile', 'pn
   if (!ci.includes(marker)) errors.push(`CI missing ${marker}`)
 }
 const release = readFileSync(join(root, '.github/workflows/release.yml'), 'utf8')
-for (const marker of ['workflow_dispatch:', 'environment: npm-release', 'actions: read', 'id-token: write', 'Require successful CI for release commit', 'pnpm release:check', 'npm publish --access public --provenance --tag alpha']) {
+for (const marker of ['workflow_dispatch:', 'environment: npm-release', 'actions: read', 'id-token: write', 'Require successful CI for release commit', 'pnpm release:check', 'npm publish --access public --provenance --tag "$NPM_TAG"']) {
   if (!release.includes(marker)) errors.push(`manual release workflow missing ${marker}`)
 }
 
@@ -126,4 +126,4 @@ if (errors.length > 0) {
   console.error(`release preflight failed:\n- ${errors.join('\n- ')}`)
   process.exit(1)
 }
-console.log(`release preflight passed: dsh-multi-tenant@${version} on alpha`)
+console.log(`release preflight passed: dsh-multi-tenant@${version} on latest`)

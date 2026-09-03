@@ -1,4 +1,4 @@
-name: Publish alpha package
+name: Publish package
 
 run-name: Publish dsh-multi-tenant from main
 
@@ -65,8 +65,15 @@ jobs:
             exit 1
           fi
           RELEASE_VERSION=$(node -p "require('./packages/multi-tenant/package.json').version")
+          NPM_TAG=$(node -p "require('./packages/multi-tenant/package.json').publishConfig.tag")
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> "$GITHUB_ENV"
-          echo "Publishing dsh-multi-tenant@$RELEASE_VERSION as npm alpha"
+          echo "NPM_TAG=$NPM_TAG" >> "$GITHUB_ENV"
+          echo "Publishing dsh-multi-tenant@$RELEASE_VERSION as npm $NPM_TAG"
+
+          if [ "$NPM_TAG" != "latest" ]; then
+            echo "Stable release workflow requires publishConfig.tag=latest; got $NPM_TAG" >&2
+            exit 1
+          fi
 
           node - <<'NODE'
           const { execFileSync } = require('node:child_process')
@@ -91,10 +98,10 @@ jobs:
       - name: Publish to npm via Trusted Publishing
         if: steps.registry.outputs.publish_needed == 'true'
         working-directory: packages/multi-tenant
-        run: npm publish --access public --provenance --tag alpha
+        run: npm publish --access public --provenance --tag "$NPM_TAG"
 
-      - name: Verify registry artifact and alpha tag
-        run: node scripts/registry-smoke.mjs "$RELEASE_VERSION"
+      - name: Verify registry artifact and dist-tag
+        run: node scripts/registry-smoke.mjs "$RELEASE_VERSION" "$NPM_TAG"
 
       - name: Create matching Git tag and GitHub release
         env:

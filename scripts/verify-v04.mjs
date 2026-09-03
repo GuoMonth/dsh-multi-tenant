@@ -7,7 +7,7 @@ import { DSH_TARGET } from './dsh-target.mjs'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
 const errors = []
-const expectedVersion = '0.4.0-alpha.3'
+const expectedVersion = '0.4.0'
 const expectedDsh = '0.1.2-rc.1'
 const expectedCommit = 'a66e4702047846cdaa10c66c9d3df3951f5ea70d'
 const expectedExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
@@ -19,7 +19,7 @@ const dshPackages = [
 ]
 
 if (pkg.version !== expectedVersion) errors.push(`package version must be ${expectedVersion}`)
-if (pkg.publishConfig?.tag !== 'alpha') errors.push('publishConfig.tag must be alpha')
+if (pkg.publishConfig?.tag !== 'latest') errors.push('publishConfig.tag must be latest')
 if (DSH_TARGET.version !== expectedDsh || DSH_TARGET.commit !== expectedCommit) {
   errors.push('DSH target identity drifted from 0.1.2-rc.1')
 }

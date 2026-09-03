@@ -2,23 +2,23 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.4.0-alpha.3` is a DSH multi-tenant plugin for Node 22.19+ and Node 24. It is pinned to `@deepseek-ai/*@0.1.2-rc.1` at upstream commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d`.
+`dsh-multi-tenant@0.4.0` is a DSH multi-tenant plugin for Node 22.19+ and Node 24. It is pinned to `@deepseek-ai/*@0.1.2-rc.1` at upstream commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d`.
 
-This alpha is for host integration and contract feedback. It provides a compact authority path from a server-minted Principal to an owned DSH Agent, durable local directory, and Agent-scoped MCP lifecycle. It assumes the host already provides trustworthy authentication and owns any isolation stronger than the bundled logical boundary.
+This is the first non-prerelease distribution of the clean `0.4` plugin surface. It provides a compact authority path from a server-minted Principal to an owned DSH Agent, durable local directory, and Agent-scoped MCP lifecycle. It assumes the host already provides trustworthy authentication and owns any isolation stronger than the bundled logical boundary.
 
 ## Install
 
-When the npm distribution is available, use the alpha channel or pin the reviewed build exactly:
+Install the stable channel, or pin this reviewed build exactly:
 
 ```bash
-pnpm add dsh-multi-tenant@alpha
-# or pin the reviewed prerelease exactly
-pnpm add dsh-multi-tenant@0.4.0-alpha.3
+pnpm add dsh-multi-tenant
+# or pin the reviewed release exactly
+pnpm add dsh-multi-tenant@0.4.0
 ```
 
-The `alpha` channel may introduce source-breaking provider contract changes before `0.4.0`. Use the exact version when reproducible deployments matter. The matching source tag is `v0.4.0-alpha.3`; publishing the npm artifact and GitHub prerelease are separate explicit release operations.
+The matching source tag is `v0.4.0`, and npm publishes it on the `latest` dist-tag. This is the reviewed, supported entry point for the documented `0.4` API and lifecycle contract, not a `1.0`-level promise against future evolution. Incompatible changes must be explicitly versioned and documented. DSH `0.1.2-rc.1` remains an upstream release candidate and an exact peer dependency; later DSH builds require an explicit plugin compatibility release.
 
-DSH RC.1 changes only release metadata relative to alpha.5, but alpha.3 intentionally supports RC.1 alone. All direct DSH peers and development dependencies are exact so an unreviewed Harness build cannot silently enter the runtime graph.
+DSH RC.1 changes only release metadata relative to alpha.5, but `0.4.0` intentionally supports RC.1 alone. All direct DSH peers and development dependencies are exact so an unreviewed Harness build cannot silently enter the runtime graph.
 
 Load the plugin after the DSH `agents` and `tools` services. With no host replacements it uses `.dsh-multi-tenant/agents.sqlite`, an empty MCP declaration, and DSH's shared in-process runtime:
 
@@ -134,7 +134,7 @@ Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tena
 - SQLite records use CAS revisions and Principal-scoped SQL. An authorized delete immediately invalidates active callback views and reserves a serialized barrier; later `withAgent()` calls cannot overtake it and see only not-found after the scrubbed tombstone is committed.
 - Provisioning is unpublished until DSH setup and the database ready transition both succeed.
 - Per-Agent create/resume/refresh/delete is serialized; concurrent opens single-flight; plugin shutdown cancels and drains every owned handle.
-- The alpha.2 lifecycle contract, retained in alpha.3, propagates abort through MCP, Secret, RuntimePartition, and DSH setup and validates provider results before use. Drain remains cooperative: code that ignores abort or never settles can delay delete or shutdown indefinitely; forced interruption and arbitrary default timeouts are out of scope.
+- The lifecycle contract propagates abort through MCP, Secret, RuntimePartition, and DSH setup and validates provider results before use. Drain remains cooperative: code that ignores abort or never settles can delay delete or shutdown indefinitely; forced interruption and arbitrary default timeouts are out of scope.
 - A configured `strong` minimum fails closed before DSH Agent creation when the provider offers only `logical` isolation.
 - `TenantAgentRepository`, `TenantMcpProvider`, `SecretProvider`, `RuntimePartitionProvider`, and `DshRuntimeDriver` are the host replacement protocols. They compose through Cordis services; there is no second DI system.
 - The bundled shared provider is process-local logical separation. It does not isolate hostile plugins, tools, filesystem access, subprocesses, memory, or network traffic.
