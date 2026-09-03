@@ -6,6 +6,6 @@ The alpha.4-to-alpha.5 source review found functional changes in storage-domain 
 
 `0.4` is a clean product line. It has no source, data, or API compatibility promise with `0.3`: Session claims, credentials, Operations, RuntimeComposition, compatibility facades, and the old SQLite ownership table are not read or migrated.
 
-Supported public subpaths are the package root, `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`. Anything else is private.
+Supported public code/API subpaths are the package root, `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`. `./cordis.patch.yml` is additionally exported for the DSH loader; it is configuration data rather than a JavaScript API. Anything else is private.
 
 Node 22.19 and Node 24 run the same typecheck, tests, build, SQLite restart probe, native DSH AgentLoop/JSONL/official-MCP lifecycle integration, and installed-tarball smoke in CI. The lifecycle test does not override the Agent factory or substitute a Session.

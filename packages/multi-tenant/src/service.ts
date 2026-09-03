@@ -263,12 +263,16 @@ export class MultiTenantService extends Service {
     this.assertAccepting()
     assertPrincipalContext(principal)
     const parsed = parseAgentId(id)
-    // Authorize before touching a live runtime. Once ownership is proven, stop
-    // foreground work immediately; durable tombstoning and drain remain serial.
-    await this.readyRecord(principal, parsed)
-    const live = this.live.get(parsed)
-    if (live !== undefined) this.invalidateLive(live, 'Agent deleted')
-    await this.serial(parsed, async () => {
+    // Start scoped authorization without yielding, then reserve the deletion
+    // barrier synchronously so a later withAgent() cannot overtake it. Only an
+    // authorized delete may revoke the currently live runtime.
+    const authorized = this.readyRecord(principal, parsed)
+    void authorized.then(() => {
+      const live = this.live.get(parsed)
+      if (live !== undefined) this.invalidateLive(live, 'Agent deleted')
+    }, () => undefined)
+    return this.serial(parsed, async () => {
+      await authorized
       const record = await this.readyRecord(principal, parsed)
       const deleted = await this.repository.transition(principal, parsed, record.revision, {
         from: 'ready',
@@ -450,6 +454,7 @@ export class MultiTenantService extends Service {
   }
 
   private invalidateLive(entry: LiveAgent, reason: string): void {
+    if (entry.invalidated) return
     entry.invalidated = true
     for (const scope of entry.scopes) scope.invalidate()
     entry.scopes.clear()

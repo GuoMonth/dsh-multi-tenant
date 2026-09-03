@@ -401,7 +401,7 @@ describe('MultiTenantService authority kernel', () => {
     await expect(second.service.get(restartedPrincipal, agent.id)).rejects.toThrow(AgentNotFoundError)
   })
 
-  it('cancels immediately on authorized delete, then drains and tombstones', async () => {
+  it('cancels immediately and prevents a later withAgent from overtaking deletion', async () => {
     const test = await harness()
     const principal = alice()
     const agent = await test.service.create(principal)
@@ -415,14 +415,75 @@ describe('MultiTenantService authority kernel', () => {
     })
     await entered.promise
     const deletion = test.service.delete(principal, agent.id)
+    let enteredAfterDelete = false
+    const queuedUse = expect(test.service.withAgent(principal, agent.id, async () => {
+      enteredAfterDelete = true
+    })).rejects.toThrow(AgentNotFoundError)
     await new Promise(resolve => setImmediate(resolve))
     expect(test.driver.handles[0]?.runtime.cancellations).toContain('Agent deleted')
     expectExpired(retained!)
     gate.resolve()
-    await Promise.all([use, deletion])
+    await Promise.all([use, deletion, queuedUse])
+    expect(enteredAfterDelete).toBe(false)
+    expect(test.driver.resumeSpecifications).toHaveLength(0)
     expect(test.driver.handles[0]?.disposeCount).toBe(1)
     const tombstone = await test.repository.get(principal, agent.id)
     expect(tombstone).toEqual(expect.objectContaining({ state: 'deleted', mcpServers: [] }))
+  })
+
+  it('allows owner use after an unauthorized delete without touching the live Agent', async () => {
+    const test = await harness()
+    const principal = alice()
+    const agent = await test.service.create(principal)
+
+    await expect(test.service.delete(bob(), agent.id)).rejects.toThrow(AgentNotFoundError)
+    await test.service.withAgent(principal, agent.id, async runtime => runtime.whenIdle())
+
+    expect(test.driver.resumeSpecifications).toHaveLength(0)
+    expect(test.driver.handles[0]?.runtime.cancellations).toHaveLength(0)
+    expect(test.driver.handles[0]?.disposeCount).toBe(0)
+  })
+
+  it('serializes concurrent deletes and disposes the live handle once', async () => {
+    const test = await harness()
+    const principal = alice()
+    const agent = await test.service.create(principal)
+
+    const results = await Promise.allSettled([
+      test.service.delete(principal, agent.id),
+      test.service.delete(principal, agent.id),
+    ])
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    const rejected = results.find(result => result.status === 'rejected')
+    expect(rejected).toEqual(expect.objectContaining({
+      reason: expect.any(AgentNotFoundError),
+    }))
+    expect(test.driver.resumeSpecifications).toHaveLength(0)
+    expect(test.driver.handles[0]?.disposeCount).toBe(1)
+  })
+
+  it('keeps a ready record usable when its durable delete transition fails', async () => {
+    const test = await harness()
+    const principal = alice()
+    const agent = await test.service.create(principal)
+    const transition = test.repository.transition.bind(test.repository)
+    let failDelete = true
+    test.repository.transition = async (owner, id, revision, change) => {
+      if (change.to === 'deleted' && failDelete) {
+        failDelete = false
+        throw new Error('database delete failed')
+      }
+      return transition(owner, id, revision, change)
+    }
+
+    await expect(test.service.delete(principal, agent.id)).rejects.toThrow('database delete failed')
+    await expect(test.service.get(principal, agent.id)).resolves.toEqual(expect.objectContaining({ id: agent.id }))
+    await test.service.withAgent(principal, agent.id, async runtime => runtime.whenIdle())
+
+    expect(test.driver.handles[0]?.runtime.cancellations).toContain('Agent deleted')
+    expect(test.driver.handles[0]?.disposeCount).toBe(1)
+    expect(test.driver.resumeSpecifications).toHaveLength(1)
   })
 
   it('revokes a secret-backed live Agent and resumes the same internal session with a fresh lease', async () => {

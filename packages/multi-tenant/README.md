@@ -109,9 +109,10 @@ Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tena
 
 ## Guarantees and boundaries
 
-- SQLite records use CAS revisions and Principal-scoped SQL. Delete revokes access first and retains only a scrubbed tombstone.
+- SQLite records use CAS revisions and Principal-scoped SQL. An authorized delete immediately invalidates active callback views and reserves a serialized barrier; later `withAgent()` calls cannot overtake it and see only not-found after the scrubbed tombstone is committed.
 - Provisioning is unpublished until DSH setup and the database ready transition both succeed.
 - Per-Agent create/resume/refresh/delete is serialized; concurrent opens single-flight; plugin shutdown cancels and drains every owned handle.
+- Alpha.1 drain is cooperative: a callback or host provider acquisition that never settles can delay delete or shutdown indefinitely. Bounded acquisition/callback outcomes and behavioral conformance remain tracked in [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50).
 - A configured `strong` minimum fails closed before DSH Agent creation when the provider offers only `logical` isolation.
 - `TenantAgentRepository`, `TenantMcpProvider`, `SecretProvider`, `RuntimePartitionProvider`, and `DshRuntimeDriver` are the host replacement protocols. They compose through Cordis services; there is no second DI system.
 - The bundled shared provider is process-local logical separation. It does not isolate hostile plugins, tools, filesystem access, subprocesses, memory, or network traffic.
@@ -119,4 +120,4 @@ Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tena
 - Delete does not claim physical erasure of DSH persistent logs.
 - No Typert public adapter is shipped because stock Typert does not establish a trusted Principal binding. Keep stock DSH `/api` private/administrative.
 
-Public subpaths are exactly `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`.
+Public code/API subpaths are exactly `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`. `./cordis.patch.yml` is additionally exported as a DSH loader configuration artifact, not a JavaScript API.

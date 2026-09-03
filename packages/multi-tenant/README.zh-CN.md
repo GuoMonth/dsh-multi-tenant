@@ -101,9 +101,10 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
 
 ## 保证与边界
 
-- SQLite 使用 CAS revision 和 Principal-scoped SQL；删除先撤销访问，只保留已清理的 tombstone。
+- SQLite 使用 CAS revision 和 Principal-scoped SQL；已授权删除会立即使 active callback view 失效并预留串行屏障，后发 `withAgent()` 不能越过删除，只会在已清理的 tombstone 提交后得到 not-found。
 - DSH setup 和数据库 ready transition 都成功后，Agent 才会公开。
 - 每个 Agent 的 create/resume/refresh/delete 串行；并发打开 single-flight；插件关闭会 cancel 并 drain 全部 handle。
+- Alpha.1 的 drain 是 cooperative 的：永不结束的 callback 或宿主 provider acquisition 可能无限延迟 delete/shutdown。Bounded acquisition/callback outcome 和 behavioral conformance 继续由 [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) 跟踪。
 - 最低隔离配置为 `strong` 时，共享逻辑 provider 会在创建 DSH Agent 前 fail closed。
 - `TenantAgentRepository`、`TenantMcpProvider`、`SecretProvider`、`RuntimePartitionProvider`、`DshRuntimeDriver` 是宿主替换协议，统一通过 Cordis service 组合。
 - 默认 shared provider 只是进程内逻辑隔离，不能隔离 hostile plugin/tool、filesystem、subprocess、内存或网络。
@@ -111,4 +112,4 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
 - 删除不承诺物理擦除 DSH 持久日志。
 - 本版本不提供 Typert 公网 adapter，因为 stock Typert 不能建立可信 Principal 绑定。Stock DSH `/api` 必须保持私有/管理用途。
 
-公共子路径只有 `/mcp`、`/sqlite`、`/web`、`/testing`、`/starter`。
+公共代码/API 子路径只有 `/mcp`、`/sqlite`、`/web`、`/testing`、`/starter`。此外还公开 `./cordis.patch.yml`，它是 DSH loader 配置 artifact，不是 JavaScript API。

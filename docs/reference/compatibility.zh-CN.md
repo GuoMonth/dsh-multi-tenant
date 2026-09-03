@@ -6,6 +6,6 @@ alpha.4 到 alpha.5 的源码审查确认：有效变化集中在 storage-domain
 
 `0.4` 是全新产品线，不承诺与 `0.3` 保持源码、数据或 API 兼容。Session claim、credential、Operation、RuntimeComposition、兼容 facade 和旧 SQLite ownership table 都不会被读取或迁移。
 
-支持的公共子路径只有 package root、`/mcp`、`/sqlite`、`/web`、`/testing`、`/starter`；其余内容都是 private。
+支持的公共代码/API 子路径只有 package root、`/mcp`、`/sqlite`、`/web`、`/testing`、`/starter`。此外还为 DSH loader 公开 `./cordis.patch.yml`；它是配置数据，不是 JavaScript API。其余内容都是 private。
 
 CI 会在 Node 22.19 和 Node 24 上执行相同的 typecheck、test、build、SQLite restart probe、原生 DSH AgentLoop/JSONL/官方 MCP 生命周期 integration 和安装后 tarball smoke。生命周期测试不覆盖 Agent factory，也不替换 Session。
