@@ -2,12 +2,13 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import { DSH_TARGET } from './dsh-target.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
 const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const errors = []
-const version = '0.4.0'
+const version = pkg.version
 const releaseTag = `v${version}`
 const requiredExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
 
@@ -18,7 +19,7 @@ function filesBelow(directory) {
   })
 }
 
-if (pkg.name !== 'dsh-multi-tenant' || pkg.version !== version) errors.push('release identity mismatch')
+if (pkg.name !== 'dsh-multi-tenant' || !/^\d+\.\d+\.\d+$/.test(version)) errors.push('release identity mismatch')
 if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.tag !== 'latest' || pkg.publishConfig?.provenance !== true) {
   errors.push('publishConfig must be public latest with provenance')
 }
@@ -30,19 +31,19 @@ for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'LICENSE', 'cordis.p
 }
 
 for (const [path, markers] of Object.entries({
-  'README.md': [version, releaseTag, '`latest` dist-tag', 'DSH `0.1.2-rc.1`', 'logical isolation', 'DSH `/api`', 'issues/50'],
-  'README.zh-CN.md': [version, releaseTag, '`latest` dist-tag', 'DSH `0.1.2-rc.1`', '逻辑隔离', 'Stock DSH `/api`', 'issues/50'],
+  'README.md': [version, releaseTag, '`latest` dist-tag', `DSH \`${DSH_TARGET.version}\``, 'logical isolation', 'DSH `/api`', 'issues/50'],
+  'README.zh-CN.md': [version, releaseTag, '`latest` dist-tag', `DSH \`${DSH_TARGET.version}\``, '逻辑隔离', 'Stock DSH `/api`', 'issues/50'],
   'packages/multi-tenant/README.md': [version, releaseTag, '## Minimal API', '## Real MCP configuration', '## Guarantees and boundaries', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
   'packages/multi-tenant/README.zh-CN.md': [version, releaseTag, '## 最小 API', '## 真实 MCP', '## 保证与边界', 'single-active-process', 'issues/49', 'issues/50', './cordis.patch.yml'],
-  'docs/reference/compatibility.md': [version, releaseTag, '0.1.2-rc.1', './cordis.patch.yml'],
-  'docs/reference/compatibility.zh-CN.md': [version, releaseTag, '0.1.2-rc.1', './cordis.patch.yml'],
+  'docs/reference/compatibility.md': [version, releaseTag, DSH_TARGET.version, './cordis.patch.yml'],
+  'docs/reference/compatibility.zh-CN.md': [version, releaseTag, DSH_TARGET.version, './cordis.patch.yml'],
   'docs/reference/release.md': [version, releaseTag, 'pnpm release:check'],
   'docs/reference/release.zh-CN.md': [version, releaseTag, 'pnpm release:check'],
   [`docs/releases/v${version}.md`]: [
     version,
     releaseTag,
     '## DSH compatibility baseline',
-    '## Stable release decision',
+    '## Release decision',
     '## Evidence',
     '## Explicit limits',
     '## 中文复盘',
@@ -92,10 +93,10 @@ for (const marker of ['workflow_dispatch:', 'environment: npm-release', 'actions
 const workspace = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
 for (const marker of [
   'minimumReleaseAge: 1440',
-  "'@deepseek-ai/dsh-agent': 0.1.2-rc.1",
-  "'@deepseek-ai/dsh-agent@0.1.2-rc.1'",
+  `'@deepseek-ai/dsh-agent': ${DSH_TARGET.version}`,
+  `'@deepseek-ai/dsh-agent@${DSH_TARGET.version}'`,
 ]) {
-  if (!workspace.includes(marker)) errors.push(`pnpm RC baseline policy missing ${marker}`)
+  if (!workspace.includes(marker)) errors.push(`pnpm exact baseline policy missing ${marker}`)
 }
 
 for (const workflow of filesBelow(join(root, '.github/workflows'))

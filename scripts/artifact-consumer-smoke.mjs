@@ -13,8 +13,8 @@ if (requested === undefined) {
   console.error('usage: artifact-consumer-smoke.mjs <package-spec|--local>')
   process.exit(2)
 }
-const consumer = mkdtempSync(join(tmpdir(), 'dsh-mt-v04-consumer-'))
-const packDirectory = requested === '--local' ? mkdtempSync(join(tmpdir(), 'dsh-mt-v04-pack-')) : undefined
+const consumer = mkdtempSync(join(tmpdir(), 'dsh-mt-consumer-'))
+const packDirectory = requested === '--local' ? mkdtempSync(join(tmpdir(), 'dsh-mt-pack-')) : undefined
 
 function targets(value, output = []) {
   if (typeof value === 'string') output.push(value)
@@ -53,12 +53,13 @@ try {
   }
 
   writeFileSync(join(consumer, 'package.json'), JSON.stringify({
-    name: 'dsh-multi-tenant-v04-consumer', private: true, type: 'module',
+    name: 'dsh-multi-tenant-consumer', private: true, type: 'module',
   }))
   writeFileSync(join(consumer, 'pnpm-workspace.yaml'), 'allowBuilds:\n  esbuild: false\n')
   execFileSync('pnpm', ['add',
     '@deepseek-ai/cordis@4.0.2',
     `@deepseek-ai/dsh-agent@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-llm@${DSH_TARGET.version}`,
     `@deepseek-ai/dsh-mcp-client@${DSH_TARGET.version}`,
     `@deepseek-ai/dsh-session@${DSH_TARGET.version}`,
     `@deepseek-ai/dsh-tools@${DSH_TARGET.version}`,
@@ -180,7 +181,7 @@ try {
     assert(tool.value.name === 'probe', 'controlled runtime did not execute tool')
     await ctx.multiTenant.delete(alice, agent.id)
     await ctx.fiber.dispose()
-    console.log('installed v0.4 Agent resource contract passed')
+    console.log('installed Agent resource contract passed')
   `)
   execFileSync(process.execPath, ['smoke.mjs'], { cwd: consumer, stdio: 'inherit' })
   console.log(`artifact consumer smoke passed: ${packageSpec}`)

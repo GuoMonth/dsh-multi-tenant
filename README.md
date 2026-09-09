@@ -2,25 +2,21 @@
 
 `dsh-multi-tenant` is a multi-tenant plugin for DeepSeek Harness. It turns an authenticated `(tenantId, principalId)` into an owned Agent resource without exposing or accepting the underlying DSH session identity.
 
-Current release: **`dsh-multi-tenant@0.4.0`**, pinned to DSH **`0.1.2-rc.1`** at commit **`a66e4702047846cdaa10c66c9d3df3951f5ea70d`**. Its matching source tag is **`v0.4.0`**.
+Current source version: **`dsh-multi-tenant@0.5.0`**, pinned to DSH **`0.1.5-alpha.1`** at commit **`5dda764ed3aa172535a7967b06ff95d9cbfe536a`**. Release identity: **`v0.5.0`**, using npm's `latest` dist-tag. See [GitHub Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases) for publication status.
 
-`0.4.0` is the first non-prerelease distribution of the clean multi-tenant plugin API and is published on npm's `latest` dist-tag. It is the reviewed, supported entry point for the documented `0.4` surface, not a `1.0`-level promise that the project will never evolve. Incompatible changes must be explicitly versioned and documented. DSH `0.1.2-rc.1` is still an upstream release candidate and remains an exact peer; a later DSH RC or stable build requires an explicit compatibility release rather than entering silently.
+This version supports only DSH `0.1.5-alpha.1`. DSH remains an upstream alpha. We maintain one reviewed baseline, without a promise of compatibility with older or future Harness builds. `0.5.0` replaces the `0.4.0` DSH peer requirement; the Principal API and SQLite Agent Directory schema remain unchanged.
 
-The plugin owns Principal-scoped Agent authorization, a durable SQLite Agent directory, capability leases, and DSH Agent/MCP lifecycle. The host still owns authentication, secret storage, and any strong process/container isolation.
+The plugin owns Principal-scoped Agent authorization, a durable SQLite Agent directory, capability leases, and DSH Agent/MCP lifecycle. The host owns authentication, secret storage, and any strong process/container isolation.
 
-The stable release carries forward the two operational contracts completed during the alpha line on top of the clean `0.4` architecture:
+A newly created Agent is checkpointed through DSH before its Directory record becomes ready, including an empty session. A missing or failed durability checkpoint prevents publication and disposes the acquired Agent.
 
-- abandoned SQLite `provisioning` records deterministically become terminal `failed` before the service is exposed;
-- MCP, Secret, runtime-partition, and DSH setup providers receive cooperative lifecycle cancellation and are validated before use.
-
-The DSH alpha.5-to-RC.1 upstream delta contains release metadata only: no Agent, Session, persistence, MCP, or Tools source changed. `0.4.0` nevertheless fixes every direct DSH peer/development dependency and the source-identity gate to the exact RC.1 release, then reruns the full native lifecycle and packed-consumer evidence.
-
-It deliberately does not become a public authentication gateway, distributed ownership system, sandbox, or process supervisor. Those responsibilities stay with the host or with explicitly implemented provider protocols.
+The driver now uses the real DSH registry/setup types and explicit branded identifiers. Native lifecycle verification uses V3 logs and `SessionHandle` reads with explicit flush and close, and checks writer contention and release on disposal. Historical logs are handled by DSH itself; this plugin does not maintain a log migration layer. **Rollback requires the matching pre-upgrade data as well as the old runtime.** An old runtime may read the retained old log while missing newer messages.
 
 - [Usage and API](./packages/multi-tenant/README.md)
 - [中文说明](./README.zh-CN.md)
-- [Compatibility](./docs/reference/compatibility.md)
+- [Compatibility and upgrade](./docs/reference/compatibility.md)
 - [Release checks](./docs/reference/release.md)
+- [0.5.0 changes and refactoring decisions](./docs/releases/v0.5.0.md)
 
 ```text
 authenticated request
@@ -31,6 +27,6 @@ authenticated request
   -> controlled withAgent() runtime view
 ```
 
-The default shared runtime provides logical isolation, not a hostile-code security boundary. Stock DSH `/api` remains private/administrative and is not a public multi-tenant ingress.
+The shared runtime provides logical isolation, not a hostile-code security boundary. Stock DSH `/api` remains private/administrative. The plugin does not become an authentication gateway, distributed ownership coordinator, sandbox, or process supervisor.
 
-The lifecycle contract passes a service `AbortSignal` through MCP, Secret, runtime-partition, and DSH setup, as completed in [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50). Shutdown remains cooperative: host code that ignores abort or never settles can still delay completion, and the plugin adds no forced termination or default timeout.
+Lifecycle cancellation from [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) remains cooperative across MCP, Secret, runtime-partition, and DSH setup. Host code that ignores abort can delay shutdown. `whenIdle()` waits for Agent activity; it is not a persistence durability barrier.

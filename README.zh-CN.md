@@ -2,25 +2,21 @@
 
 `dsh-multi-tenant` 是 DeepSeek Harness 的多租户插件。它把宿主认证得到的 `(tenantId, principalId)` 转换为有明确所有者的 Agent 资源，不接受也不暴露底层 DSH session identity。
 
-当前正式版：**`dsh-multi-tenant@0.4.0`**，精确固定 DSH **`0.1.2-rc.1`** 和 commit **`a66e4702047846cdaa10c66c9d3df3951f5ea70d`**。对应的源码 tag 是 **`v0.4.0`**。
+当前源码版本：**`dsh-multi-tenant@0.5.0`**，精确固定 DSH **`0.1.5-alpha.1`** 和 commit **`5dda764ed3aa172535a7967b06ff95d9cbfe536a`**。发布身份为 **`v0.5.0`**，npm 分发使用 `latest` dist-tag。实际发布状态见 [GitHub Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases)。
 
-`0.4.0` 是全新多租户插件 API 首个不带 prerelease 标识的正式分发版本，通过 npm `latest` dist-tag 发布。它是当前已审查、受支持的 `0.4` 公共入口，不等于 `1.0` 级别的永久兼容承诺；不兼容变更必须通过新版本和文档显式说明。DSH `0.1.2-rc.1` 本身仍是上游 RC，并作为 exact peer 固定；后续 DSH RC 或 stable 不会静默进入依赖图，必须通过新的兼容版本显式升级。
+本版本只支持 DSH `0.1.5-alpha.1`。DSH 仍是上游 alpha；项目只维护一条经过验证的精确基线，不承诺兼容过去或未来的 Harness 版本。`0.5.0` 替换 `0.4.0` 的 DSH peer 要求，Principal API 和 SQLite Agent Directory schema 保持不变。
 
-插件负责 Principal-scoped Agent 授权、持久 SQLite Agent Directory、能力租约，以及 DSH Agent/MCP 生命周期。宿主仍负责认证、Secret 存储，以及需要时的进程/容器级强隔离。
+插件负责 Principal-scoped Agent 授权、持久 SQLite Agent Directory、能力租约及 DSH Agent/MCP 生命周期。宿主负责认证、Secret 存储，以及需要时的进程/容器级强隔离。
 
-正式版保留 alpha 阶段在全新 `0.4` 架构上补齐的两个运行契约：
+新建 Agent 在 Directory 进入 ready 前先通过 DSH 完成单 session 持久化检查，空会话也必须落盘。持久化检查缺失或失败时，创建失败并释放已获取的 Agent。
 
-- 遗留的 SQLite `provisioning` 记录会在 service 对外可用前确定性地进入终态 `failed`；
-- MCP、Secret、runtime-partition 和 DSH setup provider 会收到合作式生命周期取消信号，返回结果在使用前经过校验。
-
-DSH alpha.5 到 RC.1 的上游差异只有 release metadata，没有修改 Agent、Session、persistence、MCP 或 Tools 源码。`0.4.0` 仍把全部直接 DSH peer/dev dependency 和源码身份门禁精确固定到 RC.1，并重新执行完整原生生命周期与打包消费者证据。
-
-它不会扩张成公网认证入口、分布式所有权系统、sandbox 或进程管理器。这些职责继续由宿主承担，或通过明确的 provider 协议实现。
+Driver 改用真实 DSH registry/setup 类型和显式 branded identifier。原生生命周期验证使用 V3 日志，以及带显式 flush/close 的 `SessionHandle` 读取，并验证 writer 冲突及 dispose 后释放。历史日志由 DSH 自己处理，插件不维护日志迁移层。**回滚需要同时恢复升级前数据和对应旧 runtime。** 旧 runtime 可能读到保留的旧日志，却看不到升级后的新消息。
 
 - [中文使用与 API](./packages/multi-tenant/README.zh-CN.md)
 - [English](./README.md)
-- [兼容性](./docs/reference/compatibility.zh-CN.md)
+- [兼容性与升级](./docs/reference/compatibility.zh-CN.md)
 - [发布检查](./docs/reference/release.zh-CN.md)
+- [0.5.0 变更与重构决策](./docs/releases/v0.5.0.md)
 
 ```text
 已认证请求
@@ -31,6 +27,6 @@ DSH alpha.5 到 RC.1 的上游差异只有 release metadata，没有修改 Agent
   -> 受控的 withAgent() runtime view
 ```
 
-默认 shared runtime 只提供逻辑隔离，不是 hostile-code 安全边界。Stock DSH `/api` 保持私有/管理用途，不是公网多租户入口。
+Shared runtime 只提供逻辑隔离，不是 hostile-code 安全边界。Stock DSH `/api` 保持私有/管理用途。插件不扩张为认证网关、分布式所有权协调器、sandbox 或进程管理器。
 
-生命周期契约会把 service `AbortSignal` 传入 MCP、Secret、runtime-partition 和 DSH setup，该能力已在 [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) 完成。Shutdown 仍是 cooperative 的：忽略 abort 或永不结束的宿主代码仍可能延迟完成，插件不会增加强制终止或默认 timeout。
+[#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) 的生命周期取消继续覆盖 MCP、Secret、runtime-partition 和 DSH setup。Shutdown 仍是合作式的，忽略 abort 的宿主代码可能延迟完成。`whenIdle()` 只等待 Agent 活动结束，不是持久化屏障。

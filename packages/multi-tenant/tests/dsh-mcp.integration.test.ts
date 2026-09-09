@@ -8,12 +8,15 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import LlmRuntime, { createUserMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import { SessionAlreadyOwnedError } from '@deepseek-ai/dsh-session-persistence'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
 import {
   AgentNotFoundError,
+  AgentProvisioningError,
+  CapabilityUnavailableError,
   createPrincipalContext,
   MultiTenantService,
   RuntimePartitionProvider,
@@ -66,7 +69,7 @@ class PrincipalSecretProvider extends SecretProvider {
   }
 }
 
-async function openRuntime(database: string, sessions: string): Promise<Context> {
+async function openRuntime(database: string, sessions: string, persistence = true): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
@@ -75,7 +78,7 @@ async function openRuntime(database: string, sessions: string): Promise<Context>
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
-  await ctx.plugin(JsonlSessionPersistence, { root: sessions, compression: 'none' })
+  if (persistence) await ctx.plugin(JsonlSessionPersistence, { root: sessions, compression: 'none' })
   await ctx.plugin(SQLiteTenantAgentRepository, { path: database })
   await ctx.plugin(PrincipalMcpProvider)
   await ctx.plugin(PrincipalSecretProvider)
@@ -104,9 +107,100 @@ async function injectMarker(ctx: Context, principal: PrincipalContext, id: Agent
   })
 }
 
-describe('DSH 0.1.2-rc.1 native Agent/Session/MCP lifecycle', () => {
+/** Observe durable state, rather than treating Agent idleness as a write barrier. */
+async function readStored(ctx: Context, id: ReturnType<typeof SessionId>) {
+  await ctx.sessionPersistence.flush()
+  const handle = await ctx.sessionPersistence.open(id, 'read')
+  try {
+    expect(handle.header.version).toBe(3)
+    return await handle.read()
+  } finally {
+    await handle.close()
+  }
+}
+
+describe('DSH 0.1.5-alpha.1 native Agent/Session/MCP lifecycle', () => {
+  it('refuses to publish a shared Agent without a durability checkpoint', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-no-persistence-'))
+    let ctx: Context | undefined
+    try {
+      ctx = await openRuntime(join(directory, 'agents.sqlite'), join(directory, 'sessions'), false)
+      const principal = createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })
+      await expect(ctx.multiTenant.create(principal)).rejects.toThrow(CapabilityUnavailableError)
+      expect(await ctx.multiTenant.list(principal)).toEqual([])
+      const records = await ctx.tenantAgentRepository.list(principal)
+      expect(records).toHaveLength(1)
+      expect(records[0]?.state).toBe('failed')
+      expect(ctx.agents.get(SessionId(records[0]!.sessionId))).toBeUndefined()
+    } finally {
+      if (ctx !== undefined) await ctx.fiber.dispose().catch(() => undefined)
+      await rm(directory, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('fails publication and releases the writer and MCP scope when a checkpoint fails', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-flush-failure-'))
+    let ctx: Context | undefined
+    try {
+      ctx = await openRuntime(join(directory, 'agents.sqlite'), join(directory, 'sessions'))
+      const principal = createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })
+      const removeFailure = ctx.on('session/flush', () => { throw new Error('checkpoint failed') })
+      try {
+        await expect(ctx.multiTenant.create(principal)).rejects.toThrow(AgentProvisioningError)
+      } finally {
+        removeFailure()
+      }
+      expect(await ctx.multiTenant.list(principal)).toEqual([])
+      const records = await ctx.tenantAgentRepository.list(principal)
+      expect(records).toHaveLength(1)
+      expect(records[0]?.state).toBe('failed')
+      const id = SessionId(records[0]!.sessionId)
+      expect(ctx.agents.get(id)).toBeUndefined()
+      // The official backend did flush before the other listener failed;
+      // acquisition here proves that cleanup released the native writer.
+      const writer = await ctx.sessionPersistence.open(id, 'write')
+      await writer.close()
+      const retried = await ctx.multiTenant.create(principal)
+      await expect(identity(ctx, principal, retried.id)).resolves.toEqual({
+        tenant: 'acme', principal: 'alice', credentialAccepted: true,
+      })
+    } finally {
+      if (ctx !== undefined) await ctx.fiber.dispose().catch(() => undefined)
+      await rm(directory, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('can resume a published Agent after restart before its first message', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-empty-'))
+    const database = join(directory, 'agents.sqlite')
+    const sessions = join(directory, 'sessions')
+    let first: Context | undefined
+    let second: Context | undefined
+    try {
+      first = await openRuntime(database, sessions)
+      const principal = createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })
+      const agent = await first.multiTenant.create(principal, {
+        agentOptions: { provider: 'test-provider', model: 'test-model', reasoningEffort: 'medium', maxTokens: 128 },
+      })
+      const record = await first.tenantAgentRepository.get(principal, agent.id)
+      if (record === undefined) throw new Error('Agent Directory lost a ready record')
+      expect(first.agents.get(SessionId(record.sessionId))?.options.reasoningEffort).toBe('medium')
+      // No message, persistence read, or caller-owned flush before shutdown.
+      await first.fiber.dispose()
+      first = undefined
+      second = await openRuntime(database, sessions)
+      await expect(identity(second, principal, agent.id)).resolves.toEqual({
+        tenant: 'acme', principal: 'alice', credentialAccepted: true,
+      })
+    } finally {
+      if (first !== undefined) await first.fiber.dispose().catch(() => undefined)
+      if (second !== undefined) await second.fiber.dispose().catch(() => undefined)
+      await rm(directory, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('creates, persists, restarts, resumes, and deletes real DSH Agents', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-rc1-'))
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-v3-'))
     const database = join(directory, 'agents.sqlite')
     const sessions = join(directory, 'sessions')
     let first: Context | undefined
@@ -139,8 +233,8 @@ describe('DSH 0.1.2-rc.1 native Agent/Session/MCP lifecycle', () => {
       await injectMarker(first, alice, aliceAgent.id, 'alice survives restart')
       await injectMarker(first, bob, bobAgent.id, 'bob survives restart')
 
-      const aliceStored = await first.sessionPersistence.load(SessionId(aliceRecord.sessionId))
-      const bobStored = await first.sessionPersistence.load(SessionId(bobRecord.sessionId))
+      const aliceStored = await readStored(first, SessionId(aliceRecord.sessionId))
+      const bobStored = await readStored(first, SessionId(bobRecord.sessionId))
       expect(JSON.stringify(aliceStored.events)).toContain('alice survives restart')
       expect(JSON.stringify(bobStored.events)).toContain('bob survives restart')
 
@@ -170,8 +264,51 @@ describe('DSH 0.1.2-rc.1 native Agent/Session/MCP lifecycle', () => {
       await second.multiTenant.delete(restartedAlice, aliceAgent.id)
       await expect(second.multiTenant.get(restartedAlice, aliceAgent.id)).rejects.toThrow(AgentNotFoundError)
       expect(second.agents.get(SessionId(aliceRecord.sessionId))).toBeUndefined()
-      const retainedLog = await second.sessionPersistence.load(SessionId(aliceRecord.sessionId))
+      const retainedLog = await readStored(second, SessionId(aliceRecord.sessionId))
       expect(JSON.stringify(retainedLog.events)).toContain('alice survives restart')
+    } finally {
+      if (first !== undefined) await first.fiber.dispose().catch(() => undefined)
+      if (second !== undefined) await second.fiber.dispose().catch(() => undefined)
+      await rm(directory, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('allows durable readers but refuses another writer until Agent disposal releases ownership', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-writer-'))
+    let first: Context | undefined
+    let second: Context | undefined
+    try {
+      const sessions = join(directory, 'sessions')
+      first = await openRuntime(join(directory, 'first.sqlite'), sessions)
+      second = await openRuntime(join(directory, 'second.sqlite'), sessions)
+      const principal = createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })
+      const resource = await first.multiTenant.create(principal)
+      const record = await first.tenantAgentRepository.get(principal, resource.id)
+      if (record === undefined) throw new Error('Agent Directory lost a ready record')
+      const id = SessionId(record.sessionId)
+      await injectMarker(first, principal, resource.id, 'writer handoff retains history')
+      await first.sessionPersistence.flush()
+
+      // A different backend instance can read a flushed prefix without owning the writer.
+      const reader = await second.sessionPersistence.open(id, 'read')
+      try {
+        expect(JSON.stringify((await reader.read()).events)).toContain('writer handoff retains history')
+        await expect(second.agents.resume({ resumeSessionId: id })).rejects.toThrow(SessionAlreadyOwnedError)
+        expect(second.agents.get(id)).toBeUndefined()
+        expect(first.agents.get(id)).toBeDefined()
+      } finally {
+        await reader.close()
+      }
+
+      await first.fiber.dispose()
+      first = undefined
+      const resumed = await second.agents.resume({ resumeSessionId: id })
+      try {
+        expect(resumed.agent.session.header.version).toBe(3)
+        expect(JSON.stringify(resumed.agent.session.snapshotEvents())).toContain('writer handoff retains history')
+      } finally {
+        await resumed.dispose()
+      }
     } finally {
       if (first !== undefined) await first.fiber.dispose().catch(() => undefined)
       if (second !== undefined) await second.fiber.dispose().catch(() => undefined)

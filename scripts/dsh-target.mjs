@@ -8,6 +8,6 @@
  */
 export const DSH_TARGET = Object.freeze({
   repository: 'deepseek-ai/deepseek-harness',
-  version: '0.1.2-rc.1',
-  commit: 'a66e4702047846cdaa10c66c9d3df3951f5ea70d',
+  version: '0.1.5-alpha.1',
+  commit: '5dda764ed3aa172535a7967b06ff95d9cbfe536a',
 })

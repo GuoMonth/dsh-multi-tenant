@@ -2,25 +2,24 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.4.0` is a DSH multi-tenant plugin for Node 22.19+ and Node 24. It is pinned to `@deepseek-ai/*@0.1.2-rc.1` at upstream commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d`.
+`dsh-multi-tenant@0.5.0` is a DSH multi-tenant plugin for Node 22.19+ and Node 24, pinned to DSH `0.1.5-alpha.1` at source commit `5dda764ed3aa172535a7967b06ff95d9cbfe536a`.
 
-This is the first non-prerelease distribution of the clean `0.4` plugin surface. It provides a compact authority path from a server-minted Principal to an owned DSH Agent, durable local directory, and Agent-scoped MCP lifecycle. It assumes the host already provides trustworthy authentication and owns any isolation stronger than the bundled logical boundary.
+The Principal API and SQLite Directory schema carry forward from `0.4.0`; the required DSH baseline changes. Only the exact target is supported, without a multi-version compatibility layer. The host owns authentication and any isolation stronger than the bundled logical boundary.
 
 ## Install
 
-Install the stable channel, or pin this reviewed build exactly:
+The release identity is `v0.5.0`, using npm's `latest` dist-tag. Pin the plugin and its exact DSH peers together:
 
 ```bash
-pnpm add dsh-multi-tenant
-# or pin the reviewed release exactly
-pnpm add dsh-multi-tenant@0.4.0
+pnpm add dsh-multi-tenant@0.5.0 @deepseek-ai/cordis@4.0.2 \
+  @deepseek-ai/dsh-agent@0.1.5-alpha.1 @deepseek-ai/dsh-llm@0.1.5-alpha.1 \
+  @deepseek-ai/dsh-mcp-client@0.1.5-alpha.1 @deepseek-ai/dsh-session@0.1.5-alpha.1 \
+  @deepseek-ai/dsh-tools@0.1.5-alpha.1
 ```
 
-The matching source tag is `v0.4.0`, and npm publishes it on the `latest` dist-tag. This is the reviewed, supported entry point for the documented `0.4` API and lifecycle contract, not a `1.0`-level promise against future evolution. Incompatible changes must be explicitly versioned and documented. DSH `0.1.2-rc.1` remains an upstream release candidate and an exact peer dependency; later DSH builds require an explicit plugin compatibility release.
+DSH remains an alpha. Upgrade the host's entire DSH dependency graph together. Its supported historical logs may migrate to V3; the plugin does not implement data migration. Stop the host and back up its Directory and DSH data before upgrading. Rollback requires the corresponding old runtime and pre-upgrade data together: old retained logs do not contain V3 additions.
 
-DSH RC.1 changes only release metadata relative to alpha.5, but `0.4.0` intentionally supports RC.1 alone. All direct DSH peers and development dependencies are exact so an unreviewed Harness build cannot silently enter the runtime graph.
-
-Load the plugin after the DSH `agents` and `tools` services. With no host replacements it uses `.dsh-multi-tenant/agents.sqlite`, an empty MCP declaration, and DSH's shared in-process runtime:
+Load the plugin after the DSH `agents`, `tools`, and `sessions` services, with a persistence backend such as JSONL mounted before creating Agents. With no host replacements it uses `.dsh-multi-tenant/agents.sqlite`, an empty MCP declaration, and DSH's shared in-process runtime:
 
 ```ts
 import * as MultiTenant from 'dsh-multi-tenant'
@@ -55,9 +54,13 @@ const result = await ctx.multiTenant.withAgent(principal, agent.id, runtime =>
 await ctx.multiTenant.delete(principal, agent.id)
 ```
 
+`create()` on the shared driver checkpoints the new DSH session before the Directory becomes ready, including when there are no messages. Missing or failing durability listeners reject creation and dispose the acquired Agent. Custom persistent runtime drivers must also establish their durability boundary before returning success.
+
 `create()` generates both the public `AgentId` and a separate internal DSH session id. `get`, `list`, `withAgent`, and `delete` scope every lookup by Agent, Tenant, and Principal. Unknown, foreign, failed, and deleted resources all appear as `AgentNotFoundError`.
 
 `withAgent()` is the only trusted execution entry. Its callback receives `followup`, `steer`, `inject`, `cancel`, `whenIdle`, and `executeTool`; it cannot obtain a DSH session id, Agent handle, Cordis context, or disposer.
+
+`whenIdle()` waits for Agent activity only. It does not flush the durable session log. Trusted host persistence inspection must explicitly flush and close its read handle; these capabilities are not exposed through the tenant runtime view.
 
 Each runtime view is callback-scoped. It expires when the callback resolves or rejects, and also on delete, capability revocation/refresh, and service shutdown. Retained views reject every operation with `CapabilityUnavailableError`.
 
@@ -132,7 +135,7 @@ Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tena
 ## Guarantees and boundaries
 
 - SQLite records use CAS revisions and Principal-scoped SQL. An authorized delete immediately invalidates active callback views and reserves a serialized barrier; later `withAgent()` calls cannot overtake it and see only not-found after the scrubbed tombstone is committed.
-- Provisioning is unpublished until DSH setup and the database ready transition both succeed.
+- Provisioning is unpublished until DSH setup, the shared driver session checkpoint, and the database ready transition all succeed.
 - Per-Agent create/resume/refresh/delete is serialized; concurrent opens single-flight; plugin shutdown cancels and drains every owned handle.
 - The lifecycle contract propagates abort through MCP, Secret, RuntimePartition, and DSH setup and validates provider results before use. Drain remains cooperative: code that ignores abort or never settles can delay delete or shutdown indefinitely; forced interruption and arbitrary default timeouts are out of scope.
 - A configured `strong` minimum fails closed before DSH Agent creation when the provider offers only `logical` isolation.

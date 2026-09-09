@@ -51,6 +51,7 @@ export interface TenantAgentRuntime {
   steer(message: UserMessage): void
   inject(message: UserMessage): void
   cancel(reason?: string): void
+  /** Wait for Agent activity to settle; this is not a session durability barrier. */
   whenIdle(): Promise<void>
   executeTool(name: string, args: unknown, options?: ExecuteToolOptions): Promise<ToolExecutionResult>
 }
@@ -68,6 +69,7 @@ export interface DshAgentSpecification extends CreateAgentOptions {
 }
 
 export interface DshRuntimeDriver {
+  /** Return only after the backing session can survive restart; rejection must release any acquired handle. */
   create(specification: DshAgentSpecification): Promise<DshRuntimeAgentHandle>
   resume(specification: DshAgentSpecification): Promise<DshRuntimeAgentHandle>
 }
