@@ -1,17 +1,33 @@
 # Compatibility
 
-`dsh-multi-tenant@0.4.0` targets Node `^22.19.0 || >=24.0.0` and exactly DSH `0.1.2-rc.1` (release source commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d`). Its DSH peer and development dependencies are exact, not ranges.
+`dsh-multi-tenant@0.5.0` targets Node `^22.19.0 || >=24.0.0` and exactly DSH `0.1.5-alpha.1`, source commit `5dda764ed3aa172535a7967b06ff95d9cbfe536a`. The release identity is `v0.5.0`, using npm's `latest` dist-tag.
 
-`0.4.0` is the first non-prerelease distribution of this plugin's clean public surface, with matching source tag `v0.4.0` and npm `latest` dist-tag. It is not a `1.0`-level indefinite compatibility promise; incompatible changes must be explicitly versioned and documented. DSH `0.1.2-rc.1` is still an upstream release candidate: the plugin release does not relabel DSH or imply compatibility with later DSH prereleases. Exact DSH upgrades are reviewed and released explicitly.
+Only this DSH baseline is supported by the current source. All direct DSH peer/development dependencies and resolved DSH packages are exact; older releases retain their historical support records. There is no forward-compatibility or indefinite backwards-compatibility promise. DSH is still an alpha, regardless of the plugin's version syntax.
 
-The exact [alpha.5-to-RC.1 upstream comparison](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.2-alpha.5...dsh-v0.1.2-rc.1) contains two release commits and only package-version metadata changes. Agent registry/loop, core Session, persistence, Session projection, MCP client, Tools, and API/Web source are unchanged. Even so, `0.4.0` advances every direct DSH peer/development dependency and the source-identity gate together; RC.1 is its only supported DSH baseline.
+## Upgrade from 0.4.0
 
-The earlier alpha.4-to-alpha.5 review found functional changes in storage-domain compatibility, JSON storage, and persisted session-projection cache handling. Those changes remain part of RC.1 and continue to be exercised by restart and real lifecycle tests.
+`0.5.0` changes the required DSH baseline from `0.1.2-rc.1` to `0.1.5-alpha.1`. The Principal API, provider protocols, public resource identity, and SQLite `tenant_agents_v04` schema remain unchanged. The driver additionally imports the official LLM identifier constructors, so `@deepseek-ai/dsh-llm` is now an explicit exact peer.
 
-`0.4` is a clean product line. It has no source, data, or API compatibility promise with `0.3`: Session claims, credentials, Operations, RuntimeComposition, compatibility facades, and the old SQLite ownership table are not read or migrated.
+The [upstream comparison](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.2-rc.1...dsh-v0.1.5-alpha.1) includes the SessionHandle lifecycle, V2/V3 log changes, explicit Agent API, type-only Inbox, persona prefix/suffix split, ordinary subprocess handle changes, and new Web UI. Host-provided plugins and profiles must be reviewed against those contracts; the native integration suite does not cover arbitrary host extensions.
 
-The lifecycle `AbortSignal` arguments on MCP, Secret, runtime-partition, and DSH driver contracts are required. Host providers must accept the signal and cooperate with shutdown where possible.
+Stop the active host before taking a consistent backup of its Agent Directory, DSH session/storage data, and configuration. Keep the exact old runtime and dependency identity with that backup. Upgrade all DSH packages together, then verify create, resume, authorization, MCP, and shutdown using the target runtime before resuming service.
 
-Supported public code/API subpaths are the package root, `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`. `./cordis.patch.yml` is additionally exported for the DSH loader; it is configuration data rather than a JavaScript API. Anything else is private.
+DSH may migrate supported historical sessions into V3 generations while preserving old files. The plugin neither parses nor converts historical logs. Keeping the original file does not make a downgrade lossless: our RC.1 experiment resumed the old generation and did not see messages written by V3. Restore the matching pre-upgrade data and old runtime together for rollback; upgrade-time additions are outside that rollback point. Older and newer runtimes must not share a writable data directory.
 
-Node 22.19 and Node 24 run the same typecheck, tests, build, SQLite restart probe, native DSH AgentLoop/JSONL/official-MCP lifecycle integration, and installed-tarball smoke in CI. The lifecycle test does not override the Agent factory or substitute a Session.
+## Runtime and persistence contracts
+
+The driver uses typed `AgentRegistry.create/resume`, `AgentSetup`, and explicit Agent/tool identifiers. It does not use `ctx.agent`, construct Inbox, or call removed persistence methods. Tenant Agents are runtime roots; adding child Agents requires explicit `parentAgent`, not an ambient-context assumption.
+
+The shared driver requires the DSH Session store and a working durability listener. It awaits `ctx.sessions.flush(agent.session)` before returning a newly created handle, so an empty session exists before the Directory becomes ready. A missing listener or failed checkpoint disposes the handle and fails publication. Custom persistent `DshRuntimeDriver.create()` implementations must establish the same ready-to-resume boundary; this is a lifecycle requirement, not a new public method.
+
+`TenantAgentRuntime.whenIdle()` waits for Agent activity, not durable writes. Host-owned persistence inspection uses `await ctx.sessionPersistence.flush()`, `open(id, 'read')`, `read()`, and `close()` in `finally`. Live transcript access and durable-log inspection are different operations. Raw SessionHandles remain private to the trusted host/DSH lifecycle and are not added to the tenant runtime view.
+
+DSH's writer lock protects one session's JSONL lifecycle. It does not coordinate Principal ownership, protect the SQLite directory across multiple active processes, or provide distributed fencing. The built-in repository still requires local, single-node, single-active-process deployment.
+
+Provider lifecycle `AbortSignal` arguments remain required and cancellation remains cooperative. The plugin does not read or migrate `0.3` ownership data, retired Session claims, Operations, RuntimeComposition, or compatibility facades.
+
+## Public surface and verification
+
+Supported public code/API subpaths are the package root, `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`. `./cordis.patch.yml` is exported as DSH loader configuration data. All other implementation details are private.
+
+CI runs frozen install and the full release checks on Node 22.19 and Node 24, and checks out the exact upstream source identity. Native tests use the real AgentLoop, V3 JSONL backend and official MCP client, including restart, authorization, retained logs after delete, concurrent reader/writer behavior, and writer release on disposal. The tests do not replace the Agent factory or Session. See [release checks](./release.md) and [refactoring decisions](../releases/v0.5.0.md).

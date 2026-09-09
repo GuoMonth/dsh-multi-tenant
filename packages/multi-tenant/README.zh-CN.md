@@ -2,25 +2,24 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.4.0` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 `@deepseek-ai/*@0.1.2-rc.1` 和上游 commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d`。
+`dsh-multi-tenant@0.5.0` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 DSH `0.1.5-alpha.1` 和源码 commit `5dda764ed3aa172535a7967b06ff95d9cbfe536a`。
 
-这是全新 `0.4` 插件公共面的首个不带 prerelease 标识的正式分发版本。它提供一条精简的 authority path：从服务端创建的 Principal，到有明确所有者的 DSH Agent、持久本地 Directory 和 Agent-scoped MCP 生命周期。它假定宿主已经提供可信认证，并负责强于默认逻辑边界的隔离。
+Principal API 和 SQLite Directory schema 延续 `0.4.0`，DSH 依赖基线明确切换。项目只支持精确目标，不维护多版本兼容层。宿主负责认证，以及强于默认逻辑边界的隔离。
 
 ## 安装
 
-npm 可以直接安装稳定通道，也可以精确固定本次已审查的版本：
+发布身份为 `v0.5.0`，npm 分发使用 `latest` dist-tag。同时固定插件与全部直接 DSH peer：
 
 ```bash
-pnpm add dsh-multi-tenant
-# 或精确固定本次已审查的正式版本
-pnpm add dsh-multi-tenant@0.4.0
+pnpm add dsh-multi-tenant@0.5.0 @deepseek-ai/cordis@4.0.2 \
+  @deepseek-ai/dsh-agent@0.1.5-alpha.1 @deepseek-ai/dsh-llm@0.1.5-alpha.1 \
+  @deepseek-ai/dsh-mcp-client@0.1.5-alpha.1 @deepseek-ai/dsh-session@0.1.5-alpha.1 \
+  @deepseek-ai/dsh-tools@0.1.5-alpha.1
 ```
 
-对应源码 tag 是 `v0.4.0`，npm 使用 `latest` dist-tag。它是当前已审查、受支持的 `0.4` API 与生命周期契约入口，不等于 `1.0` 级别的永久兼容承诺；不兼容变更必须通过新版本和文档显式说明。DSH `0.1.2-rc.1` 本身仍是上游 RC，并保持 exact peer。升级到后续 DSH 版本需要新的插件兼容版本，不会静默发生。
+DSH 仍是 alpha。宿主应整体升级 DSH 依赖图。受支持的历史日志可能被 DSH 迁移为 V3，插件不实现数据迁移。升级前停止宿主并备份 Directory 与 DSH 数据；回滚必须同时恢复对应旧 runtime 和升级前数据，保留的旧日志不包含 V3 新增内容。
 
-DSH RC.1 相对 alpha.5 只修改了 release metadata，但 `0.4.0` 有意只支持 RC.1。全部直接 DSH peer/dev dependency 都使用精确版本，未经审查的 Harness 构建不会静默进入 runtime graph。
-
-在 DSH 的 `agents` 和 `tools` service 之后加载。宿主没有提供替代实现时，插件使用 `.dsh-multi-tenant/agents.sqlite`、空 MCP 声明和 DSH 进程内 shared runtime：
+在 DSH 的 `agents`、`tools` 和 `sessions` service 之后加载，并在创建 Agent 前挂载 JSONL 等持久化 backend。宿主没有提供替代实现时，插件使用 `.dsh-multi-tenant/agents.sqlite`、空 MCP 声明和 DSH 进程内 shared runtime：
 
 ```ts
 import * as MultiTenant from 'dsh-multi-tenant'
@@ -52,9 +51,13 @@ const result = await ctx.multiTenant.withAgent(principal, agent.id, runtime =>
 await ctx.multiTenant.delete(principal, agent.id)
 ```
 
+Shared driver 的 `create()` 会在 Directory 进入 ready 前完成 DSH session 持久化检查，尚无消息的空会话也会落盘。持久化 listener 缺失或失败时，创建失败并释放已获取的 Agent。自定义持久化 runtime driver 也必须在返回成功前完成自身的持久化边界。
+
 `create()` 同时生成公开 `AgentId` 和独立的内部 DSH session id。`get/list/withAgent/delete` 的查询都同时限定 Agent、Tenant、Principal。未知、越权、失败和已删除资源统一表现为 `AgentNotFoundError`。
 
 `withAgent()` 是唯一可信运行入口。回调只有 `followup/steer/inject/cancel/whenIdle/executeTool`，拿不到 DSH session id、原始 Agent handle、Cordis context 或 disposer。
+
+`whenIdle()` 只等待 Agent 活动结束，不负责刷新持久化日志。可信宿主检查持久化数据时须显式 flush 并关闭 read handle；这些能力不通过租户 runtime view 暴露。
 
 每个 runtime view 都是 callback-scoped：回调 resolve/reject、delete、能力撤销/刷新或 service shutdown 时立即失效。保留的旧 view 再调用任何方法都会得到 `CapabilityUnavailableError`。
 
@@ -124,7 +127,7 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
 ## 保证与边界
 
 - SQLite 使用 CAS revision 和 Principal-scoped SQL；已授权删除会立即使 active callback view 失效并预留串行屏障，后发 `withAgent()` 不能越过删除，只会在已清理的 tombstone 提交后得到 not-found。
-- DSH setup 和数据库 ready transition 都成功后，Agent 才会公开。
+- DSH setup、shared driver 的 session 持久化检查和数据库 ready transition 都成功后，Agent 才会公开。
 - 每个 Agent 的 create/resume/refresh/delete 串行；并发打开 single-flight；插件关闭会 cancel 并 drain 全部 handle。
 - 生命周期契约会把 abort 传入 MCP、Secret、RuntimePartition 和 DSH setup，并在使用前校验 provider 结果。Drain 仍是 cooperative 的：忽略 abort 或永不结束的代码可能无限延迟 delete/shutdown；强制中断和任意默认 timeout 不在范围内。
 - 最低隔离配置为 `strong` 时，共享逻辑 provider 会在创建 DSH Agent 前 fail closed。

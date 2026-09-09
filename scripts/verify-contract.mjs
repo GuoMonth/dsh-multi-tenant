@@ -7,21 +7,23 @@ import { DSH_TARGET } from './dsh-target.mjs'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
 const errors = []
-const expectedVersion = '0.4.0'
-const expectedDsh = '0.1.2-rc.1'
-const expectedCommit = 'a66e4702047846cdaa10c66c9d3df3951f5ea70d'
+const expectedVersion = pkg.version
+const expectedDsh = DSH_TARGET.version
 const expectedExports = ['.', './mcp', './sqlite', './web', './testing', './starter', './cordis.patch.yml']
 const dshPackages = [
   '@deepseek-ai/dsh-agent',
+  '@deepseek-ai/dsh-llm',
   '@deepseek-ai/dsh-mcp-client',
   '@deepseek-ai/dsh-session',
   '@deepseek-ai/dsh-tools',
 ]
 
-if (pkg.version !== expectedVersion) errors.push(`package version must be ${expectedVersion}`)
+if (!/^\d+\.\d+\.\d+$/.test(expectedVersion)) errors.push('package version must be an exact non-prerelease identity')
 if (pkg.publishConfig?.tag !== 'latest') errors.push('publishConfig.tag must be latest')
-if (DSH_TARGET.version !== expectedDsh || DSH_TARGET.commit !== expectedCommit) {
-  errors.push('DSH target identity drifted from 0.1.2-rc.1')
+if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(expectedDsh)
+  || !/^[0-9a-f]{40}$/.test(DSH_TARGET.commit)
+  || DSH_TARGET.repository !== 'deepseek-ai/deepseek-harness') {
+  errors.push('DSH target must identify an exact upstream version and source commit')
 }
 if (JSON.stringify(Object.keys(pkg.exports)) !== JSON.stringify(expectedExports)) {
   errors.push(`public exports must be exactly ${expectedExports.join(', ')}`)
@@ -75,7 +77,7 @@ for (const path of [
   'docs/reference/release.zh-CN.md',
   `docs/releases/v${expectedVersion}.md`,
 ]) {
-  if (!existsSync(join(root, path))) errors.push(`required v0.4 artifact missing: ${path}`)
+  if (!existsSync(join(root, path))) errors.push(`required contract artifact missing: ${path}`)
 }
 
 const sourceFiles = [
@@ -121,7 +123,7 @@ for (const required of ['AgentLoop', 'JsonlSessionPersistence', 'SessionProjecti
 }
 
 if (errors.length > 0) {
-  console.error(`v0.4 verification failed:\n- ${errors.join('\n- ')}`)
+  console.error(`contract verification failed:\n- ${errors.join('\n- ')}`)
   process.exit(1)
 }
-console.log(`v0.4 verification passed: ${pkg.name}@${pkg.version}, DSH ${DSH_TARGET.version} @ ${DSH_TARGET.commit}`)
+console.log(`contract verification passed: ${pkg.name}@${pkg.version}, DSH ${DSH_TARGET.version} @ ${DSH_TARGET.commit}`)

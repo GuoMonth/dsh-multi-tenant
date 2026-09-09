@@ -3,7 +3,9 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import * as McpClient from '@deepseek-ai/dsh-mcp-client'
-import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentRegistry, AgentSetup } from '@deepseek-ai/dsh-agent'
+import { ReasoningEffortId, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { ToolExecutionResult, ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { CapabilityUnavailableError } from './errors.ts'
 import {
@@ -17,20 +19,15 @@ import {
   type TenantAgentRuntime,
 } from './protocols.ts'
 
-interface AgentRegistryLike {
-  create(options: Record<string, unknown>): Promise<AgentHandle>
-  resume(options: Record<string, unknown>): Promise<AgentHandle>
-}
-
-function requireService<T extends object>(ctx: Context, key: string): T {
+function requireService<K extends 'agents' | 'tools' | 'sessions'>(ctx: Context, key: K): Context[K] {
   const service = ctx.get(key)
   if (typeof service !== 'object' || service === null) {
     throw new CapabilityUnavailableError(`Required DSH service "${key}" is unavailable.`)
   }
-  return service as T
+  return service
 }
 
-function setupMcp(specification: DshAgentSpecification): (ctx: Context) => Promise<void> {
+function setupMcp(specification: DshAgentSpecification): AgentSetup {
   return async (agentCtx) => {
     for (const server of specification.mcpServers) {
       specification.signal.throwIfAborted()
@@ -53,7 +50,7 @@ function runtimeView(agent: Agent, tools: ToolRuntime): TenantAgentRuntime {
     executeTool: async (name: string, args: unknown, options: ExecuteToolOptions = {}): Promise<ToolExecutionResult> => {
       const controller = options.signal === undefined ? new AbortController() : undefined
       return tools.execute({
-        callId: `dsh-mt-${randomUUID()}` as never,
+        callId: ToolCallId(`dsh-mt-${randomUUID()}`),
         name,
         arguments: args,
         agent,
@@ -64,12 +61,14 @@ function runtimeView(agent: Agent, tools: ToolRuntime): TenantAgentRuntime {
 }
 
 class SharedDshRuntimeDriver implements DshRuntimeDriver {
-  private readonly agents: AgentRegistryLike
+  private readonly agents: Pick<AgentRegistry, 'create' | 'resume'>
   private readonly tools: ToolRuntime
+  private readonly sessions: Pick<Context['sessions'], 'flush'>
 
   constructor(ctx: Context) {
-    this.agents = requireService<AgentRegistryLike>(ctx, 'agents')
-    this.tools = requireService<ToolRuntime>(ctx, 'tools')
+    this.agents = requireService(ctx, 'agents')
+    this.tools = requireService(ctx, 'tools')
+    this.sessions = requireService(ctx, 'sessions')
   }
 
   create(specification: DshAgentSpecification): Promise<DshRuntimeAgentHandle> {
@@ -85,21 +84,42 @@ class SharedDshRuntimeDriver implements DshRuntimeDriver {
     specification: DshAgentSpecification,
   ): Promise<DshRuntimeAgentHandle> {
     specification.signal.throwIfAborted()
+    const { agentOptions } = specification
+    const { reasoningEffort, ...modelOptions } = agentOptions ?? {}
     const common = {
       signal: specification.signal,
       setup: setupMcp(specification),
-      ...(specification.agentOptions === undefined ? {} : { agentOptions: specification.agentOptions }),
+      ...(agentOptions === undefined ? {} : {
+        agentOptions: {
+          ...modelOptions,
+          ...(reasoningEffort === undefined ? {} : {
+            reasoningEffort: ReasoningEffortId(reasoningEffort),
+          }),
+        },
+      }),
     }
     const handle = mode === 'create'
       ? await this.agents.create({
         ...common,
-        sessionId: specification.sessionId,
+        sessionId: SessionId(specification.sessionId),
         ...(specification.meta === undefined ? {} : { meta: specification.meta }),
       })
       : await this.agents.resume({
         ...common,
-        resumeSessionId: specification.sessionId,
+        resumeSessionId: SessionId(specification.sessionId),
       })
+    try {
+      // DSH defers materializing an empty session. Publish a tenant resource
+      // only after its own session has a durability checkpoint; otherwise a
+      // ready Directory record can outlive a session that never reached disk.
+      if (mode === 'create' && !await this.sessions.flush(handle.agent.session)) {
+        throw new CapabilityUnavailableError('DSH session durability checkpoint is unavailable.')
+      }
+      specification.signal.throwIfAborted()
+    } catch (error) {
+      await handle.dispose().catch(() => undefined)
+      throw error
+    }
     return Object.freeze({
       runtime: runtimeView(handle.agent, this.tools),
       dispose: () => handle.dispose(),
