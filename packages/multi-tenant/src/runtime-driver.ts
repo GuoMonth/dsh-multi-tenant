@@ -7,6 +7,8 @@ import type { Agent, AgentRegistry, AgentSetup } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { ToolExecutionResult, ToolRuntime } from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-session-query'
+import type { SessionReadLease, SessionReadRequest } from './observation.ts'
 import { CapabilityUnavailableError } from './errors.ts'
 import {
   RuntimePartitionProvider,
@@ -142,6 +144,44 @@ export class SharedDshRuntimePartitionProvider extends RuntimePartitionProvider 
       driver: this.driver,
       dispose() {},
     })
+  }
+
+  override async openRead(request: SessionReadRequest): Promise<SessionReadLease> {
+    request.signal.throwIfAborted()
+    const query = this.ctx.get('sessionQuery')
+    if (!query) throw new CapabilityUnavailableError('DSH sessionQuery is required for reading.')
+    const id = SessionId(request.sessionId)
+    const subscriptions = new Set<() => void>()
+    let disposed = false
+    return {
+      read: async () => {
+        request.signal.throwIfAborted()
+        if (disposed) throw new CapabilityUnavailableError('Session reader is disposed.')
+        const observation = await query.observeSession(id, { signal: request.signal, projectionMode: 'all' })
+        try {
+          return { events: observation.events, cursor: observation.cursor, active: this.ctx.agents.get(id)?.status === 'running' }
+        } finally { observation[Symbol.dispose]() }
+      },
+      subscribe: (changed) => {
+        const off = [
+          this.ctx.on('session/event', (session) => { if (session.id === id) changed() }),
+          this.ctx.on('agent/status', ({ agent }) => { if (agent.id === id) changed() }),
+          this.ctx.on('agent/disposed', ({ agent }) => { if (agent.id === id) changed() }),
+          this.ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+            if (agent.id !== id) return
+            if (frame.type === 'chunk' && frame.chunk.type === 'text-delta') changed({ attempt: frame.attemptId, text: frame.chunk.text, reset: false })
+            else if (frame.type === 'start' || frame.type === 'end') {
+              changed({ attempt: frame.attemptId, text: '', reset: true })
+              if (frame.type === 'end') changed()
+            }
+          }),
+        ]
+        const unsubscribe = () => { for (const dispose of off) dispose(); subscriptions.delete(unsubscribe) }
+        subscriptions.add(unsubscribe)
+        return unsubscribe
+      },
+      dispose: () => { disposed = true; for (const unsubscribe of subscriptions) unsubscribe() },
+    }
   }
 }
 

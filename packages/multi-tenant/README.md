@@ -151,3 +151,9 @@ Public code/API subpaths are exactly `/mcp`, `/sqlite`, `/web`, `/testing`, and 
 The callback API has been removed. Long tool operations and idle waits do not hold the lifecycle queue. Delete, refresh, revocation and shutdown close the generation, cancel admitted work and drain before releasing the handle and provider leases. A failed durable delete stays closed to new commands until the owner retries deletion in this process.
 
 Web adds `POST /_dsh-multi-tenant/agents/:id/messages` with `{ text, delivery? }` and `POST .../:id/cancel` with `{ reason? }`. Message source is host-established. There is no arbitrary Web tool execution endpoint.
+
+### Scoped history and observations
+
+With the optional exact `@deepseek-ai/dsh-session-query-sqlite@0.1.5-rc.2` service installed, `service.read(principal, id, { before, limit, signal })` returns safe text/turn history. `service.observe(principal, id, { signal })` returns a disposable async stream: `replace` baseline, cursor-based `append`, `status`, and separate per-attempt `transient` text/reset frames. HTTP exposes authenticated `GET /agents/:id/history` and `/events` (SSE) below the adapter base path. A reconnect replaces the baseline; live text received before subscribing is not replayed, and durable assistant messages replace partial text when committed.
+
+Cold reads use native Session observations without Agent activation, MCP, or Secret acquisition. Root deletion, shutdown, request cancellation, and an optional reader-provider authorization signal close observations. Hosts must supply revocation signals for changes in login/ACL authority. Slow consumers fail and reconnect instead of losing events silently. Custom isolation providers must implement `openRead` in their own partition; the default refuses it. Raw Session events and internal paths are never product responses.
