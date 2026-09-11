@@ -100,6 +100,13 @@ export function createDomainIngress(options: DomainIngressOptions) {
         const outgoing = headers(received.headers)
         delete outgoing['set-cookie']
         outgoing['cache-control'] = 'no-store'
+        // Add an intersecting policy; never discard native script/style policies.
+        const csp = outgoing['content-security-policy']
+        outgoing['content-security-policy'] = [
+          ...(csp === undefined ? [] : Array.isArray(csp) ? csp : [String(csp)]),
+          "frame-ancestors 'self'",
+        ].join(', ')
+        outgoing['x-frame-options'] ??= 'SAMEORIGIN'
         response.writeHead(received.statusCode ?? 502, outgoing)
         received.once('error', () => response.destroy())
         received.pipe(response)

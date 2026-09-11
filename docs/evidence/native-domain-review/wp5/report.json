@@ -14,20 +14,21 @@
     "Execution denies other-domain/platform files, Docker socket, profile/root writes and network egress",
     "A workload socket symlink cannot redirect platform connections; MCP has an independently detached descendant",
     "Official Web sends native tool calls and reconnects through authenticated isolated ingress",
+    "A real browser refuses cross-origin framing of an authenticated native Host",
     "Native cold continuations preserve MCP composition and toolFilter after generation replacement",
     "SIGKILL recovery removes the exact orphan container before reusing storage in a new generation",
     "Login revocation closes an existing native mux; domain revocation preserves the other domain and rejects after directory restart",
     "Cleanup leaves no owned container (including detached MCP descendants) or pinned runtime descriptor"
   ],
   "measurements": {
-    "twoColdHostsMs": 3850,
+    "twoColdHostsMs": 3599,
     "binaryUpload2MiBMs": 20,
     "fortyWarmAdmissionsMs": 1,
-    "aliceContainer": "{\"BlockIO\":\"0B / 2.83MB\",\"CPUPerc\":\"0.17%\",\"Container\":\"36c990e6d6251afab3519d0b2353a729d6d734821ce1c8ae2aae46db01c63db6\",\"ID\":\"36c990e6d625\",\"MemPerc\":\"39.76%\",\"MemUsage\":\"407.2MiB / 1GiB\",\"Name\":\"dsh-domain-f209c83d11f9440d-5fa589ae-0240-4977-9b7e-3cea50268086\",\"NetIO\":\"0B / 0B\",\"PIDs\":\"48\"}",
-    "aliceBrowserReconnectMs": 1066,
-    "bobBrowserReconnectMs": 1117,
-    "suspendAndRestartMs": 3981,
-    "domainRevokeMs": 571
+    "aliceContainer": "{\"BlockIO\":\"0B / 2.83MB\",\"CPUPerc\":\"0.18%\",\"Container\":\"1e4b40dccc015712bed2b00202accefcaedfb8e6b192e5d4f5be4df271a38ef3\",\"ID\":\"1e4b40dccc01\",\"MemPerc\":\"37.03%\",\"MemUsage\":\"379.2MiB / 1GiB\",\"Name\":\"dsh-domain-715678e23851cc0b-a06b244c-1f90-4245-a1fb-260a5e08fd87\",\"NetIO\":\"0B / 0B\",\"PIDs\":\"48\"}",
+    "aliceBrowserReconnectMs": 1145,
+    "bobBrowserReconnectMs": 1015,
+    "suspendAndRestartMs": 4029,
+    "domainRevokeMs": 536
   },
   "passed": true,
   "browser": "150.0.7871.128",

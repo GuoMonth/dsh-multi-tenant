@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { once } from 'node:events'
+import { createServer } from 'node:http'
 import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, readlink, realpath } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -275,6 +276,23 @@ try {
     await context.close()
   }
   report.checks.push('Official Web sends native tool calls and reconnects through authenticated isolated ingress')
+  const frameServer = createServer((_request, response) => response.end(`<iframe src="${a.origin}"></iframe>`))
+  const frameContext = await browser.newContext()
+  try {
+    await frameContext.addCookies([{ name: 'domain-session', value: a.token, url: a.origin }])
+    frameServer.listen(0, '127.0.0.1')
+    await once(frameServer, 'listening')
+    const framePage = await frameContext.newPage()
+    const messages = []
+    framePage.on('console', message => messages.push(message.text()))
+    await framePage.goto(`http://127.0.0.1:${frameServer.address().port}`)
+    await until('cross-origin frame rejection', async () => messages.some(message => message.includes('frame-ancestors')))
+    report.checks.push('A real browser refuses cross-origin framing of an authenticated native Host')
+  } finally {
+    await frameContext.close()
+    await new Promise(resolve => frameServer.close(resolve))
+  }
+
   const replacementStarted = performance.now()
   await coordinator.setDesired(a.record.id, 'suspended')
   await assert.rejects(coordinator.ensure(a.owner), /not enabled/)

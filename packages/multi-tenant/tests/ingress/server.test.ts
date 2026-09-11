@@ -21,6 +21,7 @@ async function setup() {
   const native = createServer((req, res) => {
     if (req.headers.cookie !== 'native=private') { res.writeHead(401).end(); return }
     res.setHeader('set-cookie', 'native=never-expose')
+    res.setHeader('content-security-policy', "script-src 'self'")
     if (req.url === '/stream') { res.writeHead(200); res.write('first'); return }
     if (req.url === '/echo') { req.pipe(res); return }
     res.end(JSON.stringify(req.headers))
@@ -75,6 +76,8 @@ it('maps internal authority, strips user credentials and does not expose native 
   expect(response.status).toBe(200)
   expect(response.headers.get('set-cookie')).toBeNull()
   expect(response.headers.get('cache-control')).toBe('no-store')
+  expect(response.headers.get('content-security-policy')).toContain("script-src 'self'")
+  expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'self'")
   const received = await response.json()
   expect(received.cookie).toBe('native=private')
   expect(received.origin).not.toBe(t.origin)
