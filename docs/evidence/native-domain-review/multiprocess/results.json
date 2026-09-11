@@ -1,0 +1,132 @@
+{
+  "baseline": "0.1.5-rc.2",
+  "startedAt": "2026-09-11T07:03:47.304Z",
+  "checks": [
+    {
+      "name": "two native rc.2 Web profiles started in independent restricted containers",
+      "status": "passed"
+    },
+    {
+      "name": "alice: native auth, real preset, real MCP identity and persisted history",
+      "status": "passed"
+    },
+    {
+      "name": "bob: native auth, real preset, real MCP identity and persisted history",
+      "status": "passed"
+    },
+    {
+      "name": "alice: cross-domain list/search/prompt/follow/file/cookie and direct network access denied",
+      "status": "passed"
+    },
+    {
+      "name": "alice: native raw file upload accepted locally and foreign Session upload rejected",
+      "status": "passed"
+    },
+    {
+      "name": "bob: cross-domain list/search/prompt/follow/file/cookie and direct network access denied",
+      "status": "passed"
+    },
+    {
+      "name": "bob: native raw file upload accepted locally and foreign Session upload rejected",
+      "status": "passed"
+    },
+    {
+      "name": "alice: native continuable subagent and inherited toolFilter",
+      "status": "passed"
+    },
+    {
+      "name": "bob: native continuable subagent and inherited toolFilter",
+      "status": "passed"
+    },
+    {
+      "name": "alice: official Web workspace picker, composer, MCP call and streamed reply work without page errors",
+      "status": "passed"
+    },
+    {
+      "name": "bob: official Web workspace picker, composer, MCP call and streamed reply work without page errors",
+      "status": "passed"
+    },
+    {
+      "name": "stopping Alice leaves Bob fully operational",
+      "status": "passed"
+    },
+    {
+      "name": "Alice restart recovers native history and resumes the same Session",
+      "status": "passed"
+    },
+    {
+      "name": "native child cold continuation restores its Principal preset and MCP after process restart",
+      "status": "passed"
+    },
+    {
+      "name": "native toolFilter is restored during child cold continuation after process restart",
+      "status": "passed"
+    },
+    {
+      "name": "native server-push event streams contain no other Principal root Session identity",
+      "status": "passed"
+    },
+    {
+      "name": "idle SIGKILL of Alice leaves Bob operational and Alice can resume its persisted Session",
+      "status": "passed"
+    },
+    {
+      "name": "all probe containers, networks and private temporary data released",
+      "status": "passed"
+    }
+  ],
+  "metrics": {
+    "alice": {
+      "coldReadyMs": 3596,
+      "dockerStats": {
+        "BlockIO": "0B / 520kB",
+        "CPUPerc": "0.07%",
+        "Container": "dsh-native-probe-cbab849a-alice",
+        "ID": "9d2d12834841",
+        "MemPerc": "30.25%",
+        "MemUsage": "309.8MiB / 1GiB",
+        "Name": "dsh-native-probe-cbab849a-alice",
+        "NetIO": "119kB / 5.06MB",
+        "PIDs": "29"
+      },
+      "stopMs": 615,
+      "stopExitCode": 0,
+      "restartReadyMs": 3566,
+      "eventFramesObserved": 36
+    },
+    "bob": {
+      "coldReadyMs": 3591,
+      "dockerStats": {
+        "BlockIO": "0B / 512kB",
+        "CPUPerc": "0.06%",
+        "Container": "dsh-native-probe-cbab849a-bob",
+        "ID": "360ec75115df",
+        "MemPerc": "31.61%",
+        "MemUsage": "323.6MiB / 1GiB",
+        "Name": "dsh-native-probe-cbab849a-bob",
+        "NetIO": "118kB / 5.04MB",
+        "PIDs": "29"
+      },
+      "eventFramesObserved": 39
+    }
+  },
+  "limitations": [
+    "Two preassigned Hosts: platform identity routing, logout/revocation and single-writer supervisor are not implemented.",
+    "Loopback origins and separate browser contexts: production TLS, domain cookies, shared-browser account switching and ingress proxy are not verified.",
+    "Keyless deterministic model and local MCP; no external provider, internet egress or MCP reconnect test.",
+    "Domain capability inheritance only: per-root grants, revocation, grandchildren, fork and preset-generation changes remain unverified.",
+    "Selected native Web/API flows only; no complete route inventory, settings/plugin policy or desktop capability certification.",
+    "Two Node 24 containers on one Linux host; timings exclude installation and image pull, and memory is a low-load snapshot, not capacity planning."
+  ],
+  "environment": {
+    "hostNode": "v24.18.0",
+    "containerImage": "node:24-bookworm-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+    "installedDshPackageInstances": 234,
+    "imageId": "sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+    "containerNode": "v24.19.0",
+    "chromium": "151.0.7922.34"
+  },
+  "status": "passed",
+  "cleanupErrors": [],
+  "finishedAt": "2026-09-11T07:04:20.635Z"
+}

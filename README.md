@@ -23,5 +23,6 @@ From this checkout, run `pnpm install --frozen-lockfile` and `pnpm --filter dsh-
 - [Release process](./docs/reference/release.md)
 - [0.6.0 changes](./docs/releases/v0.6.0.md)
 - [#57 implementation evidence](./docs/evidence/dsh-rc2/README.md)
+- [Principal-isolated native Host assessment and reproducible validation (Chinese)](./docs/evidence/native-domain-review/multiprocess/REPORT.zh-CN.md)
 
 AgentPresets capability-scope composition and complete stock Web authority coverage remain tracked in [#68](https://github.com/GuoMonth/dsh-multi-tenant/issues/68) and [#71](https://github.com/GuoMonth/dsh-multi-tenant/issues/71). Unsupported combinations fail closed; the optional panel does not imply that the full official Web UI has been made multi-tenant.
