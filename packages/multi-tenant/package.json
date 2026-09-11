@@ -46,7 +46,11 @@
       "types": "./dist/starter-plugin.d.mts",
       "import": "./dist/starter-plugin.mjs"
     },
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./deliveries": {
+      "types": "./dist/deliveries.d.mts",
+      "import": "./dist/deliveries.mjs"
+    }
   },
   "files": [
     "dist",
@@ -84,7 +88,8 @@
     "@deepseek-ai/dsh-llm": "0.1.5-rc.2",
     "@deepseek-ai/dsh-session-query": "0.1.5-rc.2",
     "@deepseek-ai/dsh-scope": "0.1.5-rc.2",
-    "@deepseek-ai/dsh-subagent": "0.1.5-rc.2"
+    "@deepseek-ai/dsh-subagent": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-fs": "0.1.5-rc.2"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
@@ -112,7 +117,11 @@
     "@deepseek-ai/dsh-session-query-sqlite": "0.1.5-rc.2",
     "@deepseek-ai/dsh-subagent": "0.1.5-rc.2",
     "@deepseek-ai/dsh-subagent-spawn-in-process": "0.1.5-rc.2",
-    "@deepseek-ai/dsh-subagent-fork-in-process": "0.1.5-rc.2"
+    "@deepseek-ai/dsh-subagent-fork-in-process": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-fs": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-fs-local": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-tool-present": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.2"
   },
   "scripts": {
     "build": "tsdown",
@@ -125,6 +134,9 @@
       "optional": true
     },
     "@deepseek-ai/dsh-subagent": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-fs": {
       "optional": true
     }
   }

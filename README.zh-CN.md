@@ -44,3 +44,11 @@ Shared runtime 只提供逻辑隔离，不是 hostile-code 安全边界。Stock 
 one-shot 只读；continuable Queue/Steer 使用官方 host 入口并保留人类消息来源。直接冷子级可以通过活动根恢复；更深的冷链需先通过中间父级自己的 continuation 使其活动。没有本地 Session 事实的远程 run 不构成 Session 目标。根释放/撤销会清理原生 continuation 后代及其 scope。
 
 共享 provider 支持未装配 AgentPresets 的 in-process 子级：同步原生 publication 阶段核验 exact runtime owner，把子 scope 接到父级能力层，继承 scoped MCP/Secret 并保留工具限制。已有不相容 preset scope 的子级明确拒绝；AgentPresets 组合另见 #68。自定义 backend 必须提供自己的读取与控制能力。这是逻辑隔离，不是操作系统文件或容器边界。
+
+### 授权交付文件
+
+`deliveries(principal, rootId, { childRef? })` 列出目标自己的原生 `deliverables/presented` 事实；`file(principal, rootId, ref, { childRef?, signal? })` 按目标绑定的 event/index 引用返回可释放字节流。Web 提供 `GET /agents/:id/deliveries` 和 `GET|HEAD /agents/:id/deliveries/:ref`，子级路径下同样适用；`?download=1` 强制下载。每次请求重新认证，引用不是 bearer 链接，不接受 path 参数。
+
+宿主需在正确执行环境实现 `RuntimePartitionProvider.openFile` 才能启用。可选 `dsh-multi-tenant/deliveries` 的 `openNativeDelivery(request, { fs, workspace, signal?, dispose })` 接受明确授权的原生 FS 与可信 Principal workspace，核验规范路径包含关系，拒绝末级 symlink 和目录，读取有大小上限的当前字节。不把 Session cwd 当授权根，也不退回全局 host FS；别名与竞态保证仍由原生 backend 负责。默认上限 16 MiB（`maximumDeliveryBytes`，最多 256 MiB），辅助实现最多缓存该上限，再按有界分块传输。
+
+源文件更新后下次读取获得新内容；删除后返回 404。响应使用 no-store、nosniff、安全文件名和 sandbox CSP，HTML/SVG 作为惰性文本，未知格式下载。断连、授权撤销、删除根和关闭服务会中止响应并释放 reader，已发出的字节不能收回。不提供不可变归档或桌面打开接口。

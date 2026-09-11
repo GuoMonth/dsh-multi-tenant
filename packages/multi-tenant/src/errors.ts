@@ -29,6 +29,10 @@ export class AgentNotFoundError extends MultiTenantError {
   }
 }
 
+export class DeliveryNotFoundError extends MultiTenantError {
+  constructor() { super('DELIVERY_NOT_FOUND', 'Delivery not found.') }
+}
+
 export class AgentRecordConflictError extends MultiTenantError {
   constructor(options?: ErrorOptions) {
     super('AGENT_RECORD_CONFLICT', 'Agent record conflict.', options)

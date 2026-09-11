@@ -32,6 +32,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   if (ctx.get('runtimePartitions') === undefined) await ctx.plugin(SharedDshRuntimePartitionProvider)
   await ctx.plugin(MultiTenantService, {
     ...(config.minimumIsolation === undefined ? {} : { minimumIsolation: config.minimumIsolation }),
+    ...(config.maximumDeliveryBytes === undefined ? {} : { maximumDeliveryBytes: config.maximumDeliveryBytes }),
   })
 }
 
@@ -40,6 +41,7 @@ export default apply
 export { MultiTenantService } from './service.ts'
 export type { MultiTenantConfig } from './service.ts'
 export type { ChildSummary, NativeChild } from './targets.ts'
+export type { DeliverySummary, DeliveryFile, FileReadRequest, FileReadLease } from './delivery-types.ts'
 export type { HistoryItem, HistoryPage, ReadOptions, ObservationFrame, AgentObservation, SessionReadRequest, SessionReadSnapshot, SessionReadLease } from './observation.ts'
 
 export {
@@ -104,6 +106,7 @@ export {
   ValidationError,
   AuthenticationRequiredError,
   AgentNotFoundError,
+  DeliveryNotFoundError,
   AgentRecordConflictError,
   CapabilityUnavailableError,
   IsolationUnavailableError,

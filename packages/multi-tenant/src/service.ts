@@ -3,6 +3,8 @@
 import { ActivationOperations, abortableWait } from './activation.ts'
 import { historyPage, observeLease, readBounds, type ReadOptions, type HistoryPage, type AgentObservation, type SessionReadLease } from './observation.ts'
 import { assertChild, childPath, childSummaries, type ChildSummary } from './targets.ts'
+import { deliveryFact, deliveryName, deliveryContentType, deliverySummaries } from './delivery-facts.ts'
+import type { DeliveryFile, DeliverySummary, FileReadLease } from './delivery-types.ts'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import { ValidationError } from './errors.ts'
@@ -60,6 +62,7 @@ declare module '@deepseek-ai/cordis' {
 
 export interface MultiTenantConfig {
   readonly minimumIsolation?: IsolationLevel
+  readonly maximumDeliveryBytes?: number
 }
 
 interface PreparedCapabilities {
@@ -120,12 +123,17 @@ export class MultiTenantService extends Service {
   private readonly tails = new Map<AgentId, Promise<void>>()
   private generation = 0
   private readonly cutoffs = new Map<AgentId, AbortController>()
+  private readonly readers = new Set<() => Promise<void>>()
+  private readonly readAdmissions = new Set<Promise<unknown>>()
+  private readonly maximumDeliveryBytes: number
   private accepting = true
   private closing: Promise<void> | undefined
 
   constructor(ctx: Context, config: MultiTenantConfig = {}) {
     super(ctx, 'multiTenant')
     this.minimumIsolation = config.minimumIsolation ?? 'logical'
+    this.maximumDeliveryBytes = config.maximumDeliveryBytes ?? 16 * 1024 * 1024
+    if (!Number.isSafeInteger(this.maximumDeliveryBytes) || this.maximumDeliveryBytes < 1 || this.maximumDeliveryBytes > 256 * 1024 * 1024) throw new TypeError('maximumDeliveryBytes must be between 1 and 268435456')
     if (this.minimumIsolation !== 'logical' && this.minimumIsolation !== 'strong') {
       throw new TypeError('minimumIsolation must be logical or strong')
     }
@@ -325,6 +333,83 @@ export class MultiTenantService extends Service {
     } finally { await lease.dispose() }
   }
 
+  async deliveries(principal: PrincipalContext, id: AgentId, options: { signal?: AbortSignal; childRef?: string } = {}): Promise<readonly DeliverySummary[]> {
+    const { lease, signal } = await this.openReader(principal, id, options.signal, options.childRef)
+    try {
+      const snapshot = await lease.read()
+      signal.throwIfAborted()
+      return deliverySummaries(options.childRef ?? id, snapshot)
+    } finally { await lease.dispose() }
+  }
+
+  async file(principal: PrincipalContext, id: AgentId, ref: string, options: { signal?: AbortSignal; childRef?: string } = {}): Promise<DeliveryFile> {
+    const target = await this.openReader(principal, id, options.signal, options.childRef)
+    let releaseFile: (() => Promise<void>) | undefined
+    let signal = target.signal
+    let dispose: (() => Promise<void>) | undefined
+    try {
+      const snapshot = await target.lease.read()
+      signal.throwIfAborted()
+      const fact = deliveryFact(options.childRef ?? id, snapshot, ref)
+      if (!snapshot.header) throw new CapabilityUnavailableError('File delivery requires native Session metadata.')
+      const acquired = await this.acquireReader(() => this.partitions.openFile({ principal, agentId: id, sessionId: target.sessionId, signal, header: snapshot.header!, path: fact.path, maxBytes: this.maximumDeliveryBytes }), signal)
+      const file: FileReadLease = acquired.lease
+      releaseFile = acquired.dispose
+      if (file.signal) signal = AbortSignal.any([signal, file.signal])
+      signal.throwIfAborted()
+      if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size > this.maximumDeliveryBytes) throw new CapabilityUnavailableError('File provider returned an invalid byte size.')
+      const name = deliveryName(fact.path)
+      let disposed: Promise<void> | undefined
+      const abort = () => { void dispose!().catch(() => undefined) }
+      dispose = () => disposed ??= (async () => {
+        signal.removeEventListener('abort', abort)
+        await settleDisposers([releaseFile!, () => target.lease.dispose()], 'file delivery cleanup failed')
+      })()
+      signal.addEventListener('abort', abort, { once: true })
+      const cleanup = dispose
+      return {
+        name, size: file.size, contentType: deliveryContentType(name), signal, dispose: cleanup,
+        content: { async *[Symbol.asyncIterator]() {
+          let bytes = 0
+          try {
+            for await (const chunk of file.content) {
+              signal.throwIfAborted()
+              bytes += chunk.byteLength
+              if (bytes > file.size) throw new CapabilityUnavailableError('File size changed during delivery.')
+              yield chunk
+            }
+            signal.throwIfAborted()
+            if (bytes !== file.size) throw new CapabilityUnavailableError('Incomplete file delivery.')
+          } finally { await cleanup() }
+        } },
+      }
+    } catch (error) {
+      await settleDisposers([...(releaseFile ? [releaseFile] : []), () => target.lease.dispose()], 'file delivery cleanup failed')
+      throw error
+    }
+  }
+
+  /** Track late provider acquisition and idempotent release so shutdown joins reader cleanup. */
+  private async acquireReader<T extends { dispose(): void | PromiseLike<void> }>(open: () => Promise<T>, signal: AbortSignal): Promise<{ lease: T; dispose: () => Promise<void> }> {
+    const pending = (async () => {
+      signal.throwIfAborted()
+      const lease = await open()
+      let disposed: Promise<void> | undefined
+      const dispose = () => disposed ??= Promise.resolve().then(() => lease.dispose()).finally(() => this.readers.delete(dispose))
+      this.readers.add(dispose)
+      if (signal.aborted) { await dispose(); signal.throwIfAborted() }
+      return { lease, dispose }
+    })()
+    this.readAdmissions.add(pending)
+    try { return await pending }
+    finally { this.readAdmissions.delete(pending) }
+  }
+
+  private async acquireSessionReader(principal: PrincipalContext, agentId: AgentId, sessionId: string, signal: AbortSignal): Promise<SessionReadLease> {
+    const { lease, dispose } = await this.acquireReader(() => this.partitions.openRead({ principal, agentId, sessionId, signal }), signal)
+    return { read: () => lease.read(), subscribe: changed => lease.subscribe(changed), dispose, ...(lease.signal ? { signal: lease.signal } : {}) }
+  }
+
   private async openReader(principal: PrincipalContext, id: AgentId, request?: AbortSignal, childRef?: string): Promise<{ lease: SessionReadLease; signal: AbortSignal; sessionId: string; parentSessionId?: string; mode?: 'one-shot' | 'continuable' }> {
     this.assertAccepting()
     const parsed = parseAgentId(id)
@@ -335,7 +420,7 @@ export class MultiTenantService extends Service {
     let sessionId = record.sessionId
     let parentSessionId: string | undefined
     let mode: 'one-shot' | 'continuable' | undefined
-    let lease = await this.partitions.openRead({ principal, agentId: parsed, sessionId, signal })
+    let lease = await this.acquireSessionReader(principal, parsed, sessionId, signal)
     try {
       for (const index of path) {
         if (lease.signal) signal = AbortSignal.any([signal, lease.signal])
@@ -348,7 +433,7 @@ export class MultiTenantService extends Service {
         parentSessionId = sessionId
         sessionId = child.id
         mode = child.mode
-        lease = await this.partitions.openRead({ principal, agentId: parsed, sessionId, signal })
+        lease = await this.acquireSessionReader(principal, parsed, sessionId, signal)
         const childSnapshot = await lease.read()
         signal.throwIfAborted()
         assertChild(childSnapshot, parentSessionId, child)
@@ -393,7 +478,11 @@ export class MultiTenantService extends Service {
     for (const entry of this.live.values()) this.invalidateLive(entry, 'multi-tenant service disposed')
     this.closing = (async () => {
       await Promise.allSettled([...this.tails.values()])
-      const results = await Promise.allSettled([...this.live.keys()].map(id => this.disposeLive(id)))
+      await Promise.allSettled([...this.readAdmissions])
+      const results = await Promise.allSettled([
+        ...[...this.readers].map(dispose => dispose()),
+        ...[...this.live.keys()].map(id => this.disposeLive(id)),
+      ])
       const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
       this.cutoffs.clear()
       if (errors.length > 0) throw new AggregateError(errors, 'multi-tenant Agent teardown failed')
