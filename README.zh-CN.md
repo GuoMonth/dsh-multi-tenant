@@ -2,9 +2,9 @@
 
 `dsh-multi-tenant` 是 DeepSeek Harness 的多租户插件。它把宿主认证得到的 `(tenantId, principalId)` 转换为有明确所有者的 Agent 资源，不接受也不暴露底层 DSH session identity。
 
-当前源码版本：**`dsh-multi-tenant@0.5.0`**，精确固定 DSH **`0.1.5-alpha.1`** 和 commit **`5dda764ed3aa172535a7967b06ff95d9cbfe536a`**。发布身份为 **`v0.5.0`**，npm 分发使用 `latest` dist-tag。实际发布状态见 [GitHub Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases)。
+当前源码版本：**`dsh-multi-tenant@0.6.0`**，精确固定 DSH **`0.1.5-rc.2`** 和 commit **`fb2c4b9e698e30edb738bca4cf0618587db7d203`**。发布身份为 **`v0.6.0`**，npm 分发使用 `latest` dist-tag。实际发布状态见 [GitHub Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases)。
 
-本版本只支持 DSH `0.1.5-alpha.1`。DSH 仍是上游 alpha；项目只维护一条经过验证的精确基线，不承诺兼容过去或未来的 Harness 版本。`0.5.0` 替换 `0.4.0` 的 DSH peer 要求，Principal API 和 SQLite Agent Directory schema 保持不变。
+本版本只支持 DSH `0.1.5-rc.2`。DSH 仍是预发布版本；项目只维护一条经过验证的精确基线，不承诺兼容过去或未来的 Harness 版本。`0.6.0` 替换 `0.5.0` 的 DSH peer 要求，Principal API 和 SQLite Agent Directory schema 保持不变。
 
 插件负责 Principal-scoped Agent 授权、持久 SQLite Agent Directory、能力租约及 DSH Agent/MCP 生命周期。宿主负责认证、Secret 存储，以及需要时的进程/容器级强隔离。
 
@@ -16,7 +16,7 @@ Driver 改用真实 DSH registry/setup 类型和显式 branded identifier。原�
 - [English](./README.md)
 - [兼容性与升级](./docs/reference/compatibility.zh-CN.md)
 - [发布检查](./docs/reference/release.zh-CN.md)
-- [0.5.0 变更与重构决策](./docs/releases/v0.5.0.md)
+- [0.6.0 变更与重构决策](./docs/releases/v0.6.0.md)
 
 ```text
 已认证请求

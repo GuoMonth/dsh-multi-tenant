@@ -2,9 +2,9 @@
 
 `dsh-multi-tenant` is a multi-tenant plugin for DeepSeek Harness. It turns an authenticated `(tenantId, principalId)` into an owned Agent resource without exposing or accepting the underlying DSH session identity.
 
-Current source version: **`dsh-multi-tenant@0.5.0`**, pinned to DSH **`0.1.5-alpha.1`** at commit **`5dda764ed3aa172535a7967b06ff95d9cbfe536a`**. Release identity: **`v0.5.0`**, using npm's `latest` dist-tag. See [GitHub Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases) for publication status.
+Current source version: **`dsh-multi-tenant@0.6.0`**, pinned to DSH **`0.1.5-rc.2`** at commit **`fb2c4b9e698e30edb738bca4cf0618587db7d203`**. Release identity: **`v0.6.0`**, using npm's `latest` dist-tag. See [GitHub Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases) for publication status.
 
-This version supports only DSH `0.1.5-alpha.1`. DSH remains an upstream alpha. We maintain one reviewed baseline, without a promise of compatibility with older or future Harness builds. `0.5.0` replaces the `0.4.0` DSH peer requirement; the Principal API and SQLite Agent Directory schema remain unchanged.
+This version supports only DSH `0.1.5-rc.2`. DSH remains an upstream alpha. We maintain one reviewed baseline, without a promise of compatibility with older or future Harness builds. `0.6.0` replaces the `0.5.0` DSH peer requirement; the Principal API and SQLite Agent Directory schema remain unchanged.
 
 The plugin owns Principal-scoped Agent authorization, a durable SQLite Agent directory, capability leases, and DSH Agent/MCP lifecycle. The host owns authentication, secret storage, and any strong process/container isolation.
 
@@ -16,7 +16,7 @@ The driver now uses the real DSH registry/setup types and explicit branded ident
 - [中文说明](./README.zh-CN.md)
 - [Compatibility and upgrade](./docs/reference/compatibility.md)
 - [Release checks](./docs/reference/release.md)
-- [0.5.0 changes and refactoring decisions](./docs/releases/v0.5.0.md)
+- [0.6.0 changes and refactoring decisions](./docs/releases/v0.6.0.md)
 
 ```text
 authenticated request

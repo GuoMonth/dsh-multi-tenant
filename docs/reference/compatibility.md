@@ -1,14 +1,14 @@
 # Compatibility
 
-`dsh-multi-tenant@0.5.0` targets Node `^22.19.0 || >=24.0.0` and exactly DSH `0.1.5-alpha.1`, source commit `5dda764ed3aa172535a7967b06ff95d9cbfe536a`. The release identity is `v0.5.0`, using npm's `latest` dist-tag.
+`dsh-multi-tenant@0.6.0` targets Node `^22.19.0 || >=24.0.0` and exactly DSH `0.1.5-rc.2`, source commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`. The release identity is `v0.6.0`, using npm's `latest` dist-tag.
 
 Only this DSH baseline is supported by the current source. All direct DSH peer/development dependencies and resolved DSH packages are exact; older releases retain their historical support records. There is no forward-compatibility or indefinite backwards-compatibility promise. DSH is still an alpha, regardless of the plugin's version syntax.
 
-## Upgrade from 0.4.0
+## Upgrade from 0.5.0
 
-`0.5.0` changes the required DSH baseline from `0.1.2-rc.1` to `0.1.5-alpha.1`. The Principal API, provider protocols, public resource identity, and SQLite `tenant_agents_v04` schema remain unchanged. The driver additionally imports the official LLM identifier constructors, so `@deepseek-ai/dsh-llm` is now an explicit exact peer.
+`0.6.0` changes the required DSH baseline from `0.1.5-alpha.1` to `0.1.5-rc.2`. The Principal API, provider protocols, public resource identity, and SQLite `tenant_agents_v04` schema remain unchanged. The driver additionally imports the official LLM identifier constructors, so `@deepseek-ai/dsh-llm` is now an explicit exact peer.
 
-The [upstream comparison](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.2-rc.1...dsh-v0.1.5-alpha.1) includes the SessionHandle lifecycle, V2/V3 log changes, explicit Agent API, type-only Inbox, persona prefix/suffix split, ordinary subprocess handle changes, and new Web UI. Host-provided plugins and profiles must be reviewed against those contracts; the native integration suite does not cover arbitrary host extensions.
+The [upstream comparison](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.5-alpha.1...dsh-v0.1.5-rc.2) includes the SessionHandle lifecycle, V2/V3 log changes, explicit Agent API, type-only Inbox, persona prefix/suffix split, ordinary subprocess handle changes, and new Web UI. Host-provided plugins and profiles must be reviewed against those contracts; the native integration suite does not cover arbitrary host extensions.
 
 Stop the active host before taking a consistent backup of its Agent Directory, DSH session/storage data, and configuration. Keep the exact old runtime and dependency identity with that backup. Upgrade all DSH packages together, then verify create, resume, authorization, MCP, and shutdown using the target runtime before resuming service.
 
@@ -30,4 +30,4 @@ Provider lifecycle `AbortSignal` arguments remain required and cancellation rema
 
 Supported public code/API subpaths are the package root, `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`. `./cordis.patch.yml` is exported as DSH loader configuration data. All other implementation details are private.
 
-CI runs frozen install and the full release checks on Node 22.19 and Node 24, and checks out the exact upstream source identity. Native tests use the real AgentLoop, V3 JSONL backend and official MCP client, including restart, authorization, retained logs after delete, concurrent reader/writer behavior, and writer release on disposal. The tests do not replace the Agent factory or Session. See [release checks](./release.md) and [refactoring decisions](../releases/v0.5.0.md).
+CI runs frozen install and the full release checks on Node 22.19 and Node 24, and checks out the exact upstream source identity. Native tests use the real AgentLoop, V3 JSONL backend and official MCP client, including restart, authorization, retained logs after delete, concurrent reader/writer behavior, and writer release on disposal. The tests do not replace the Agent factory or Session. See [release checks](./release.md) and [refactoring decisions](../releases/v0.6.0.md).
