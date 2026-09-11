@@ -2,22 +2,22 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.5.0` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 DSH `0.1.5-alpha.1` 和源码 commit `5dda764ed3aa172535a7967b06ff95d9cbfe536a`。
+`dsh-multi-tenant@0.6.0` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 DSH `0.1.5-rc.2` 和源码 commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`。
 
 Principal API 和 SQLite Directory schema 延续 `0.4.0`，DSH 依赖基线明确切换。项目只支持精确目标，不维护多版本兼容层。宿主负责认证，以及强于默认逻辑边界的隔离。
 
 ## 安装
 
-发布身份为 `v0.5.0`，npm 分发使用 `latest` dist-tag。同时固定插件与全部直接 DSH peer：
+发布身份为 `v0.6.0`，npm 分发使用 `latest` dist-tag。同时固定插件与全部直接 DSH peer：
 
 ```bash
-pnpm add dsh-multi-tenant@0.5.0 @deepseek-ai/cordis@4.0.2 \
-  @deepseek-ai/dsh-agent@0.1.5-alpha.1 @deepseek-ai/dsh-llm@0.1.5-alpha.1 \
-  @deepseek-ai/dsh-mcp-client@0.1.5-alpha.1 @deepseek-ai/dsh-session@0.1.5-alpha.1 \
-  @deepseek-ai/dsh-tools@0.1.5-alpha.1
+pnpm add dsh-multi-tenant@0.6.0 @deepseek-ai/cordis@4.0.2 \
+  @deepseek-ai/dsh-agent@0.1.5-rc.2 @deepseek-ai/dsh-llm@0.1.5-rc.2 \
+  @deepseek-ai/dsh-mcp-client@0.1.5-rc.2 @deepseek-ai/dsh-session@0.1.5-rc.2 \
+  @deepseek-ai/dsh-tools@0.1.5-rc.2
 ```
 
-DSH 仍是 alpha。宿主应整体升级 DSH 依赖图。受支持的历史日志可能被 DSH 迁移为 V3，插件不实现数据迁移。升级前停止宿主并备份 Directory 与 DSH 数据；回滚必须同时恢复对应旧 runtime 和升级前数据，保留的旧日志不包含 V3 新增内容。
+DSH 仍是预发布版本。宿主应整体升级 DSH 依赖图。受支持的历史日志可能被 DSH 迁移为 V3，插件不实现数据迁移。升级前停止宿主并备份 Directory 与 DSH 数据；回滚必须同时恢复对应旧 runtime 和升级前数据，保留的旧日志不包含 V3 新增内容。
 
 在 DSH 的 `agents`、`tools` 和 `sessions` service 之后加载，并在创建 Agent 前挂载 JSONL 等持久化 backend。宿主没有提供替代实现时，插件使用 `.dsh-multi-tenant/agents.sqlite`、空 MCP 声明和 DSH 进程内 shared runtime：
 

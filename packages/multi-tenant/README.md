@@ -2,22 +2,22 @@
 
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.5.0` is a DSH multi-tenant plugin for Node 22.19+ and Node 24, pinned to DSH `0.1.5-alpha.1` at source commit `5dda764ed3aa172535a7967b06ff95d9cbfe536a`.
+`dsh-multi-tenant@0.6.0` is a DSH multi-tenant plugin for Node 22.19+ and Node 24, pinned to DSH `0.1.5-rc.2` at source commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`.
 
 The Principal API and SQLite Directory schema carry forward from `0.4.0`; the required DSH baseline changes. Only the exact target is supported, without a multi-version compatibility layer. The host owns authentication and any isolation stronger than the bundled logical boundary.
 
 ## Install
 
-The release identity is `v0.5.0`, using npm's `latest` dist-tag. Pin the plugin and its exact DSH peers together:
+The release identity is `v0.6.0`, using npm's `latest` dist-tag. Pin the plugin and its exact DSH peers together:
 
 ```bash
-pnpm add dsh-multi-tenant@0.5.0 @deepseek-ai/cordis@4.0.2 \
-  @deepseek-ai/dsh-agent@0.1.5-alpha.1 @deepseek-ai/dsh-llm@0.1.5-alpha.1 \
-  @deepseek-ai/dsh-mcp-client@0.1.5-alpha.1 @deepseek-ai/dsh-session@0.1.5-alpha.1 \
-  @deepseek-ai/dsh-tools@0.1.5-alpha.1
+pnpm add dsh-multi-tenant@0.6.0 @deepseek-ai/cordis@4.0.2 \
+  @deepseek-ai/dsh-agent@0.1.5-rc.2 @deepseek-ai/dsh-llm@0.1.5-rc.2 \
+  @deepseek-ai/dsh-mcp-client@0.1.5-rc.2 @deepseek-ai/dsh-session@0.1.5-rc.2 \
+  @deepseek-ai/dsh-tools@0.1.5-rc.2
 ```
 
-DSH remains an alpha. Upgrade the host's entire DSH dependency graph together. Its supported historical logs may migrate to V3; the plugin does not implement data migration. Stop the host and back up its Directory and DSH data before upgrading. Rollback requires the corresponding old runtime and pre-upgrade data together: old retained logs do not contain V3 additions.
+DSH remains pre-stable. Upgrade the host's entire DSH dependency graph together. Its supported historical logs may migrate to V3; the plugin does not implement data migration. Stop the host and back up its Directory and DSH data before upgrading. Rollback requires the corresponding old runtime and pre-upgrade data together: old retained logs do not contain V3 additions.
 
 Load the plugin after the DSH `agents`, `tools`, and `sessions` services, with a persistence backend such as JSONL mounted before creating Agents. With no host replacements it uses `.dsh-multi-tenant/agents.sqlite`, an empty MCP declaration, and DSH's shared in-process runtime:
 

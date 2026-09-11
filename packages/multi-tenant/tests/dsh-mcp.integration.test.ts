@@ -119,7 +119,7 @@ async function readStored(ctx: Context, id: ReturnType<typeof SessionId>) {
   }
 }
 
-describe('DSH 0.1.5-alpha.1 native Agent/Session/MCP lifecycle', () => {
+describe('DSH 0.1.5-rc.2 native Agent/Session/MCP lifecycle', () => {
   it('refuses to publish a shared Agent without a durability checkpoint', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-no-persistence-'))
     let ctx: Context | undefined
@@ -316,3 +316,28 @@ describe('DSH 0.1.5-alpha.1 native Agent/Session/MCP lifecycle', () => {
     }
   }, 60_000)
 })
+
+it('repeated MCP discovery cursor fails provisioning and releases Agent', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-rc2-cursor-'))
+  const ctx = await openRuntime(join(directory, 'agents.sqlite'), join(directory, 'sessions'))
+  const principal = createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })
+  ctx.tenantMcp.load = async () => ({
+    revision: 'repeated-cursor',
+    servers: [{
+      transport: 'stdio', serverName: 'cursor', command: process.execPath,
+      args: [fileURLToPath(new URL('./fixtures/repeated-cursor.mjs', import.meta.url))],
+      reconnect: { enabled: false }, toolCallTimeoutMs: 1000,
+    }],
+  })
+  try {
+    await expect(ctx.multiTenant.create(principal)).rejects.toThrow(AgentProvisioningError)
+    expect(await ctx.multiTenant.list(principal)).toEqual([])
+    const records = await ctx.tenantAgentRepository.list(principal)
+    expect(records).toHaveLength(1)
+    expect(records[0]!.state).toBe('failed')
+    expect(ctx.agents.get(SessionId(records[0]!.sessionId))).toBeUndefined()
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(directory, { recursive: true, force: true })
+  }
+}, 5000)

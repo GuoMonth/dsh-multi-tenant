@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertExportFiles } from './artifact-contract.mjs'
 import { DSH_TARGET } from './dsh-target.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -16,13 +17,6 @@ if (requested === undefined) {
 const consumer = mkdtempSync(join(tmpdir(), 'dsh-mt-consumer-'))
 const packDirectory = requested === '--local' ? mkdtempSync(join(tmpdir(), 'dsh-mt-pack-')) : undefined
 
-function targets(value, output = []) {
-  if (typeof value === 'string') output.push(value)
-  else if (value !== null && typeof value === 'object') {
-    for (const child of Object.values(value)) targets(child, output)
-  }
-  return output
-}
 
 try {
   let packageSpec = requested
@@ -46,10 +40,7 @@ try {
     ]
     const missing = required.filter(path => !has(path))
     if (missing.length > 0) throw new Error(`tarball is missing ${missing.join(', ')}`)
-    const unresolved = targets(packageJson.exports)
-      .map(path => path.replace(/^\.\//, ''))
-      .filter(path => !has(path))
-    if (unresolved.length > 0) throw new Error(`export targets missing: ${unresolved.join(', ')}`)
+    assertExportFiles(packageJson.exports, has)
   }
 
   writeFileSync(join(consumer, 'package.json'), JSON.stringify({
@@ -79,8 +70,12 @@ try {
       RuntimePartitionProvider, SecretProvider, TenantMcpProvider,
       type DshAgentSpecification, type PrincipalContext,
       type RuntimePartitionLease, type RuntimePartitionRequest, type SecretLease,
-      type TenantMcpSnapshot,
+      type TenantMcpSnapshot, type MultiTenantService,
     } from 'dsh-multi-tenant'
+
+    declare const service: MultiTenantService
+    // @ts-expect-error Unauthenticated callers cannot manufacture a Principal from JSON.
+    service.get({ tenantId: 'tenant', principalId: 'user' }, 'not-an-agent-id')
 
     export class McpProvider extends TenantMcpProvider {
       async load(_principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot> {

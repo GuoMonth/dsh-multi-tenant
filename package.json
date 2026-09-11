@@ -8,7 +8,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "peers:check": "pnpm peers check",
-    "verify": "node scripts/verify-packages.mjs && node scripts/verify-contract.mjs",
+    "verify": "node scripts/verify-packages.mjs && node scripts/verify-contract.mjs && node --test scripts/tests/*.test.mjs",
     "probe:sqlite": "node scripts/sqlite-agent-repository-probe.mjs",
     "probe:platform": "pnpm --filter dsh-multi-tenant exec vitest run tests/dsh-mcp.integration.test.ts",
     "smoke": "node scripts/artifact-consumer-smoke.mjs --local",
