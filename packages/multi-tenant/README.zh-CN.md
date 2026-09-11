@@ -4,7 +4,7 @@
 
 `dsh-multi-tenant@0.6.0` 是面向 Node 22.19+ / Node 24 的 DSH 多租户插件，精确固定 DSH `0.1.5-rc.2` 和源码 commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`。
 
-Principal API 和 SQLite Directory schema 延续 `0.4.0`，DSH 依赖基线明确切换。项目只支持精确目标，不维护多版本兼容层。宿主负责认证，以及强于默认逻辑边界的隔离。
+0.6.0 用显式命令替换 runtime callback，并新增 scoped reader、子级控制和交付 provider；SQLite 根资源归属 schema 保持不变。项目只支持精确目标，不维护多版本兼容层。宿主负责认证，以及强于默认逻辑边界的隔离。
 
 ## 安装
 
@@ -165,3 +165,7 @@ one-shot 只读；continuable Queue/Steer 使用官方 host 入口并保留人�
 宿主需在正确执行环境实现 `RuntimePartitionProvider.openFile` 才能启用。可选 `dsh-multi-tenant/deliveries` 的 `openNativeDelivery(request, { fs, workspace, signal?, dispose })` 接受明确授权的原生 FS 与可信 Principal workspace，核验规范路径包含关系，拒绝末级 symlink 和目录，读取有大小上限的当前字节。不把 Session cwd 当授权根，也不退回全局 host FS；别名与竞态保证仍由原生 backend 负责。默认上限 16 MiB（`maximumDeliveryBytes`，最多 256 MiB），辅助实现最多缓存该上限，再按有界分块传输。
 
 源文件更新后下次读取获得新内容；删除后返回 404。响应使用 no-store、nosniff、安全文件名和 sandbox CSP，HTML/SVG 作为惰性文本，未知格式下载。断连、授权撤销、删除根和关闭服务会中止响应并释放 reader，已发出的字节不能收回。不提供不可变归档或桌面打开接口。
+
+### 可选 Web profile
+
+[包内 scoped-web 示例](./examples/scoped-web/README.zh-CN.md) 提供本机 Cordis profile、可选官方 sidebar/main 面板和可重复的三身份浏览器验证。该 profile 不装配 stock Connection 与特权 controller。完整官方 UI 集成与 AgentPresets scope 组合分别留在 #71、#68。

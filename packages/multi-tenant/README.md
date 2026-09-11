@@ -4,7 +4,7 @@
 
 `dsh-multi-tenant@0.6.0` is a DSH multi-tenant plugin for Node 22.19+ and Node 24, pinned to DSH `0.1.5-rc.2` at source commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`.
 
-The Principal API and SQLite Directory schema carry forward from `0.4.0`; the required DSH baseline changes. Only the exact target is supported, without a multi-version compatibility layer. The host owns authentication and any isolation stronger than the bundled logical boundary.
+Version 0.6.0 replaces the runtime callback with explicit commands and adds scoped readers, child controls and delivery providers. The SQLite root ownership schema remains unchanged. Only the exact target is supported, without a multi-version compatibility layer. The host owns authentication and any isolation stronger than the bundled logical boundary.
 
 ## Install
 
@@ -173,3 +173,7 @@ The shared provider supports rosterless in-process children: synchronous native 
 File access is disabled until the host implements `RuntimePartitionProvider.openFile` in the correct execution world. The optional `dsh-multi-tenant/deliveries` helper `openNativeDelivery(request, { fs, workspace, signal?, dispose })` accepts an explicitly authorized native FS and trusted Principal workspace, checks canonical containment, refuses final symlinks/directories, and reads bounded current bytes. It never treats a Session cwd as an authorization root or falls back to global host FS. Native backend containment and alias/race guarantees still apply. The default limit is 16 MiB (`maximumDeliveryBytes`, at most 256 MiB); the helper buffers at most that limit before streaming bounded chunks.
 
 Source edits appear on the next request; removed files return 404. Responses use no-store, nosniff, safe filenames and sandbox CSP; HTML/SVG are inert text, unknown formats download. Disconnect, authority revocation, deletion and shutdown abort responses and release readers. Already sent bytes cannot be recalled. No immutable archive or desktop-open endpoint is provided.
+
+### Optional Web profile
+
+See [the packaged scoped-web example](./examples/scoped-web/README.md) for a loopback Cordis profile, an optional official sidebar/main panel, and a reproducible three-identity browser check. The profile omits stock Connection and privileged controllers. Full stock UI integration and AgentPresets scope composition remain in issues #71 and #68.

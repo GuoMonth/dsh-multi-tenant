@@ -6,9 +6,9 @@
 
 ## 从 0.5.0 升级
 
-`0.6.0` 将 DSH 要求从 `0.1.5-alpha.1` 切到 `0.1.5-rc.2`。Principal API、provider 协议、公开资源 identity 和 SQLite `tenant_agents_v04` schema 保持不变。Driver 继续使用官方 LLM identifier 构造器，`@deepseek-ai/dsh-llm` 保持显式 exact peer。
+`0.6.0` 将 DSH 要求从 `0.1.5-alpha.1` 切到 `0.1.5-rc.2`。runtime callback 已删除，新增显式命令、reader、子级控制和文件 provider 协议；公开根资源 identity 与 SQLite `tenant_agents_v04` schema 保持不变。Driver 继续使用官方 LLM identifier 构造器，`@deepseek-ai/dsh-llm` 保持显式 exact peer。
 
-[完整上游比较](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.5-alpha.1...dsh-v0.1.5-rc.2) 包含 SessionHandle 生命周期、V2/V3 日志、显式 Agent API、type-only Inbox、persona 前后缀拆分、普通 subprocess handle 变化及新版 Web UI。宿主自定义插件和 profile 必须按这些契约审核；原生集成测试不覆盖任意宿主扩展。
+[完整上游比较](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.5-alpha.1...dsh-v0.1.5-rc.2) 新增父级目录和当前源文件交付语义。Agent registry、AgentLoop、Tools、SessionQuery、Connection 在两个已审查快照之间未变。V3、SessionHandle 和异步 Agent 创建已存在于前一 alpha.1 基线，继续作为要求，不能算作 rc.2 新增破坏。宿主特定 profile 仍需自行验证。
 
 先停止活动宿主，再一致备份 Agent Directory、DSH session/storage 数据和配置，并保存对应的旧 runtime 与依赖身份。整体升级 DSH 包，在目标 runtime 验证 create、resume、授权、MCP 和 shutdown 后再恢复服务。
 
@@ -20,7 +20,7 @@ Driver 使用有类型约束的 `AgentRegistry.create/resume`、`AgentSetup` 和
 
 Shared driver 要求 DSH Session store 和可用的持久化 listener。它在返回新建 handle 前等待 `ctx.sessions.flush(agent.session)`，确保空会话也在 Directory ready 前落盘。Listener 缺失或检查失败时会释放 handle 并拒绝发布。自定义持久化 `DshRuntimeDriver.create()` 也必须在返回前达到可恢复的持久化边界；这是生命周期要求，没有新增公共方法。
 
-`TenantAgentRuntime.whenIdle()` 等待 Agent 活动结束，不保证持久化完成。宿主检查持久化日志时，使用 `await ctx.sessionPersistence.flush()`、`open(id, 'read')`、`read()`，并在 `finally` 中 `close()`。Live transcript 和持久化日志是不同读取语义。原始 SessionHandle 继续由可信宿主/DSH 生命周期持有，不加入租户 runtime view。
+`TenantAgentRuntime.whenIdle()` 等待 Agent 活动结束，不保证持久化完成。宿主检查持久化日志时，使用 `await ctx.sessionPersistence.flush()`、`open(id, 'read')`、`read()`，并在 `finally` 中 `close()`。Live transcript 和持久化日志是不同读取语义。原始 SessionHandle 继续由可信宿主/DSH 生命周期持有，不向产品 API 暴露。
 
 DSH writer 锁只保护单个 session 的 JSONL 生命周期，不协调 Principal 所有权、不保证多活动进程共享 SQLite Directory，也不提供分布式 fencing。内置 Repository 仍要求 local、single-node、single-active-process。
 
@@ -31,3 +31,5 @@ Provider lifecycle `AbortSignal` 仍为必填，取消仍是合作式。插件�
 公开代码/API 子路径只有 package root、`/mcp`、`/sqlite`、`/web`、`/testing`、`/starter`。另外导出 `./cordis.patch.yml` 作为 DSH loader 配置数据；其余实现均为 private。
 
 CI 在 Node 22.19 和 Node 24 上运行 frozen install 和完整发布检查，并单独 checkout 精确上游源码身份。原生测试使用真实 AgentLoop、V3 JSONL 和官方 MCP，覆盖重启、授权、删除后保留日志、并发 reader/writer 和 dispose 后释放 writer。测试不替换 Agent factory 或 Session。详见[发布检查](./release.zh-CN.md)和[重构决策](../releases/v0.6.0.md)。
+
+0.6.0 删除 runtime callback，使用显式命令；reader、子级控制与文件 provider 是新增协议。可选 query、subagent 和 FS 能力必须来自授权 partition。共享 provider 支持未装配 AgentPresets 的 in-process 后代，不相容组合拒绝（#68）；可选 Web profile 使用授权 adapter，完整 stock Remote/settings/desktop 权限覆盖留待 #71。

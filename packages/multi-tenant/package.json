@@ -57,7 +57,8 @@
     "README.md",
     "README.zh-CN.md",
     "LICENSE",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "examples"
   ],
   "keywords": [
     "deepseek-harness",
@@ -121,13 +122,19 @@
     "@deepseek-ai/dsh-fs": "0.1.5-rc.2",
     "@deepseek-ai/dsh-fs-local": "0.1.5-rc.2",
     "@deepseek-ai/dsh-tool-present": "0.1.5-rc.2",
-    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.2"
+    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-tool-subagent": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.5-rc.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   },
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
-    "prepare": "tsdown"
+    "prepare": "tsdown",
+    "demo": "node examples/scoped-web/server.mjs"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-session-query": {

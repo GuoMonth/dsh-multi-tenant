@@ -1,0 +1,54 @@
+Tenant workspace
+
+DSH 0.1.5-rc.2 · scoped adapter example
+
+Demo identity
+acme-alice
+acme-bob
+globex-alice
+Switch identity
+acme-alice
+
+Local demonstration with a keyless model. Use /hold to test Stop, /delegate for a native child, and /present for a report.
+
+New AgentRefresh list
+5030c77c-9432-4b7b-bab3-40d551aefc5c
+00ab9b5f-ba65-4de3-97ca-a27798d8100f
+16fa8493-2976-454c-9d67-fd6ef7299b7f
+729b78b7-5af2-4b90-a2a2-8e5d2fa8a4e0
+93cae8f8-2bb1-4d95-ba97-d65dd365e5d5
+93cae8f8-2bb1-4d95-ba97-d65dd365e5d5.0
+Inactive
+Reconnect
+Delete root
+Back to root
+
+user: Please reply with a short result.
+
+assistant: Demo response: native operation completed
+
+user: hello child acme-alice
+
+assistant: Demo response: hello child acme-alice
+
+user: /hold
+
+assistant: Working until you press Stop…
+
+user: child steer
+
+user: /present
+
+assistant:
+
+assistant: Demo response: native operation completed
+
+Message
+Delivery
+Queue
+Steer
+SendStop
+Deliveries
+report.html Preview Download
+
+Identity selected

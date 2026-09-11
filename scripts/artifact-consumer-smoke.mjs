@@ -46,17 +46,30 @@ try {
   writeFileSync(join(consumer, 'package.json'), JSON.stringify({
     name: 'dsh-multi-tenant-consumer', private: true, type: 'module',
   }))
-  writeFileSync(join(consumer, 'pnpm-workspace.yaml'), 'allowBuilds:\n  esbuild: false\n')
-  execFileSync('pnpm', ['add',
+  // Keep the reviewed native identity and JSONL backend build policy in the
+  // independent consumer too; it still installs only registry packages + tarball.
+  writeFileSync(join(consumer, 'pnpm-workspace.yaml'), readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'))
+  try { execFileSync('pnpm', ['add',
     '@deepseek-ai/cordis@4.0.2',
     `@deepseek-ai/dsh-agent@${DSH_TARGET.version}`,
     `@deepseek-ai/dsh-llm@${DSH_TARGET.version}`,
     `@deepseek-ai/dsh-mcp-client@${DSH_TARGET.version}`,
     `@deepseek-ai/dsh-session@${DSH_TARGET.version}`,
     `@deepseek-ai/dsh-tools@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-agent-loop@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-session-projection@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-system-prompt@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-session-persistence-jsonl@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-session-query-sqlite@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-subagent@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-subagent-spawn-in-process@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-tool-subagent@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-fs-local@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-tool-present@${DSH_TARGET.version}`,
+    `@deepseek-ai/dsh-host-webserver@${DSH_TARGET.version}`,
     'typescript@6.0.3',
     packageSpec,
-  ], { cwd: consumer, stdio: 'ignore' })
+  ], { cwd: consumer, stdio: 'pipe' }) } catch (error) { throw new Error(`Consumer install failed: ${error.stdout?.toString() ?? ''}${error.stderr?.toString() ?? ''}`) }
 
   writeFileSync(join(consumer, 'tsconfig.json'), JSON.stringify({
     compilerOptions: {
@@ -116,7 +129,7 @@ try {
       }
     }
   `)
-  execFileSync('pnpm', ['exec', 'tsc'], { cwd: consumer, stdio: 'ignore' })
+  execFileSync('pnpm', ['exec', 'tsc'], { cwd: consumer, stdio: 'inherit' })
 
   writeFileSync(join(consumer, 'smoke.mjs'), `
     import { Context } from '@deepseek-ai/cordis'
@@ -196,6 +209,7 @@ try {
     console.log('installed Agent resource contract passed')
   `)
   execFileSync(process.execPath, ['smoke.mjs'], { cwd: consumer, stdio: 'inherit' })
+  execFileSync(process.execPath, [join(consumer, 'node_modules/dsh-multi-tenant/examples/scoped-web/smoke.mjs')], { cwd: consumer, stdio: 'inherit' })
   console.log(`artifact consumer smoke passed: ${packageSpec}`)
 } finally {
   rmSync(consumer, { recursive: true, force: true })

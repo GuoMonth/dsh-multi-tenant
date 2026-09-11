@@ -2,7 +2,14 @@ import { expect, it } from 'vitest'
 import { SessionSeq, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { historyPage, observeLease, type SessionReadLease, type SessionReadSnapshot, type ObservationFrame } from '../src/observation.ts'
 
-const event = (seq: number): SessionEvent => ({ type: 'user/message', seq: SessionSeq(seq), data: { content: [{ type: 'text', text: `message ${seq}` }] } } as SessionEvent)
+const event = (seq: number): SessionEvent => ({ type: 'user/message', seq: SessionSeq(seq), data: { source: { kind: 'user' }, content: [{ type: 'text', text: `message ${seq}` }] } } as SessionEvent)
+
+it('does not expose host-injected runtime context as human history', () => {
+  const hidden = { ...event(0), data: { source: { kind: 'plugin', plugin: 'host' }, content: [{ type: 'text', text: '/private/host/context' }] } } as SessionEvent
+  const page = historyPage('root', { events: [hidden, event(1)], cursor: 1, active: false })
+  expect(page.items).toEqual([{ seq: 1, kind: 'user', text: 'message 1' }])
+  expect(JSON.stringify(page)).not.toContain('/private')
+})
 
 it('subscribes before opening, catches opening gaps, paginates deltas, and releases on revocation', async () => {
   const opening = Promise.withResolvers<SessionReadSnapshot>()
@@ -55,4 +62,14 @@ it('fails visibly when a client stops consuming instead of silently dropping eve
   for (let i = 0; i < 130; i++) changed({ attempt: 'a', text: 'x', reset: false })
   await expect(stream[Symbol.asyncIterator]().next()).rejects.toThrow('too slow')
   expect(disposed).toBe(1)
+})
+
+it('keeps -1 as a real delta cursor when an empty opening accumulates more than one page', () => {
+  const snapshot = { events: Array.from({ length: 401 }, (_, i) => event(i)), cursor: 400, active: false }
+  const first = historyPage('root', snapshot, { limit: 200 }, -1)
+  expect(first.items[0]?.seq).toBe(0)
+  expect(first.items.at(-1)?.seq).toBe(199)
+  expect(first.cursor).toBe('root:199')
+  const next = historyPage('root', snapshot, { limit: 200 }, 199)
+  expect(next.items[0]?.seq).toBe(200)
 })
