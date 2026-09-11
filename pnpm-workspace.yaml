@@ -15,6 +15,11 @@ minimumReleaseAge: 1440
 # Upstream package manifests use semver peer ranges. Keep the repository's
 # executable dependency graph on one reviewed DSH identity.
 overrides:
+  '@deepseek-ai/dsh-host-webserver': 0.1.5-rc.2
+  '@deepseek-ai/dsh-sandbox': 0.1.5-rc.2
+  '@deepseek-ai/dsh-tool-present': 0.1.5-rc.2
+  '@deepseek-ai/dsh-fs-local': 0.1.5-rc.2
+  '@deepseek-ai/dsh-fs': 0.1.5-rc.2
   '@deepseek-ai/dsh-util-time': 0.1.5-rc.2
   '@deepseek-ai/dsh-chunked-list': 0.1.5-rc.2
   '@deepseek-ai/dsh-subagent-in-process-driver': 0.1.5-rc.2
@@ -59,6 +64,11 @@ overrides:
 # Every exception is an exact package/version from the manually reviewed DSH
 # 0.1.5-rc.2 source identity pinned in scripts/dsh-target.mjs.
 minimumReleaseAgeExclude:
+  - '@deepseek-ai/dsh-host-webserver@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-sandbox@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-tool-present@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-fs-local@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-fs@0.1.5-rc.2'
   - '@deepseek-ai/dsh-util-time@0.1.5-rc.2'
   - '@deepseek-ai/dsh-chunked-list@0.1.5-rc.2'
   - '@deepseek-ai/dsh-subagent-in-process-driver@0.1.5-rc.2'

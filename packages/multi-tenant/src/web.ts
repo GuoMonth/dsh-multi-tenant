@@ -5,6 +5,7 @@ import { once } from 'node:events'
 import type { Context } from '@deepseek-ai/cordis'
 import {
   AgentNotFoundError,
+  DeliveryNotFoundError,
   AgentProvisioningError,
   AuthenticationRequiredError,
   CapabilityUnavailableError,
@@ -149,7 +150,7 @@ function responseError(error: unknown): { readonly status: number; readonly code
   if (error instanceof AuthenticationRequiredError) {
     return { status: 401, code: error.code, message: error.message }
   }
-  if (error instanceof AgentNotFoundError) {
+  if (error instanceof AgentNotFoundError || error instanceof DeliveryNotFoundError) {
     return { status: 404, code: error.code, message: error.message }
   }
   if (error instanceof CapabilityUnavailableError || error instanceof IsolationUnavailableError || error instanceof ServiceClosedError) {
@@ -211,7 +212,7 @@ export function mountMultiTenantWeb(
     const encoded = pathname.slice(`${agentsPath}/`.length)
     if (encoded.length === 0) throw new AgentNotFoundError()
     const parts = encoded.split('/')
-    if (parts.length > 4) throw new AgentNotFoundError()
+    if (parts.length > 5) throw new AgentNotFoundError()
     let decoded: string
     try {
       decoded = decodeURIComponent(parts[0]!)
@@ -221,11 +222,53 @@ export function mountMultiTenantWeb(
     const id = parseAgentId(decoded)
     let action = parts[1]
     let childRef: string | undefined
+    let fileRef: string | undefined
     if (action === 'children' && parts.length >= 3) {
       try { childRef = decodeURIComponent(parts[2]!) } catch { throw new AgentNotFoundError() }
       action = parts[3] ?? 'history'
-    } else if (parts.length > 2) throw new AgentNotFoundError()
+      if (parts.length === 5) {
+        if (action !== 'deliveries') throw new AgentNotFoundError()
+        try { fileRef = decodeURIComponent(parts[4]!) } catch { throw new DeliveryNotFoundError() }
+      }
+    } else if (parts.length > 2) {
+      if (parts.length !== 3 || action !== 'deliveries') throw new AgentNotFoundError()
+      try { fileRef = decodeURIComponent(parts[2]!) } catch { throw new DeliveryNotFoundError() }
+    }
     const target = childRef === undefined ? {} : { childRef }
+    if (action === 'deliveries') {
+      if (req.method !== 'GET' && req.method !== 'HEAD') { writeJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }); return }
+      const params = new URL(req.url!, 'http://localhost').searchParams
+      if ([...params.keys()].some(key => key !== 'download') || (params.has('download') && params.get('download') !== '1')) throw new ValidationError('unknown delivery field')
+      const controller = new AbortController()
+      const disconnected = () => controller.abort()
+      res.once('close', disconnected)
+      try {
+        if (fileRef === undefined) {
+          if (req.method === 'HEAD') { writeJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }); return }
+          writeJson(res, 200, { deliveries: await service.deliveries(principal, id, { ...target, signal: controller.signal }) })
+        } else {
+          const file = await service.file(principal, id, fileRef, { ...target, signal: controller.signal })
+          const revoked = () => res.destroy()
+          file.signal.addEventListener('abort', revoked, { once: true })
+          try {
+            file.signal.throwIfAborted()
+            const disposition = params.has('download') || file.contentType === 'application/octet-stream' ? 'attachment' : 'inline'
+            const encodedName = encodeURIComponent(file.name).replace(/['()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+            res.writeHead(200, {
+              'content-type': file.contentType, 'content-length': file.size,
+              'content-disposition': `${disposition}; filename="download"; filename*=UTF-8''${encodedName}`,
+              'cache-control': 'no-store', 'x-content-type-options': 'nosniff',
+              'content-security-policy': "sandbox; default-src 'none'; frame-ancestors 'self'",
+            })
+            if (req.method !== 'HEAD') for await (const chunk of file.content) {
+              if (!res.write(chunk)) await once(res, 'drain', { signal: file.signal })
+            }
+            res.end()
+          } finally { file.signal.removeEventListener('abort', revoked); await file.dispose() }
+        }
+      } finally { controller.abort(); res.off('close', disconnected) }
+      return
+    }
     if (action === 'children') {
       if (req.method !== 'GET') { writeJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }); return }
       writeJson(res, 200, { children: await service.children(principal, id, target) })

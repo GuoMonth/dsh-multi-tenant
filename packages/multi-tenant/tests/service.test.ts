@@ -262,6 +262,32 @@ const alice = () => createPrincipalContext({ tenantId: 'acme', principalId: 'ali
 const bob = () => createPrincipalContext({ tenantId: 'acme', principalId: 'bob' })
 const globexAlice = () => createPrincipalContext({ tenantId: 'globex', principalId: 'alice' })
 
+it('joins late readonly acquisition and asynchronous reader disposal on shutdown', async () => {
+  const test = await harness()
+  const owner = createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })
+  const resource = await test.service.create(owner)
+  const entered = Promise.withResolvers<void>()
+  const acquired = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  let disposed = 0
+  test.partitions.openRead = async () => {
+    entered.resolve()
+    await acquired.promise
+    return { async read() { return { events: [], cursor: -1, active: false } }, subscribe() { return () => {} }, async dispose() { disposed++; await release.promise } }
+  }
+  const reading = test.service.read(owner, resource.id)
+  const denied = expect(reading).rejects.toBeInstanceOf(ServiceClosedError)
+  await entered.promise
+  let closed = false
+  const closing = test.service.close().then(() => { closed = true })
+  acquired.resolve()
+  await expect.poll(() => disposed).toBe(1)
+  expect(closed).toBe(false)
+  release.resolve()
+  await Promise.all([denied, closing])
+  expect(disposed).toBe(1)
+})
+
 describe('MultiTenantService authority kernel', () => {
   it('admits steer and cancel while a tool operation is pending', async () => {
     const test = await harness()

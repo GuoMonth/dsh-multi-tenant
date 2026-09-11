@@ -69,7 +69,7 @@ export class PrincipalSecretProvider extends SecretProvider {
   }
 }
 
-export async function openRuntime(database: string, sessions: string, persistence = true, subagents = false): Promise<Context> {
+export async function openRuntime(database: string, sessions: string, persistence = true, subagents = false, configure?: (ctx: Context) => Promise<void>): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
@@ -90,7 +90,8 @@ export async function openRuntime(database: string, sessions: string, persistenc
   await ctx.plugin(SQLiteTenantAgentRepository, { path: database })
   await ctx.plugin(PrincipalMcpProvider)
   await ctx.plugin(PrincipalSecretProvider)
-  await ctx.plugin(SharedDshRuntimePartitionProvider)
+  await configure?.(ctx)
+  if (!ctx.get('runtimePartitions')) await ctx.plugin(SharedDshRuntimePartitionProvider)
   await ctx.plugin(MultiTenantService)
   return ctx
 }

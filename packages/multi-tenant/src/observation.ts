@@ -1,6 +1,8 @@
 /** Product-safe views and bounded, disposable observations of native Session facts. */
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import { childSummaries, type NativeChild, type ChildSummary } from './targets.ts'
+import { deliverySummaries } from './delivery-facts.ts'
+import type { DeliverySummary } from './delivery-types.ts'
 import type { AgentId, PrincipalContext } from './types.ts'
 import { CapabilityUnavailableError, ValidationError } from './errors.ts'
 
@@ -38,6 +40,7 @@ export interface HistoryItem {
 }
 
 export interface HistoryPage {
+  readonly deliveries?: readonly DeliverySummary[]
   readonly children?: readonly ChildSummary[]
   readonly items: readonly HistoryItem[]
   readonly cursor: string
@@ -91,6 +94,7 @@ export function historyPage(target: string, snapshot: SessionReadSnapshot, optio
   const cursor = after < 0 || all.length <= limit ? snapshot.cursor : items.at(-1)!.seq
   const children = childSummaries(target, snapshot)
   return { items, cursor: `${target}:${cursor}`, active: snapshot.active,
+    deliveries: deliverySummaries(target, snapshot),
     ...(children === undefined ? {} : { children }),
     ...(after < 0 && all.length > limit ? { older: `${target}:${items[0]!.seq}` } : {}),
   }
@@ -165,7 +169,7 @@ export async function observeLease(target: string, lease: SessionReadLease, sign
         do {
           const page = historyPage(target, snapshot, { limit: 200 }, cursor)
           cursor = Number(page.cursor.slice(target.length + 1))
-          if (page.items.length || page.children !== undefined) queue.push({ type: 'append', page })
+          if (page.items.length || page.children !== undefined || page.deliveries?.length) queue.push({ type: 'append', page })
         } while (cursor < snapshot.cursor && !stopped.signal.aborted)
         queue.push({ type: 'status', active: snapshot.active })
       }

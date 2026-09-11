@@ -4,6 +4,7 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import type { SessionReadLease, SessionReadRequest } from './observation.ts'
 import { CapabilityUnavailableError } from './errors.ts'
+import type { FileReadRequest, FileReadLease } from './delivery-types.ts'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import type { ResolvedMcpServer } from './mcp.ts'
 import type { AgentId, CreateAgentOptions, IsolationLevel, PrincipalContext } from './types.ts'
@@ -106,6 +107,10 @@ export abstract class RuntimePartitionProvider extends Service {
 
   async controlChild(_request: ChildControlRequest): Promise<void> {
     throw new CapabilityUnavailableError('This runtime partition does not provide child control.')
+  }
+
+  async openFile(_request: FileReadRequest): Promise<FileReadLease> {
+    throw new CapabilityUnavailableError('This runtime partition does not provide file delivery.')
   }
 }
 
