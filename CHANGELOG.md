@@ -2,6 +2,13 @@
 
 Published artifacts and tags are listed in [GitHub Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases). Source milestones do not necessarily have an npm release.
 
+## Unreleased
+
+- Docker now defaults to bridge networking for outbound model API and remote MCP access; set `network: 'none'` for offline operation. Bridge is not a network tenant boundary.
+- Ship a runtime Dockerfile and npm dependency lock with common shell, search, Git, HTTP, Python and build tools; keep test fixtures out of the user image.
+- Docker 默认 bridge 出站，可显式配置 `network: 'none'`；bridge 不承诺网络级租户隔离。
+- 随包提供运行时 Dockerfile、依赖锁和常用 AI Bash 工具，不包含测试模型或测试 MCP。
+
 ## 0.7.0 — 2026-09-11
 
 **Developer integration release; breaking change from 0.5.x.** Give each user within a tenant an independent native DSH Host while reusing the official Web and preset/subagent behavior.

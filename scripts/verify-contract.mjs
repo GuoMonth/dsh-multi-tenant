@@ -18,5 +18,13 @@ const lock = readFileSync(join(root, 'scripts/native-host-probe/pnpm-lock.yaml')
 const packages = [...lock.matchAll(/^  '(@deepseek-ai\/dsh(?:-[^@']+)?)[@]([^:(']+)(?:\([^']*)?':/gm)]
 if (!packages.length) errors.push('native lock contains no DSH packages')
 for (const [, name, version] of packages) if (version !== DSH_TARGET.version) errors.push(`${name} native resolution is not exact`)
+const imageManifest = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/runtime/package.json'), 'utf8'))
+const imageLock = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/runtime/package-lock.json'), 'utf8'))
+for (const [name, version] of Object.entries(imageManifest.dependencies)) {
+  if (version !== DSH_TARGET.version || imageLock.packages[`node_modules/${name}`]?.version !== version) errors.push(`${name} image baseline mismatch`)
+}
+for (const [path, value] of Object.entries(imageLock.packages)) {
+  if (/node_modules\/@deepseek-ai\/dsh(?:-[^/]+)?$/.test(path) && value.version !== DSH_TARGET.version) errors.push(`${path} image resolution is not exact`)
+}
 if (errors.length) { console.error(errors.join('\n')); process.exit(1) }
 console.log(`contract verification passed: ${pkg.name}@${pkg.version}; native DSH ${DSH_TARGET.version} @ ${DSH_TARGET.commit}`)

@@ -18,19 +18,23 @@ export interface DockerRuntimeOptions {
   readonly profileDirectory: (domainId: string) => string
   readonly uid: number
   readonly gid: number
+  /** Docker bridge permits outbound access; none explicitly disables networking. */
+  readonly network?: 'bridge' | 'none'
   readonly memoryMb?: number
   readonly cpus?: number
   readonly pids?: number
 }
 
-/** Offline Linux reference boundary. No network interfaces or published ports;
+/** Linux container runtime. Bridge egress by default, no published ports;
  * the ingress reaches each runtime through its private Unix socket. Workloads
- * cannot access Docker, other domains, or the platform directory.
+ * cannot access Docker or other domain/platform mounts. Network reachability
+ * follows the Docker daemon policy; bridge is not a network tenant boundary.
  */
 export class DockerRuntimeProvider implements RuntimeProvider {
   constructor(private readonly options: DockerRuntimeOptions) {
     if (process.platform !== 'linux') throw new Error('Docker provider requires Linux')
     if (!/^(sha256:[a-f0-9]{64}|[^\s]+@sha256:[a-f0-9]{64})$/.test(options.image)) throw new TypeError('Pin the runtime image by digest')
+    if (options.network !== undefined && options.network !== 'bridge' && options.network !== 'none') throw new TypeError('Runtime network must be bridge or none')
     for (const id of [options.uid, options.gid]) if (!Number.isSafeInteger(id) || id < 1) throw new TypeError('Runtime requires a non-root uid/gid')
     if (options.uid !== process.getuid!() || options.gid !== process.getgid!()) {
       throw new Error('Local Docker transport requires the non-root coordinator and runtime to use the same uid/gid')
@@ -114,7 +118,7 @@ export class DockerRuntimeProvider implements RuntimeProvider {
       attemptedCreate = true
       id = await this.docker(['container', 'create', '--name', location.name, '--label', `dsh.claim=${claim}`,
         '--label', `dsh.owner=${location.owner}`, '--label', `dsh.domain=${spec.domainId}`, '--label', `dsh.generation=${spec.generation}`,
-        '--init', '--network', 'none', '--read-only', '--user', `${this.options.uid}:${this.options.gid}`,
+        '--init', '--network', this.options.network ?? 'bridge', '--read-only', '--user', `${this.options.uid}:${this.options.gid}`,
         '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
         '--memory', `${this.options.memoryMb ?? 1_024}m`, '--memory-swap', `${this.options.memoryMb ?? 1_024}m`,
         '--cpus', String(this.options.cpus ?? 1), '--pids-limit', String(this.options.pids ?? 160),

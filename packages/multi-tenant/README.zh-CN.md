@@ -26,7 +26,7 @@
 
 ## 使用前需要了解的边界
 
-**0.7.0 是开发者集成版本。** 内置 Docker provider **没有出站网络**，不能直接调用外部模型 API 或远程 MCP；这些场景需要部署方提供受审查的网络 runtime provider。登录/SSO、TLS、域配置、配额和运维监控由接入平台负责，本包不包含账号管理 UI 或现成托管服务。
+**本包面向开发者集成。** Docker 默认使用 bridge 网络，允许访问外部模型 API 和远程 MCP；需要离线运行时设置 `network: 'none'`。此改动尚未发布，已发布的 0.7.0 仍默认无网络。登录/SSO、TLS、域配置、配额和运维监控由接入平台负责，本包不包含账号管理 UI 或现成托管服务。
 
 授权边界是**租户内的用户**。同一 Principal 的两个 workspace 或会话不承诺互相保密；域内权限、工具过滤、停止、归档、删除和 preset 选择沿用原生语义。本版本不提供团队共享域、项目 ACL、跨用户会话共享、自动空闲回收或跨机调度。
 
@@ -46,7 +46,7 @@ node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
 
 1. 按下文准备固定版本的原生镜像，以及每域 profile。
 2. 接入登录/IdP，从可信认证结果取得租户和用户身份，为每域分配独立主机名。
-3. 本地验证可使用无网络 Docker 参考实现；需要模型/MCP 出站访问时，接入受审查的 runtime provider。
+3. 构建随包提供的运行时镜像，默认 bridge 网络支持模型/MCP 出站；需要离线运行时显式选择 `network: 'none'`。
 4. 嵌入入口与协调器，配置私有数据，并在平台实现关闭、暂停和恢复流程。
 
 想先体验完整的无外部调用原生 Web 验证，可从源码安装项目和 `scripts/native-host-probe` 依赖，在具备 Docker、Chromium 的环境运行 `pnpm probe:isolated`，见[可复现原生验证](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/scripts/native-host-probe/README.md)。该环境用于验证，不提供公网登录服务。
@@ -68,7 +68,7 @@ npm install dsh-multi-tenant@0.7.0
 
 平台使用 Node 22.19 或 Node 24+；内置 provider 面向 Linux。Docker provider 要求本机 Docker engine 及预构建的不可变镜像。镜像内固定 **DSH 0.1.5-rc.2**，源码身份 `fb2c4b9e698e30edb738bca4cf0618587db7d203`。协调器使用有 Docker 权限的非 root 用户运行；参考 runtime 的 UID/GID 必须与协调器相同，才能访问双方私有控制文件。平台进程不安装 DSH 运行时。TypeScript 消费者安装 `@types/node`，并在编译选项 `types` 中包含 `node`。
 
-Docker 参考实现使用 `--network none`，适用于本地工具和无外部调用的模型；不能连接外部模型 API 或远程 MCP。需要出站网络的部署应实现经过审查、明确网络策略的 `RuntimeProvider`。本地进程 provider 仅用于可信开发，不是恶意工作负载的隔离边界。
+Docker 默认使用 `--network bridge`；设置 `network: 'none'` 即使用 `--network none`。不发布端口，原生服务只监听容器内 loopback。bridge 可访问网络可达的宿主机、内网服务及同桥容器，不提供网络级租户隔离；需要限制时由部署方配置防火墙。外部模型和 MCP 仍需相应凭据。本地进程 provider 仅用于可信开发，不是恶意工作负载的隔离边界。
 
 ## 嵌入认证服务
 
@@ -105,6 +105,28 @@ ingress.server.listen(8080, '127.0.0.1')
 
 ## 镜像及原生 profile
 
+### 构建内置运行时镜像
+
+源码目录执行（npm 安装后将路径替换为 `node_modules/dsh-multi-tenant`）：
+
+```sh
+docker build -f packages/multi-tenant/runtime/Dockerfile -t dsh-domain-runtime:local packages/multi-tenant
+docker image inspect dsh-domain-runtime:local --format '{{.Id}}'
+```
+
+将输出的 `sha256:...` 传给 provider 的 `image`，并按下文准备每域 profile。Dockerfile 和依赖锁随 npm 包发布，不含测试模型、测试 MCP 或真实凭据。基础镜像固定 digest，DSH 及 npm 依赖由 lockfile 固定；系统工具使用 Debian 仓库的当前安全更新，因此构建结果以最终镜像 ID 为准。
+
+内置 Bash、Git/SSH 客户端、curl/wget、jq、ripgrep、常用文本/归档工具、Python 3/venv/pip、C/C++ 编译工具，以及基础镜像提供的 Node/npm。不预装需要账号的 AI CLI、浏览器或所有语言 SDK；可通过派生镜像按项目补充。运行时根目录只读，新增 Python 依赖可放在 `/domain/.venv`，Node 项目依赖放在 `/domain` 的项目目录。`/tmp` 为 noexec，编译或安装工具需要执行临时文件时，将 `TMPDIR` 指向 `/domain` 内可写目录。Provider 会覆盖镜像默认用户，使用平台配置的非 root UID/GID。
+
+```js
+new DockerRuntimeProvider({
+  // ...image、directory、profileDirectory、uid、gid
+  network: 'none', // 可选：禁止出站；省略时使用 bridge
+})
+```
+
+
+
 Docker provider 启动 `/opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile web --patch /profile/runtime.patch.json`，监听容器内 loopback 3081，不打开浏览器；固定版本 Loader 使用 Node `--expose-internals`。安装精确原生运行时后，将包导出的 `dsh-multi-tenant/native/runtime-control.mjs` 复制到镜像的 `/opt/dsh/runtime-control.mjs`。通过原生 patch 插入：
 
 ```json
@@ -138,6 +160,8 @@ Docker provider 启动 `/opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --prof
 每个本地 SQLite 目录只有一个协调器，不提供跨机调度或存储 fencing。浏览器断线可能仍有后台任务，因此没有自动空闲回收；域持续运行直到显式停止。配额和调度由嵌入平台基于实际工作负载决定。
 
 ## 验证与范围
+
+`pnpm probe:image` 从安装后的 npm 产物构建用户镜像，验证真实 DSH 就绪、工具可用、默认 HTTPS 出站以及显式 none 阻断。不调用模型 API。
 
 `pnpm release:check` 验证 exports、声明、生命周期、入口、持久化和独立 tarball 消费者。运行 `pnpm --dir scripts/native-host-probe install --frozen-lockfile` 后执行 `pnpm probe:isolated`，通过安装后的包验证真实原生 Host 和 Playwright；先安装 Chromium 或设置 `PROBE_CHROMIUM`。探针构建固定测试镜像，只使用假凭据、无外部调用模型和本地 MCP，结束时清理运行时。
 

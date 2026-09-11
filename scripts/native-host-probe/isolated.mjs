@@ -30,7 +30,7 @@ const root = await mkdtemp(join(evidenceParent, 'dsh-wp34-'))
 const profiles = join(root, 'profiles')
 const runtimeDirectory = join(root, 'runtime')
 const repository = new SQLiteDomainRepository(join(root, 'directory'))
-const provider = new DockerRuntimeProvider({ image, directory: runtimeDirectory, profileDirectory: id => join(profiles, id), uid: process.getuid(), gid: process.getgid() })
+const provider = new DockerRuntimeProvider({ network: 'none', image, directory: runtimeDirectory, profileDirectory: id => join(profiles, id), uid: process.getuid(), gid: process.getgid() })
 const coordinator = new DomainRuntimeCoordinator(repository, provider, '0.1.5-rc.2', 45_000, 20_000)
 const sessions = new MemoryDomainSessions('domain-session')
 const origins = new Map()
@@ -338,7 +338,7 @@ try {
   // Deliberately kill a separate coordinator while Docker retains its native Host.
   const crashDirectory = join(root, 'crash-directory')
   const crashConfig = { directory: crashDirectory, profile: join(profiles, a.record.id),
-    provider: { image, directory: runtimeDirectory, uid: process.getuid(), gid: process.getgid() } }
+    provider: { network: 'none', image, directory: runtimeDirectory, uid: process.getuid(), gid: process.getgid() } }
   const requirePackage = createRequire(new URL('../../packages/multi-tenant/package.json', import.meta.url))
   const controller = spawn(process.execPath, ['--import', requirePackage.resolve('tsx'),
     fileURLToPath(new URL('../../packages/multi-tenant/tests/runtime/docker-controller.fixture.mjs', import.meta.url))], {

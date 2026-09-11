@@ -28,6 +28,7 @@ jobs:
       - run: pnpm --dir scripts/native-host-probe exec playwright install --with-deps chromium
         env:
           PLAYWRIGHT_SKIP_BROWSER_GC: '1'
+      - run: pnpm probe:image
       - run: pnpm probe:isolated
         env:
           # Keep native Unix socket paths within Linux's 107-byte limit.

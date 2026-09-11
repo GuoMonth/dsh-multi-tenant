@@ -35,7 +35,8 @@
     "README.zh-CN.md",
     "LICENSE",
     "examples",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "runtime"
   ],
   "keywords": [
     "deepseek-harness",
