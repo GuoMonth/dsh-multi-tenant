@@ -143,3 +143,9 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
 原 callback API 已删除。长工具操作和活动等待不持有生命周期队列；delete、refresh、撤销和 shutdown 封闭旧 generation、取消已接纳操作并在 drain 后释放 handle 和 provider 租约。持久删除失败时，本进程继续拒绝新命令，直到所有者重试删除。
 
 Web 新增 `POST /_dsh-multi-tenant/agents/:id/messages`，body 为 `{ text, delivery? }`，以及 `POST .../:id/cancel`，body 为 `{ reason? }`。message source 由宿主构造，不提供浏览器任意工具执行入口。
+
+### 按所属关系读取历史和观察
+
+可选安装精确版本 `@deepseek-ai/dsh-session-query-sqlite@0.1.5-rc.2` 后，`service.read(principal, id, { before, limit, signal })` 返回安全的文字与 turn 历史；`service.observe(principal, id, { signal })` 返回可释放的异步流，分为 `replace` 基线、按游标追赶的 `append`、`status` 与按 attempt 区分的 `transient` 文字/重置。Web adapter 基路径下提供已认证 `GET /agents/:id/history` 和 `/events`（SSE）。重连重新替换基线；订阅前的临时文字不回放，最终持久消息替换临时显示。
+
+冷读使用原生 Session observation，不启动 Agent，不申请 MCP 或 Secret。删除根资源、关闭服务、请求取消及 reader provider 可选的授权撤销 signal 都会关闭观察。宿主应为登录/ACL 撤销提供 signal。慢消费者显式失败后重连，禁止静默丢事件。自定义隔离 provider 必须在自己的 partition 实现 `openRead`，默认拒绝。原始事件与内部路径不向产品返回。

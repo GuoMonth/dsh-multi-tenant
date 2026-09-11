@@ -15,6 +15,10 @@ minimumReleaseAge: 1440
 # Upstream package manifests use semver peer ranges. Keep the repository's
 # executable dependency graph on one reviewed DSH identity.
 overrides:
+  '@deepseek-ai/dsh-tool-todo': 0.1.5-rc.2
+  '@deepseek-ai/dsh-session-title': 0.1.5-rc.2
+  '@deepseek-ai/dsh-session-query-sqlite': 0.1.5-rc.2
+  '@deepseek-ai/dsh-session-query': 0.1.5-rc.2
   '@deepseek-ai/dsh-http-proxy': 0.1.5-rc.2
   '@deepseek-ai/dsh-session-format': 0.1.5-rc.2
   '@deepseek-ai/dsh-session-format-catalog': 0.1.5-rc.2
@@ -49,6 +53,10 @@ overrides:
 # Every exception is an exact package/version from the manually reviewed DSH
 # 0.1.5-rc.2 source identity pinned in scripts/dsh-target.mjs.
 minimumReleaseAgeExclude:
+  - '@deepseek-ai/dsh-tool-todo@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-session-title@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-session-query-sqlite@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-session-query@0.1.5-rc.2'
   - '@deepseek-ai/dsh-agent-loop@0.1.5-rc.2'
   - '@deepseek-ai/dsh-agent@0.1.5-rc.2'
   - '@deepseek-ai/dsh-attachment@0.1.5-rc.2'

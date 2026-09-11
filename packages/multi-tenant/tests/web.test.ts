@@ -9,6 +9,7 @@ import {
   createPrincipalContext,
   parseAgentId,
 } from '../src/index.ts'
+import { ObservationQueue } from '../src/observation.ts'
 import type { MultiTenantService } from '../src/service.ts'
 import type { AgentId, CreateAgentOptions, PrincipalContext, TenantAgent } from '../src/types.ts'
 import { mountMultiTenantWeb, type AgentProfileResolver } from '../src/web.ts'
@@ -47,12 +48,20 @@ async function webHarness(resolveAgentProfile?: AgentProfileResolver) {
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:01.000Z',
   })
+  let observationDisposals = 0
   let createFailure: Error | undefined
   let deleted = false
   let createCalls = 0
   const receivedCreateOptions: Array<CreateAgentOptions | undefined> = []
   let lastPrincipal: PrincipalContext | undefined
   const service = {
+    async read() { return { items: [], cursor: `${knownId}:-1`, active: false } },
+    async observe(_principal: PrincipalContext, _id: AgentId, options: { signal: AbortSignal }) {
+      const queue = new ObservationQueue(() => { observationDisposals++ })
+      options.signal.addEventListener('abort', () => { void queue.dispose() }, { once: true })
+      queue.push({ type: 'replace', page: { items: [], cursor: `${knownId}:-1`, active: false } })
+      return queue
+    },
     async send(principal: PrincipalContext, id: AgentId) {
       assertPrincipalContext(principal)
       if (id !== knownId || deleted) throw new AgentNotFoundError()
@@ -122,6 +131,7 @@ async function webHarness(resolveAgentProfile?: AgentProfileResolver) {
   return {
     base: `http://127.0.0.1:${address.port}/_dsh-multi-tenant`,
     knownId,
+    get observationDisposals() { return observationDisposals },
     setCreateFailure(error: Error | undefined) { createFailure = error },
     get createCalls() { return createCalls },
     get receivedCreateOptions() { return receivedCreateOptions },
@@ -132,6 +142,21 @@ async function webHarness(resolveAgentProfile?: AgentProfileResolver) {
 const authenticated = { authorization: 'Bearer alice' }
 
 describe('authenticated Web adapter', () => {
+  it('streams an authenticated baseline and disposes observation on HTTP disconnect', async () => {
+    const test = await webHarness()
+    const url = `${test.base}/agents/${test.knownId}`
+    expect((await fetch(`${url}/events`)).status).toBe(401)
+    expect((await fetch(`${url}/history?sessionId=forged`, { headers: authenticated })).status).toBe(400)
+    const controller = new AbortController()
+    const response = await fetch(`${url}/events`, { headers: authenticated, signal: controller.signal })
+    expect(response.headers.get('content-type')).toBe('text/event-stream')
+    const reader = response.body!.getReader()
+    const frame = await reader.read()
+    expect(new TextDecoder().decode(frame.value)).toContain('event: replace')
+    controller.abort()
+    await reader.cancel().catch(() => undefined)
+    await expect.poll(() => test.observationDisposals).toBe(1)
+  })
   it('admits only authenticated product messages and cancellation inputs', async () => {
     const test = await webHarness()
     const url = `${test.base}/agents/${test.knownId}`

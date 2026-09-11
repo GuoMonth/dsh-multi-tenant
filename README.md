@@ -30,3 +30,9 @@ authenticated request
 The shared runtime provides logical isolation, not a hostile-code security boundary. Stock DSH `/api` remains private/administrative. The plugin does not become an authentication gateway, distributed ownership coordinator, sandbox, or process supervisor.
 
 Lifecycle cancellation from [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) remains cooperative across MCP, Secret, runtime-partition, and DSH setup. Host code that ignores abort can delay shutdown. `whenIdle()` waits for Agent activity; it is not a persistence durability barrier.
+
+### Scoped history and observations
+
+With the optional exact `@deepseek-ai/dsh-session-query-sqlite@0.1.5-rc.2` service installed, `service.read(principal, id, { before, limit, signal })` returns safe text/turn history. `service.observe(principal, id, { signal })` returns a disposable async stream: `replace` baseline, cursor-based `append`, `status`, and separate per-attempt `transient` text/reset frames. HTTP exposes authenticated `GET /agents/:id/history` and `/events` (SSE) below the adapter base path. A reconnect replaces the baseline; live text received before subscribing is not replayed, and durable assistant messages replace partial text when committed.
+
+Cold reads use native Session observations without Agent activation, MCP, or Secret acquisition. Root deletion, shutdown, request cancellation, and an optional reader-provider authorization signal close observations. Hosts must supply revocation signals for changes in login/ACL authority. Slow consumers fail and reconnect instead of losing events silently. Custom isolation providers must implement `openRead` in their own partition; the default refuses it. Raw Session events and internal paths are never product responses.

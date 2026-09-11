@@ -30,3 +30,9 @@ Driver 改用真实 DSH registry/setup 类型和显式 branded identifier。原�
 Shared runtime 只提供逻辑隔离，不是 hostile-code 安全边界。Stock DSH `/api` 保持私有/管理用途。插件不扩张为认证网关、分布式所有权协调器、sandbox 或进程管理器。
 
 [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50) 的生命周期取消继续覆盖 MCP、Secret、runtime-partition 和 DSH setup。Shutdown 仍是合作式的，忽略 abort 的宿主代码可能延迟完成。`whenIdle()` 只等待 Agent 活动结束，不是持久化屏障。
+
+### 按所属关系读取历史和观察
+
+可选安装精确版本 `@deepseek-ai/dsh-session-query-sqlite@0.1.5-rc.2` 后，`service.read(principal, id, { before, limit, signal })` 返回安全的文字与 turn 历史；`service.observe(principal, id, { signal })` 返回可释放的异步流，分为 `replace` 基线、按游标追赶的 `append`、`status` 与按 attempt 区分的 `transient` 文字/重置。Web adapter 基路径下提供已认证 `GET /agents/:id/history` 和 `/events`（SSE）。重连重新替换基线；订阅前的临时文字不回放，最终持久消息替换临时显示。
+
+冷读使用原生 Session observation，不启动 Agent，不申请 MCP 或 Secret。删除根资源、关闭服务、请求取消及 reader provider 可选的授权撤销 signal 都会关闭观察。宿主应为登录/ACL 撤销提供 signal。慢消费者显式失败后重连，禁止静默丢事件。自定义隔离 provider 必须在自己的 partition 实现 `openRead`，默认拒绝。原始事件与内部路径不向产品返回。

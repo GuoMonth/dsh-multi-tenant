@@ -39,6 +39,7 @@ export default apply
 
 export { MultiTenantService } from './service.ts'
 export type { MultiTenantConfig } from './service.ts'
+export type { HistoryItem, HistoryPage, ReadOptions, ObservationFrame, AgentObservation, SessionReadRequest, SessionReadSnapshot, SessionReadLease } from './observation.ts'
 
 export {
   createPrincipalContext,

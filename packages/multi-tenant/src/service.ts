@@ -1,6 +1,7 @@
 /** Multi-tenant authority kernel and owned DSH Agent lifecycle. */
 
 import { ActivationOperations, abortableWait } from './activation.ts'
+import { historyPage, observeLease, readBounds, type ReadOptions, type HistoryPage, type AgentObservation, type SessionReadLease } from './observation.ts'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import { ValidationError } from './errors.ts'
@@ -274,6 +275,33 @@ export class MultiTenantService extends Service {
     let controller = this.cutoffs.get(id)
     if (!controller) { controller = new AbortController(); this.cutoffs.set(id, controller) }
     return controller
+  }
+
+  async read(principal: PrincipalContext, id: AgentId, options: ReadOptions = {}): Promise<HistoryPage> {
+    readBounds(id, options)
+    const { lease, signal } = await this.openReader(principal, id, options.signal)
+    try {
+      const snapshot = await lease.read()
+      signal.throwIfAborted()
+      lease.signal?.throwIfAborted()
+      return historyPage(id, snapshot, options)
+    } finally { await lease.dispose() }
+  }
+
+  async observe(principal: PrincipalContext, id: AgentId, options: { signal?: AbortSignal } = {}): Promise<AgentObservation> {
+    const { lease, signal } = await this.openReader(principal, id, options.signal)
+    return observeLease(id, lease, signal)
+  }
+
+  private async openReader(principal: PrincipalContext, id: AgentId, request?: AbortSignal): Promise<{ lease: SessionReadLease; signal: AbortSignal }> {
+    this.assertAccepting()
+    const parsed = parseAgentId(id)
+    const record = await this.readyRecord(principal, parsed)
+    const signal = AbortSignal.any([this.lifecycle.signal, this.cutoff(parsed).signal, ...(request ? [request] : [])])
+    signal.throwIfAborted()
+    const lease = await this.partitions.openRead({ principal, agentId: parsed, sessionId: record.sessionId, signal })
+    if (signal.aborted) { await lease.dispose(); signal.throwIfAborted() }
+    return { lease, signal }
   }
 
   async delete(principal: PrincipalContext, id: AgentId): Promise<void> {

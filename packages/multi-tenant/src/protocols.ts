@@ -2,6 +2,8 @@
 
 import { Service, type Context } from '@deepseek-ai/cordis'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
+import type { SessionReadLease, SessionReadRequest } from './observation.ts'
+import { CapabilityUnavailableError } from './errors.ts'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import type { ResolvedMcpServer } from './mcp.ts'
 import type { AgentId, CreateAgentOptions, IsolationLevel, PrincipalContext } from './types.ts'
@@ -96,4 +98,9 @@ export abstract class RuntimePartitionProvider extends Service {
   }
 
   abstract acquire(request: RuntimePartitionRequest): Promise<RuntimePartitionLease>
+
+  /** Read from the same isolation boundary; never fall back to another partition. */
+  async openRead(_request: SessionReadRequest): Promise<SessionReadLease> {
+    throw new CapabilityUnavailableError('This runtime partition does not provide session reading.')
+  }
 }

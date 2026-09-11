@@ -1,6 +1,7 @@
 /** Authenticated product CRUD mounted into DSH's existing WebServer. */
 
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:http'
+import { once } from 'node:events'
 import type { Context } from '@deepseek-ai/cordis'
 import {
   AgentNotFoundError,
@@ -168,6 +169,8 @@ async function respond(res: ServerResponse, operation: () => Promise<void>): Pro
   try {
     await operation()
   } catch (error) {
+    if (res.destroyed || res.writableEnded) return
+    if (res.headersSent) { res.destroy(); return }
     const result = responseError(error)
     writeJson(res, result.status, { error: { code: result.code, message: result.message } })
   }
@@ -217,6 +220,33 @@ export function mountMultiTenantWeb(
     }
     const id = parseAgentId(decoded)
     const action = parts[1]
+    if (action === 'history' || action === 'events') {
+      if (req.method !== 'GET') { writeJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }); return }
+      const params = new URL(req.url!, 'http://localhost').searchParams
+      if ([...params.keys()].some(key => !['before', 'limit'].includes(key)) || (action === 'events' && params.size)) throw new ValidationError('unknown read field')
+      const controller = new AbortController()
+      const disconnected = () => controller.abort()
+      res.once('close', disconnected)
+      try {
+        if (action === 'history') {
+          const page = await service.read(principal, id, { signal: controller.signal,
+            ...(params.has('before') ? { before: params.get('before')! } : {}),
+            ...(params.has('limit') ? { limit: Number(params.get('limit')) } : {}),
+          })
+          writeJson(res, 200, page)
+        } else {
+          const observation = await service.observe(principal, id, { signal: controller.signal })
+          try {
+            res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', 'x-accel-buffering': 'no' })
+            for await (const frame of observation) {
+              if (!res.write(`event: ${frame.type}\ndata: ${JSON.stringify(frame)}\n\n`)) await once(res, 'drain', { signal: controller.signal })
+            }
+            res.end()
+          } finally { await observation.dispose() }
+        }
+      } finally { controller.abort(); res.off('close', disconnected) }
+      return
+    }
     if (action !== undefined) {
       if (action !== 'messages' && action !== 'cancel') throw new AgentNotFoundError()
       if (req.method !== 'POST') { writeJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }); return }

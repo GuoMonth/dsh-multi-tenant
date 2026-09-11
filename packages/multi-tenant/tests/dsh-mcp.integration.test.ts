@@ -6,6 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import LlmRuntime, { createUserMessage } from '@deepseek-ai/dsh-llm'
+import SessionQuerySqlite from '@deepseek-ai/dsh-session-query-sqlite'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { SessionAlreadyOwnedError } from '@deepseek-ai/dsh-session-persistence'
@@ -79,7 +80,10 @@ async function openRuntime(database: string, sessions: string, persistence = tru
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
-  if (persistence) await ctx.plugin(JsonlSessionPersistence, { root: sessions, compression: 'none' })
+  if (persistence) {
+    await ctx.plugin(JsonlSessionPersistence, { root: sessions, compression: 'none' })
+    await ctx.plugin(SessionQuerySqlite, { path: database + '.query' })
+  }
   await ctx.plugin(SQLiteTenantAgentRepository, { path: database })
   await ctx.plugin(PrincipalMcpProvider)
   await ctx.plugin(PrincipalSecretProvider)
@@ -117,6 +121,55 @@ async function readStored(ctx: Context, id: ReturnType<typeof SessionId>) {
 }
 
 describe('DSH 0.1.5-rc.2 native Agent/Session/MCP lifecycle', () => {
+  it('reads persisted history after restart without activating an Agent or loading runtime capabilities', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-read-'))
+    const database = join(directory, 'agents.sqlite')
+    const sessions = join(directory, 'sessions')
+    let ctx = await openRuntime(database, sessions)
+    const owner = createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })
+    try {
+      ctx.llm.registerAdapter(['test'], new TestModel())
+      const resource = await ctx.multiTenant.create(owner, { agentOptions: { provider: 'test', model: 'test' } })
+      const observation = await ctx.multiTenant.observe(owner, resource.id)
+      const frames: unknown[] = []
+      const consuming = (async () => { for await (const frame of observation) frames.push(frame) })()
+      await ctx.multiTenant.send(owner, resource.id, 'private question')
+      await ctx.multiTenant.whenIdle(owner, resource.id)
+      await expect.poll(() => JSON.stringify(frames)).toContain('test response')
+      await observation.dispose()
+      await consuming
+      const livePage = await ctx.multiTenant.read(owner, resource.id)
+      expect(livePage.items.filter(item => item.kind === 'assistant')).toHaveLength(1)
+      await ctx.fiber.dispose()
+      ctx = await openRuntime(database, sessions)
+      ctx.tenantMcp.load = async () => { throw new Error('must not acquire MCP while reading') }
+      ctx.multiTenantSecrets.acquire = async () => { throw new Error('must not acquire Secrets while reading') }
+      ctx.runtimePartitions.acquire = async () => { throw new Error('must not activate a partition') }
+      const page = await ctx.multiTenant.read(owner, resource.id)
+      expect(page.items).toEqual(livePage.items)
+      expect(page.active).toBe(false)
+      const tail = await ctx.multiTenant.read(owner, resource.id, { limit: 1 })
+      expect(tail.older).toBeDefined()
+      const older = await ctx.multiTenant.read(owner, resource.id, { before: tail.older! })
+      expect(older.items.every(item => item.seq < tail.items[0]!.seq)).toBe(true)
+      const record = await ctx.tenantAgentRepository.get(owner, resource.id)
+      expect(ctx.agents.get(SessionId(record!.sessionId))).toBeUndefined()
+      expect(ctx.sessions.get(SessionId(record!.sessionId))).toBeUndefined()
+      const outsider = createPrincipalContext({ tenantId: 'acme', principalId: 'bob' })
+      const openRead = ctx.runtimePartitions.openRead.bind(ctx.runtimePartitions)
+      ctx.runtimePartitions.openRead = async () => { throw new Error('unauthorized read reached provider') }
+      await expect(ctx.multiTenant.read(outsider, resource.id)).rejects.toBeInstanceOf(AgentNotFoundError)
+      ctx.runtimePartitions.openRead = openRead
+      const stream = await ctx.multiTenant.observe(owner, resource.id)
+      const iterator = stream[Symbol.asyncIterator]()
+      expect((await iterator.next()).value?.type).toBe('replace')
+      const pending = iterator.next()
+      const rejected = expect(pending).rejects.toBeInstanceOf(CapabilityUnavailableError)
+      await ctx.multiTenant.delete(owner, resource.id)
+      await rejected
+      await expect(ctx.multiTenant.read(owner, resource.id)).rejects.toBeInstanceOf(AgentNotFoundError)
+    } finally { await ctx.fiber.dispose(); await rm(directory, { recursive: true, force: true }) }
+  })
   it('accepts sends and stops a real model call without waiting for its turn', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-controls-'))
     const ctx = await openRuntime(join(directory, 'agents.sqlite'), join(directory, 'sessions'))
