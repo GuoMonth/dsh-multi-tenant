@@ -1,0 +1,27 @@
+- id: agent-default-model
+  config:
+    provider: probe
+    model: probe
+- id: session-title-llm
+  disabled: true
+- id: llm-deepseek
+  disabled: true
+- id: llm-pi-ai
+  disabled: true
+- id: session-telemetry-otel
+  disabled: true
+- id: session-query-sqlite
+  config:
+    path: /domain/dsh-home/query.sqlite
+    openAt: first-search
+- id: agent-presets
+  config:
+    default: probe
+    includeShippedRoot: true
+    includeUserRoot: false
+    roots:
+      - path: /domain/presets
+        trust: system
+- insert:
+    - id: native-host-probe-model
+      name: /fixtures/model.mjs

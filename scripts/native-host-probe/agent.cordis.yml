@@ -1,0 +1,23 @@
+- id: principal-mcp
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    transport: stdio
+    serverName: principal
+    command: /usr/local/bin/node
+    args: [/fixtures/mcp.mjs]
+    reconnect:
+      enabled: false
+- id: delegate
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: spawn
+    toolName: probe_delegate
+    backgroundMode: continuable
+- id: restricted
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: spawn
+    toolName: probe_restricted
+    backgroundMode: continuable
+    toolFilter:
+      allow: []

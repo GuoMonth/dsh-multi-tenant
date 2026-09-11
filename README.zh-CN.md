@@ -23,5 +23,6 @@ DeepSeek Harness 多租户插件，把宿主认证后的 `(tenantId, principalId
 - [发布流程](./docs/reference/release.zh-CN.md)
 - [0.6.0 变更](./docs/releases/v0.6.0.md)
 - [#57 实现证据](./docs/evidence/dsh-rc2/README.md)
+- [Principal 独立原生 Host 架构评估与可复现验证](./docs/evidence/native-domain-review/multiprocess/REPORT.zh-CN.md)
 
 AgentPresets 能力 scope 组合与完整 stock Web 权限覆盖分别留在 [#68](https://github.com/GuoMonth/dsh-multi-tenant/issues/68)、[#71](https://github.com/GuoMonth/dsh-multi-tenant/issues/71)。不支持的组合明确拒绝；可选面板不代表完整官方 Web 已完成多租户化。
