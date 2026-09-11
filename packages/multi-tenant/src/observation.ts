@@ -64,7 +64,7 @@ function textContent(content: readonly unknown[]): string {
 }
 
 export function historyItem(event: SessionEvent): HistoryItem | undefined {
-  if (event.type === 'user/message') return { seq: event.seq, kind: 'user', text: textContent(event.data.content) }
+  if (event.type === 'user/message' && event.data.source.kind === 'user') return { seq: event.seq, kind: 'user', text: textContent(event.data.content) }
   if (event.type === 'assistant/message') return { seq: event.seq, kind: 'assistant', text: textContent(event.data.message.content) }
   if (event.type === 'turn/start') return { seq: event.seq, kind: 'turn-start' }
   if (event.type === 'turn/end') return { seq: event.seq, kind: 'turn-end' }
@@ -84,19 +84,19 @@ export function readBounds(target: string, options: ReadOptions): { before: numb
   return { before, limit }
 }
 
-export function historyPage(target: string, snapshot: SessionReadSnapshot, options: ReadOptions = {}, after = -1): HistoryPage {
+export function historyPage(target: string, snapshot: SessionReadSnapshot, options: ReadOptions = {}, after?: number): HistoryPage {
   const { before, limit } = readBounds(target, options)
-  const all = snapshot.events.filter(event => event.seq < before && event.seq > after).flatMap(event => {
+  const all = snapshot.events.filter(event => event.seq < before && event.seq > (after ?? -1)).flatMap(event => {
     const item = historyItem(event)
     return item ? [item] : []
   })
-  const items = after < 0 ? all.slice(-limit) : all.slice(0, limit)
-  const cursor = after < 0 || all.length <= limit ? snapshot.cursor : items.at(-1)!.seq
+  const items = after === undefined ? all.slice(-limit) : all.slice(0, limit)
+  const cursor = after === undefined || all.length <= limit ? snapshot.cursor : items.at(-1)!.seq
   const children = childSummaries(target, snapshot)
   return { items, cursor: `${target}:${cursor}`, active: snapshot.active,
     deliveries: deliverySummaries(target, snapshot),
     ...(children === undefined ? {} : { children }),
-    ...(after < 0 && all.length > limit ? { older: `${target}:${items[0]!.seq}` } : {}),
+    ...(after === undefined && all.length > limit ? { older: `${target}:${items[0]!.seq}` } : {}),
   }
 }
 

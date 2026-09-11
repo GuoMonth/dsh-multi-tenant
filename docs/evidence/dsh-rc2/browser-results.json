@@ -1,0 +1,50 @@
+{
+  "identities": [
+    {
+      "checks": [
+        "root send/steer/stop",
+        "native child send/steer/stop",
+        "native present",
+        "inert preview",
+        "download",
+        "observation reconnect"
+      ],
+      "child": "93cae8f8-2bb1-4d95-ba97-d65dd365e5d5.0",
+      "file": "http://127.0.0.1:45983/_dsh-multi-tenant/agents/93cae8f8-2bb1-4d95-ba97-d65dd365e5d5/children/93cae8f8-2bb1-4d95-ba97-d65dd365e5d5.0/deliveries/93cae8f8-2bb1-4d95-ba97-d65dd365e5d5.0%3A43%3A0?download=1",
+      "identity": "acme-alice",
+      "root": "93cae8f8-2bb1-4d95-ba97-d65dd365e5d5"
+    },
+    {
+      "checks": [
+        "root send/steer/stop",
+        "native child send/steer/stop",
+        "native present",
+        "inert preview",
+        "download",
+        "observation reconnect"
+      ],
+      "child": "a6d81cd8-5865-453a-a486-3adfce8d5d73.0",
+      "file": "http://127.0.0.1:45983/_dsh-multi-tenant/agents/a6d81cd8-5865-453a-a486-3adfce8d5d73/children/a6d81cd8-5865-453a-a486-3adfce8d5d73.0/deliveries/a6d81cd8-5865-453a-a486-3adfce8d5d73.0%3A43%3A0?download=1",
+      "identity": "acme-bob",
+      "root": "a6d81cd8-5865-453a-a486-3adfce8d5d73"
+    },
+    {
+      "checks": [
+        "root send/steer/stop",
+        "native child send/steer/stop",
+        "native present",
+        "inert preview",
+        "download",
+        "observation reconnect"
+      ],
+      "child": "b390e66b-416a-4e8a-aca4-556746d11de1.0",
+      "file": "http://127.0.0.1:45983/_dsh-multi-tenant/agents/b390e66b-416a-4e8a-aca4-556746d11de1/children/b390e66b-416a-4e8a-aca4-556746d11de1.0/deliveries/b390e66b-416a-4e8a-aca4-556746d11de1.0%3A43%3A0?download=1",
+      "identity": "globex-alice",
+      "root": "b390e66b-416a-4e8a-aca4-556746d11de1"
+    }
+  ],
+  "rejectedCrossPrincipalRequests": 72,
+  "slotMode": "authorized adapter panel; full stock UI remains deferred",
+  "status": "passed",
+  "stockPrivilegedRoutes": "404 for all three identities"
+}

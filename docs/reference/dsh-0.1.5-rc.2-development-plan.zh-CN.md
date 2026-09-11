@@ -1,8 +1,14 @@
 # DSH rc.2 对齐与原生多租户能力开发方案
 
-日期：2026-09-11。状态：已规划，待实施。目标 DSH：`0.1.5-rc.2`，commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`。
+日期：2026-09-11。状态：主线已实现；合入状态以关联 issue/PR 为准。F 按本计划的受限 adapter 备用方案交付，完整 stock Web 保留在 #71。目标 DSH：`0.1.5-rc.2`，commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`。
 
 跟踪：[总 issue #57](https://github.com/GuoMonth/dsh-multi-tenant/issues/57)。以下任务分别对应 #58–#63；实现状态以 GitHub issue 为准。
+
+## 实施结果（2026-09-11）
+
+A–E 分别由 PR #64、#66、#67、#69、#70 实现并合入。F 提供可执行的本机 Cordis profile、原生 sidebar/main 扩展和受限授权面板，采用下文已规划的备用方案。真实浏览器覆盖三身份、原生委派/交付及 72 次越权拒绝；安全历史投影的验收修正跟踪在 #72。最终签名以包 README 为准，以下拟定签名保留为设计输入。
+
+后续统一处理：#65 刷新中旧 disposer 失败的租约清理、#68 AgentPresets 与 Principal scope 组合、#71 完整 stock Web 的 Principal 绑定。它们没有被悄悄算作已完成能力。详细证据见 [验收记录](../evidence/dsh-rc2/README.md)。
 
 ## 目标与设计原则
 
