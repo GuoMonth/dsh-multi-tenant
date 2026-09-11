@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "value": {
+    "receiptId": "b533c371-994a-4dc0-b84e-80e89f0d8a76",
+    "file": {
+      "attachmentId": "sha256:d746e0dfc51a2674b31e2bcb5a36bec2b21fbe3143508fa7fd21bd88d45a4059",
+      "name": "probe.txt",
+      "bytes": 20
+    }
+  }
+}

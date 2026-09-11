@@ -1,0 +1,13 @@
+{
+  "entries": [
+    {
+      "kind": "child",
+      "id": "8b9da71a-d822-4bd2-b9a8-287b8412eb2a",
+      "mode": "continuable",
+      "label": "identity probe child",
+      "activity": "inactive",
+      "hasChildren": false
+    }
+  ],
+  "parentAvailable": true
+}

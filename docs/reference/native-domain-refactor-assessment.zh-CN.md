@@ -1,6 +1,6 @@
 # #68 / #71 原生集成重构评估与对抗性审查
 
-日期：2026-09-11。本文件保留实施前的架构评估；后续实施进度见[重构方案](native-domain-refactor-plan.zh-CN.md)及 WP1/WP2 证据。本文件不宣布 Issue 完成。
+日期：2026-09-11。本文件保留 #74 的架构评估及原生双 Host 实验证据；后续实施状态见[重构方案](native-domain-refactor-plan.zh-CN.md)和 [WP3/WP4 根授权反例](../evidence/native-domain-review/wp34/README.md)。本文件不宣布 Issue 完成。
 
 ## 结论
 
@@ -10,7 +10,7 @@
 
 这是基于当前源码的工程建议，不是 DeepSeek 宣布的多租户路线。它也改变了本项目“单个共享 Host 内的多租户插件”这一默认集成方式：需要部署宿主与入口层，不能把进程隔离说成一个 npm 插件自动提供的能力。如果必须保持“一个进程、一个完整官方 Web、多个互不信任 Principal”，应选择上游扩展协作路线，而不是声称现有 rc.2 已经足够。
 
-不建议立即全量重写。先做两项有退出条件的原生验证：真实 preset 委派/冷恢复；完整官方 Web 双授权域隔离。通过后按新所有权结构替换现有实现，不保留旧 API 兼容层。失败时根据证据修订架构。
+不建议立即全量重写。真实 preset 委派/冷恢复与官方 Web 双 Host 的最小原生验证现已通过，见[技术验证报告](../evidence/native-domain-review/multiprocess/REPORT.zh-CN.md)。可以开始按新所有权结构形成重构的纵向切片；平台身份路由、撤销、单 writer 和完整授权覆盖仍是交付门槛。不保留旧 API 兼容层，失败时根据证据修订架构。
 
 ## 证据身份与可信程度
 
@@ -229,7 +229,7 @@ rc.2 已支持 `DSH_HOME`，但显式配置路径优先级更高；它不能自�
 
 #68 的能力应进入域内受管理 preset，再通过原生委派继承；仅拆进程而保留父 Agent 私有 MCP 的现有装配，仍会遇到同一个 scope 问题。#71 的跨 Principal 数据隔离可主要由正确路由和私有数据源实现，原生 browser auth、服务端事件与撤销仍要贯通。每根 Agent 的特殊授权撤销和跨 Principal 协作不因此自动获得。
 
-首个验证样例应启动 A/B 两个真实 Host：同名 MCP、不同秘密、独立文件；各自在官方 Web 运行 preset 和子代理，确认互相不可读；停止 A 后 B 持续可用，重启 A 恢复其历史。完成后再测内存、冷启动和空闲回收成本。本补充没有执行这些完整进程集成验证。
+首个验证样例现已启动 A/B 两个真实 Host：同名 MCP、不同合成标记、独立文件；在官方 Web 实际交互，并通过原生协议验证子代理、相互隔离、停止/重启、冷恢复和 idle SIGKILL。资源测量与限制见[技术验证报告](../evidence/native-domain-review/multiprocess/REPORT.zh-CN.md)。这些最小进程集成检查不代表平台授权入口或空闲回收已完成。
 
 ## 本轮执行证据与未验证项
 
@@ -241,4 +241,6 @@ node docs/evidence/native-domain-review/scope-contract-probe.mjs
 
 该脚本使用本项目安装的真实 rc.2 Scope/ToolRuntime，以最小对象作为 scope key，验证 sibling join 不继承父 overlay、重复 bind 被拒绝、own 工具绕过 inherited filter、独立 registry 的同名隔离。**没有启动真实 AgentPresets、完整 Agent lifecycle、容器或官方 Web**，所以它是机制反证，不是阶段 1/2 的完成证据。
 
-开发环境准备阶段已运行类型检查、78 项现有测试、`pnpm verify`，依赖安装触发的构建通过。本轮新增评估文档与探针，没有修改产品源码、依赖、锁文件或上游源码；未提交、推送、发评论或修改远端 Issue。
+随后新增[原生双 Host 探针](../../scripts/native-host-probe/README.md)，使用真实 rc.2 Web profile、AgentPresets、MCP、子代理与存储；最终 18 组集成检查通过。它使用独立锁定的测试依赖，结果、截图及尚未覆盖的阶段 1/2 条件见[报告](../evidence/native-domain-review/multiprocess/REPORT.zh-CN.md)。
+
+开发环境准备阶段已运行类型检查、78 项现有测试、`pnpm verify`，依赖安装触发的构建通过。新增评估文档、独立实验依赖与探针，没有修改产品源码、主项目依赖/根锁文件或上游源码。

@@ -11,7 +11,7 @@
     "verify": "node scripts/verify-packages.mjs && node scripts/verify-contract.mjs && node --test scripts/tests/*.test.mjs",
     "probe:sqlite": "node scripts/sqlite-agent-repository-probe.mjs",
     "probe:platform": "pnpm --filter dsh-multi-tenant exec vitest run tests/dsh-mcp.integration.test.ts",
-    "probe:native-host": "node scripts/native-host-probe/run.mjs",
+    "probe:native-host": "node scripts/native-host-probe/composition.mjs",
     "probe:runtime": "pnpm --filter dsh-multi-tenant exec tsx ../../scripts/native-host-probe/lifecycle.mjs",
     "probe:isolated": "pnpm --filter dsh-multi-tenant exec tsx ../../scripts/native-host-probe/isolated.mjs",
     "smoke": "node scripts/artifact-consumer-smoke.mjs --local",

@@ -1,0 +1,24 @@
+New Session
+Workspaces
+project
+PROBE_IDENTITY_BROWSER_BOB
+now
+Ungrouped
+Settings
+PROBE_IDENTITY_BROWSER_BOB
+Native host probe
+Chat
+Trajectory
+System prompt
+PROBE_IDENTITY_BROWSER_BOB
+15:04
+1 tool call
+
+PROBE_RESULT TEST_ONLY_BOB_PRIVATE_MARKER
+
+Ran for 0s
+15:04
+Message or run a task, / commands, @ files or sessions
+Workspace Write
+probe/probe
+1 turns 2 steps
