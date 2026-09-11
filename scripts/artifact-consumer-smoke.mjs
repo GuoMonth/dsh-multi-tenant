@@ -77,6 +77,9 @@ try {
     // @ts-expect-error Unauthenticated callers cannot manufacture a Principal from JSON.
     service.get({ tenantId: 'tenant', principalId: 'user' }, 'not-an-agent-id')
 
+    // @ts-expect-error Callback runtime authority is no longer public.
+    service.withAgent
+
     export class McpProvider extends TenantMcpProvider {
       async load(_principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot> {
         signal.throwIfAborted()
@@ -172,7 +175,7 @@ try {
     let denied = false
     try { await ctx.multiTenant.get(bob, agent.id) } catch (error) { denied = error instanceof AgentNotFoundError }
     assert(denied, 'cross-Principal lookup did not fail closed')
-    const tool = await ctx.multiTenant.withAgent(alice, agent.id, runtime => runtime.executeTool('probe', { ok: true }))
+    const tool = await ctx.multiTenant.executeTool(alice, agent.id, 'probe', { ok: true })
     assert(tool.value.name === 'probe', 'controlled runtime did not execute tool')
     await ctx.multiTenant.delete(alice, agent.id)
     await ctx.fiber.dispose()

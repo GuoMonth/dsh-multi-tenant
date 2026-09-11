@@ -44,8 +44,10 @@ const principal = createPrincipalContext({
 })
 const agent = await ctx.multiTenant.create(principal)
 
-const result = await ctx.multiTenant.withAgent(principal, agent.id, runtime =>
-  runtime.executeTool('mcp__erp__find_customer', { customerId: 'C-42' }),
+await ctx.multiTenant.send(principal, agent.id, 'Hello', { delivery: 'queue' })
+await ctx.multiTenant.cancel(principal, agent.id)
+const result = await ctx.multiTenant.executeTool(
+  principal, agent.id, 'mcp__erp__find_customer', { customerId: 'C-42' },
 )
 
 await ctx.multiTenant.delete(principal, agent.id)
@@ -53,13 +55,9 @@ await ctx.multiTenant.delete(principal, agent.id)
 
 Shared driver 的 `create()` 会在 Directory 进入 ready 前完成 DSH session 持久化检查，尚无消息的空会话也会落盘。持久化 listener 缺失或失败时，创建失败并释放已获取的 Agent。自定义持久化 runtime driver 也必须在返回成功前完成自身的持久化边界。
 
-`create()` 同时生成公开 `AgentId` 和独立的内部 DSH session id。`get/list/withAgent/delete` 的查询都同时限定 Agent、Tenant、Principal。未知、越权、失败和已删除资源统一表现为 `AgentNotFoundError`。
 
-`withAgent()` 是唯一可信运行入口。回调只有 `followup/steer/inject/cancel/whenIdle/executeTool`，拿不到 DSH session id、原始 Agent handle、Cordis context 或 disposer。
 
-`whenIdle()` 只等待 Agent 活动结束，不负责刷新持久化日志。可信宿主检查持久化数据时须显式 flush 并关闭 read handle；这些能力不通过租户 runtime view 暴露。
 
-每个 runtime view 都是 callback-scoped：回调 resolve/reject、delete、能力撤销/刷新或 service shutdown 时立即失效。保留的旧 view 再调用任何方法都会得到 `CapabilityUnavailableError`。
 
 ## 真实 MCP
 
@@ -126,7 +124,6 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
 
 ## 保证与边界
 
-- SQLite 使用 CAS revision 和 Principal-scoped SQL；已授权删除会立即使 active callback view 失效并预留串行屏障，后发 `withAgent()` 不能越过删除，只会在已清理的 tombstone 提交后得到 not-found。
 - DSH setup、shared driver 的 session 持久化检查和数据库 ready transition 都成功后，Agent 才会公开。
 - 每个 Agent 的 create/resume/refresh/delete 串行；并发打开 single-flight；插件关闭会 cancel 并 drain 全部 handle。
 - 生命周期契约会把 abort 传入 MCP、Secret、RuntimePartition 和 DSH setup，并在使用前校验 provider 结果。Drain 仍是 cooperative 的：忽略 abort 或永不结束的代码可能无限延迟 delete/shutdown；强制中断和任意默认 timeout 不在范围内。
@@ -138,3 +135,11 @@ mountMultiTenantWeb(ctx, ctx.multiTenant, {
 - 本版本不提供 Typert 公网 adapter，因为 stock Typert 不能建立可信 Principal 绑定。Stock DSH `/api` 必须保持私有/管理用途。
 
 公共代码/API 子路径只有 `/mcp`、`/sqlite`、`/web`、`/testing`、`/starter`。此外还公开 `./cordis.patch.yml`，它是 DSH loader 配置 artifact，不是 JavaScript API。
+
+## 运行命令
+
+`send(principal, id, text, { delivery: 'queue' | 'steer' })` 在原生输入准入后返回 `{ accepted: true }`，不等待模型完成，也不代表持久化确认。`cancel()` 只取消当前在线 generation，返回 cancelled 或 inactive，不恢复冷 Agent。`whenIdle()` 等待当前活动，也不激活冷资源。`executeTool()` 和 `inject()` 供可信宿主使用。
+
+原 callback API 已删除。长工具操作和活动等待不持有生命周期队列；delete、refresh、撤销和 shutdown 封闭旧 generation、取消已接纳操作并在 drain 后释放 handle 和 provider 租约。持久删除失败时，本进程继续拒绝新命令，直到所有者重试删除。
+
+Web 新增 `POST /_dsh-multi-tenant/agents/:id/messages`，body 为 `{ text, delivery? }`，以及 `POST .../:id/cancel`，body 为 `{ reason? }`。message source 由宿主构造，不提供浏览器任意工具执行入口。

@@ -12,7 +12,7 @@ host authentication
   -> Principal-scoped Agent directory
   -> capability/isolation leases
   -> DSH Agent + Agent-scoped MCP
-  -> controlled withAgent() runtime
+  -> controlled send/executeTool runtime
 ```
 
 Use native Cordis services and DSH Agent/MCP lifecycle. Do not add a second DI/lifecycle system or a general framework until repeated integrations demonstrate a concrete need.

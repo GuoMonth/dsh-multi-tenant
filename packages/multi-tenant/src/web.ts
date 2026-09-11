@@ -206,14 +206,38 @@ export function mountMultiTenantWeb(
     const principal = await requirePrincipal(req, options.principalProvider)
     const pathname = new URL(req.url ?? '', 'http://localhost').pathname
     const encoded = pathname.slice(`${agentsPath}/`.length)
-    if (encoded.length === 0 || encoded.includes('/')) throw new AgentNotFoundError()
+    if (encoded.length === 0) throw new AgentNotFoundError()
+    const parts = encoded.split('/')
+    if (parts.length > 2) throw new AgentNotFoundError()
     let decoded: string
     try {
-      decoded = decodeURIComponent(encoded)
+      decoded = decodeURIComponent(parts[0]!)
     } catch {
       throw new AgentNotFoundError()
     }
     const id = parseAgentId(decoded)
+    const action = parts[1]
+    if (action !== undefined) {
+      if (action !== 'messages' && action !== 'cancel') throw new AgentNotFoundError()
+      if (req.method !== 'POST') { writeJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }); return }
+      const body = await readJson(req)
+      const allowed = action === 'messages' ? ['text', 'delivery'] : ['reason']
+      if (Object.keys(body).some(key => !allowed.includes(key))) throw new ValidationError('unknown command field')
+      if (action === 'messages') {
+        if (typeof body.text !== 'string' || (body.delivery !== undefined && body.delivery !== 'queue' && body.delivery !== 'steer')) throw new ValidationError('invalid message')
+        const controller = new AbortController()
+        const disconnected = () => { if (!res.writableEnded) controller.abort() }
+        res.once('close', disconnected)
+        try {
+          const receipt = await service.send(principal, id, body.text, { ...(body.delivery === undefined ? {} : { delivery: body.delivery }), signal: controller.signal })
+          writeJson(res, 202, receipt)
+        } finally { res.off('close', disconnected) }
+      } else {
+        if (body.reason !== undefined && (typeof body.reason !== 'string' || body.reason.length > 1024)) throw new ValidationError('invalid cancellation reason')
+        writeJson(res, 200, await service.cancel(principal, id, body.reason as string | undefined))
+      }
+      return
+    }
     if (req.method === 'GET') {
       writeJson(res, 200, { agent: await service.get(principal, id) })
       return
