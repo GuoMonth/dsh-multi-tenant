@@ -1,10 +1,55 @@
 # dsh-multi-tenant
 
-[简体中文](README.zh-CN.md)
+[简体中文](README.zh-CN.md) · [Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases) · [Changelog](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CHANGELOG.md)
 
-Run one native DeepSeek Harness Host per `(tenantId, principalId)`. The platform owns authentication, domain storage, runtime lifecycle and HTTP/WebSocket admission. DSH owns sessions, workspaces, presets, tools and its complete native Web UI.
+Give each signed-in user their own native DeepSeek Harness environment. Users keep DSH's chat, workspaces, files, presets and subagents, while the platform separates their data and execution from other users.
 
-**0.7.0 is a breaking architecture change.** It replaces the shared-process Cordis plugin and per-Agent resource API. Use a new platform directory; no legacy database migration or compatibility facade is provided. This source version is not a statement of npm publication.
+This package is for **developers building a multi-user DSH service**. It provides the integration layer between your existing authentication system and independently running DSH Hosts.
+
+## Where it fits
+
+| Scenario | What you gain | What your platform supplies |
+| --- | --- | --- |
+| Internal developer workbench | Each employee uses native DSH with their own history, files and MCP configuration | Company login, TLS, private storage and runtime deployment |
+| Multi-tenant application | Users with the same name in different tenants still receive separate environments | Trusted tenant/user identity, domain hostnames and resource policy |
+| Native DSH integration and evaluation | Reuse the official Web and preset/subagent behavior without maintaining a second chat UI | A pinned DSH runtime, reviewed profiles and your chosen runtime provider |
+
+A typical visit is: **sign in → resolve the user's domain → start or reuse its DSH Host → open native DSH Web**. A browser reconnect returns to the same domain; it does not create a new Host for every request or session.
+
+## What 0.7.0 delivers
+
+- A domain directory keyed by `(tenantId, principalId)`, keeping identity and desired state across platform restarts.
+- Deduplicated Host startup, generation checks, suspension/revocation, bounded shutdown and verified recovery after a coordinator crash.
+- Authenticated HTTP/WebSocket ingress for native Web, preserving native messages, tools and file transport. Native login cookies remain private to the platform.
+- A constrained Linux Docker reference provider and a trusted-development local process provider, plus public interfaces for deployment-specific runtimes.
+- Native preset/MCP/subagent composition, exercised through installed-package integration tests rather than a custom Agent facade.
+
+## Decide whether this version suits your deployment
+
+**0.7.0 is a developer integration release.** The included Docker provider has **no outbound network**, so it cannot call external model APIs or remote MCP. Supply a reviewed network-capable `RuntimeProvider` for those uses. Login/SSO, TLS, domain provisioning, quotas and operational monitoring are responsibilities of the embedding platform; an account-management UI or a ready-made hosted service is not included.
+
+The security boundary is the **user within a tenant**, not each project or conversation. Two workspaces belonging to one Principal are not promised to be mutually confidential. Native permissions, tool filters, stop/archive/delete and preset selection retain native semantics. Team-shared domains, project ACLs, cross-user session sharing, automatic idle eviction and multi-machine scheduling are outside this version.
+
+Independent Hosts have a fixed memory and startup cost; an inactive browser can still have background work. Choose resource limits and when to stop domains from your workload. Platform administration, authentication secrets and the Docker socket must stay outside every native Host.
+
+**Upgrading from 0.5.x or earlier:** 0.7.0 changes the integration architecture and public API. The shared-process Cordis plugin, per-Agent resource API and custom panel are removed. Start with a new platform directory, replace the integration code and preserve old data separately; there is no automatic legacy-data migration. The 0.6.0 source milestone was not published to npm.
+
+## First steps
+
+```sh
+npm install dsh-multi-tenant@0.7.0
+# Check the installed platform API without Docker or an external model:
+node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
+```
+
+The smoke uses a **simulated runtime** and starts no native DSH Host. To give users a real workbench:
+
+1. Prepare the pinned native runtime image and per-domain profile described below.
+2. Connect your login/IdP adapter to trusted tenant/user identity and assign each domain a separate hostname.
+3. Choose the offline Docker reference for local fixtures, or a reviewed runtime provider for the network access your model/MCP needs.
+4. Embed the ingress/coordinator, provision private data, and implement shutdown, suspension and recovery in your platform.
+
+For a complete keyless native Web demonstration from source, install the repository and `scripts/native-host-probe` dependencies, then run `pnpm probe:isolated` with Docker and Chromium. See [the reproducible native proof](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/scripts/native-host-probe/README.md). This is a verification environment, not a public login service.
 
 ## Authority contract
 
@@ -19,13 +64,15 @@ Run one native DeepSeek Harness Host per `(tenantId, principalId)`. The platform
 npm install dsh-multi-tenant@0.7.0
 ```
 
-When testing this PR before publication, install the `.tgz` produced by `pnpm --filter dsh-multi-tenant pack` instead.
+To test an unreleased checkout, build and install its tarball with `pnpm --filter dsh-multi-tenant pack`.
 
 The coordinator requires Node 22.19 or Node 24+. The included providers target Linux. `DockerRuntimeProvider` requires a local Docker engine and a prebuilt immutable image containing **DSH 0.1.5-rc.2**, pinned source `fb2c4b9e698e30edb738bca4cf0618587db7d203`. Run the coordinator as a non-root user with Docker access; the reference runtime UID/GID must match that user so both sides can access the private control files. It does not download DSH into the platform process. TypeScript consumers should install `@types/node` and include `node` in compiler `types`.
 
 The Docker reference intentionally uses `--network none`: keyless/local tools work; external model APIs and remote MCP do not. Deployments needing egress must supply a reviewed `RuntimeProvider` with explicit network policy. The local process provider is for trusted development, not hostile workloads.
 
 ## Embed in an authenticated server
+
+This is an integration fragment: your application supplies `authenticator` and `trustedDomainOrigins`.
 
 ```js
 import {
