@@ -16,3 +16,11 @@ it('rejects an unconnectable Unix socket path before acquiring a container', asy
     await handle.exited
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+it('rejects network modes that share another runtime or the host namespace', () => {
+  for (const network of ['host', 'container:other', 'unexpected']) {
+    expect(() => new DockerRuntimeProvider({ image: `sha256:${'a'.repeat(64)}`, directory: '/tmp/dsh-test',
+      profileDirectory: () => '/tmp/profile', uid: process.getuid!(), gid: process.getgid!(),
+      network: network as 'bridge' })).toThrow('network must be bridge or none')
+  }
+})

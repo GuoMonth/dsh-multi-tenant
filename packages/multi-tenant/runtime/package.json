@@ -1,0 +1,11 @@
+{
+  "name": "dsh-domain-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-base": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-llm": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-web-app": "0.1.5-rc.2"
+  }
+}

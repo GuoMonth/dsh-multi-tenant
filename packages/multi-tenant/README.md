@@ -16,7 +16,7 @@ This package is for **developers building a multi-user DSH service**. It provide
 
 A typical visit is: **sign in → resolve the user's domain → start or reuse its DSH Host → open native DSH Web**. A browser reconnect returns to the same domain; it does not create a new Host for every request or session.
 
-## What 0.7.0 delivers
+## What 0.7.1 delivers
 
 - A domain directory keyed by `(tenantId, principalId)`, keeping identity and desired state across platform restarts.
 - Deduplicated Host startup, generation checks, suspension/revocation, bounded shutdown and verified recovery after a coordinator crash.
@@ -26,18 +26,20 @@ A typical visit is: **sign in → resolve the user's domain → start or reuse i
 
 ## Decide whether this version suits your deployment
 
-**0.7.0 is a developer integration release.** The included Docker provider has **no outbound network**, so it cannot call external model APIs or remote MCP. Supply a reviewed network-capable `RuntimeProvider` for those uses. Login/SSO, TLS, domain provisioning, quotas and operational monitoring are responsibilities of the embedding platform; an account-management UI or a ready-made hosted service is not included.
+**This is a developer integration package.** Docker uses bridge networking by default, allowing external model APIs and remote MCP. Set `network: 'none'` when offline operation is needed. Starting with 0.7.1, bridge replaces the offline default in 0.7.0. Login/SSO, TLS, domain provisioning, quotas and operational monitoring are responsibilities of the embedding platform; an account-management UI or a ready-made hosted service is not included.
 
 The security boundary is the **user within a tenant**, not each project or conversation. Two workspaces belonging to one Principal are not promised to be mutually confidential. Native permissions, tool filters, stop/archive/delete and preset selection retain native semantics. Team-shared domains, project ACLs, cross-user session sharing, automatic idle eviction and multi-machine scheduling are outside this version.
 
 Independent Hosts have a fixed memory and startup cost; an inactive browser can still have background work. Choose resource limits and when to stop domains from your workload. Platform administration, authentication secrets and the Docker socket must stay outside every native Host.
+
+**Upgrading from 0.7.0:** Existing domain data and integration APIs retain their structure. The network default changes: explicitly set `network: 'none'` before upgrading if offline restrictions must remain. To adopt the included Dockerfile, rebuild the image, stop existing Hosts, update the image ID and restart.
 
 **Upgrading from 0.5.x or earlier:** 0.7.0 changes the integration architecture and public API. The shared-process Cordis plugin, per-Agent resource API and custom panel are removed. Start with a new platform directory, replace the integration code and preserve old data separately; there is no automatic legacy-data migration. The 0.6.0 source milestone was not published to npm.
 
 ## First steps
 
 ```sh
-npm install dsh-multi-tenant@0.7.0
+npm install dsh-multi-tenant@0.7.1
 # Check the installed platform API without Docker or an external model:
 node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
 ```
@@ -46,7 +48,7 @@ The smoke uses a **simulated runtime** and starts no native DSH Host. To give us
 
 1. Prepare the pinned native runtime image and per-domain profile described below.
 2. Connect your login/IdP adapter to trusted tenant/user identity and assign each domain a separate hostname.
-3. Choose the offline Docker reference for local fixtures, or a reviewed runtime provider for the network access your model/MCP needs.
+3. Build the included runtime image. Use default bridge networking for model/MCP access, or explicitly select `network: 'none'` for offline workloads.
 4. Embed the ingress/coordinator, provision private data, and implement shutdown, suspension and recovery in your platform.
 
 For a complete keyless native Web demonstration from source, install the repository and `scripts/native-host-probe` dependencies, then run `pnpm probe:isolated` with Docker and Chromium. See [the reproducible native proof](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/scripts/native-host-probe/README.md). This is a verification environment, not a public login service.
@@ -61,14 +63,14 @@ For a complete keyless native Web demonstration from source, install the reposit
 ## Install and prerequisites
 
 ```sh
-npm install dsh-multi-tenant@0.7.0
+npm install dsh-multi-tenant@0.7.1
 ```
 
 To test an unreleased checkout, build and install its tarball with `pnpm --filter dsh-multi-tenant pack`.
 
 The coordinator requires Node 22.19 or Node 24+. The included providers target Linux. `DockerRuntimeProvider` requires a local Docker engine and a prebuilt immutable image containing **DSH 0.1.5-rc.2**, pinned source `fb2c4b9e698e30edb738bca4cf0618587db7d203`. Run the coordinator as a non-root user with Docker access; the reference runtime UID/GID must match that user so both sides can access the private control files. It does not download DSH into the platform process. TypeScript consumers should install `@types/node` and include `node` in compiler `types`.
 
-The Docker reference intentionally uses `--network none`: keyless/local tools work; external model APIs and remote MCP do not. Deployments needing egress must supply a reviewed `RuntimeProvider` with explicit network policy. The local process provider is for trusted development, not hostile workloads.
+Docker defaults to `--network bridge`; set `network: 'none'` for `--network none`. No ports are published and the native server listens on container loopback. Bridge allows access to reachable host/LAN services and other containers on the same bridge; it is not a network tenant boundary. Apply deployment firewall policy when network separation is required. External API credentials remain necessary. The local process provider is for trusted development, not hostile workloads.
 
 ## Embed in an authenticated server
 
@@ -103,6 +105,28 @@ Use distinct hostnames (not only different ports) and trusted TLS termination: b
 
 ## Runtime image and profile contract
 
+### Build the included runtime image
+
+From source (after npm installation, substitute `node_modules/dsh-multi-tenant` for the package path):
+
+```sh
+docker build -f packages/multi-tenant/runtime/Dockerfile -t dsh-domain-runtime:local packages/multi-tenant
+docker image inspect dsh-domain-runtime:local --format '{{.Id}}'
+```
+
+Pass the resulting `sha256:...` as the provider `image`, then provision each domain profile below. The Dockerfile and dependency lock ship in the npm package, without fixture models, fixture MCP or credentials. The base image digest and npm dependencies are pinned; OS tools take current Debian repository security updates, so use the final image ID as deployment identity.
+
+Includes Bash, Git/SSH client, curl/wget, jq, ripgrep, text/archive utilities, Python 3/venv/pip, C/C++ build tools and the base image's Node/npm. Account-dependent AI CLIs, browsers and additional language SDKs belong in project-specific derived images. The runtime root is read-only: install Python packages into `/domain/.venv` and Node dependencies into projects under `/domain`. `/tmp` is noexec; set `TMPDIR` to a writable directory under `/domain` when build/install tools need executable temporary files. The provider overrides the image's default user with the configured non-root UID/GID.
+
+```js
+new DockerRuntimeProvider({
+  // ...image, directory, profileDirectory, uid, gid
+  network: 'none', // Optional offline mode; omitted means bridge.
+})
+```
+
+
+
 The reference provider launches `/opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile web --patch /profile/runtime.patch.json` with Node `--expose-internals` for the pinned native Loader, loopback port 3081 and no browser opener. Install the exact native runtime and copy the exported `dsh-multi-tenant/native/runtime-control.mjs` asset into the image at `/opt/dsh/runtime-control.mjs`. Add this row through the native profile patch:
 
 ```json
@@ -134,6 +158,8 @@ Native user settings, user-installed domain plugins and domain credentials are i
 One coordinator owns each local SQLite directory. This is not a multi-machine scheduler or storage fence. Domains stay running until explicitly stopped; automatic idle eviction is not provided because a disconnected browser may have active background work. Choose quotas and scheduling in the embedding platform from workload measurements.
 
 ## Verification and scope
+
+`pnpm probe:image` builds the user image from the installed npm artifact and checks native DSH readiness, usable tools, default HTTPS egress and explicit none blocking. It makes no model API calls.
 
 `pnpm release:check` verifies exports, declarations, lifecycle, ingress, persistence and an independent tarball consumer. `pnpm --dir scripts/native-host-probe install --frozen-lockfile` followed by `pnpm probe:isolated` exercises the installed package with real native Hosts and Playwright (install Chromium first or set `PROBE_CHROMIUM`). The probe builds a pinned test image, uses only fake credentials/keyless model/local MCP and cleans its runtimes. It does not make external model calls.
 

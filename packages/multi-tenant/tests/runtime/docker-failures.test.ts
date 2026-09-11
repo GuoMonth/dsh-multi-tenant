@@ -13,7 +13,7 @@ import { DockerRuntimeProvider } from '../../src/runtime/providers/docker.ts'
 const directories: string[] = []
 afterEach(async () => { for (const root of directories.splice(0)) await rm(root, { recursive: true, force: true }) })
 
-async function setup({ uncertain = false, failRemoval = false } = {}) {
+async function setup({ uncertain = false, failRemoval = false, network = undefined as 'bridge' | 'none' | undefined } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'docker-fault-'))
   directories.push(root)
   let current: { Id: string; Config: { Labels: Record<string, string> } } | undefined
@@ -39,7 +39,7 @@ async function setup({ uncertain = false, failRemoval = false } = {}) {
     }
     return { stdout, stderr: '' }
   })
-  const provider = new DockerRuntimeProvider({ directory: root, image: `sha256:${'a'.repeat(64)}`, profileDirectory: () => root, uid: process.getuid!(), gid: process.getgid!() })
+  const provider = new DockerRuntimeProvider({ ...(network === undefined ? {} : { network }), directory: root, image: `sha256:${'a'.repeat(64)}`, profileDirectory: () => root, uid: process.getuid!(), gid: process.getgid!() })
   return { provider, calls, repair() { failRemoval = false }, get current() { return current } }
 }
 const spec = { domainId: '00000000-0000-4000-8000-000000000001', generation: 1, version: '0.1.5-rc.2' }
@@ -87,3 +87,17 @@ it('refuses recovery when the recorded generation does not own the container', a
   expect(t.current).toBeDefined()
   await handle.stop()
 })
+
+for (const network of [undefined, 'bridge', 'none'] as const) {
+  it(`starts with ${network ?? 'default bridge'} networking and keeps private transport and sandbox constraints`, async () => {
+    const t = await setup({ network })
+    const handle = t.provider.acquire(spec, new AbortController().signal)
+    await expect(handle.ready).rejects.toThrow('native startup failed')
+    const command = t.calls.find(args => args[1] === 'create')!
+    expect(command[command.indexOf('--network') + 1]).toBe(network ?? 'bridge')
+    expect(command).not.toContain('--publish')
+    expect(command).toContain('--read-only')
+    expect(command).toContain('no-new-privileges')
+    await handle.stop()
+  })
+}

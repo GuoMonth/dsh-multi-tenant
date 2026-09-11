@@ -17,8 +17,8 @@ test('a wrong exact native runtime dependency fails the executable baseline gate
   const root = mkdtempSync(join(tmpdir(), 'dsh-baseline-negative-'))
   try {
     mkdirSync(join(root, 'scripts/native-host-probe'), { recursive: true })
-    mkdirSync(join(root, 'packages/multi-tenant'), { recursive: true })
-    for (const file of ['scripts/verify-contract.mjs', 'scripts/dsh-target.mjs', 'scripts/native-host-probe/pnpm-lock.yaml', 'scripts/native-host-probe/package.json', 'packages/multi-tenant/package.json']) {
+    mkdirSync(join(root, 'packages/multi-tenant/runtime'), { recursive: true })
+    for (const file of ['scripts/verify-contract.mjs', 'scripts/dsh-target.mjs', 'scripts/native-host-probe/pnpm-lock.yaml', 'scripts/native-host-probe/package.json', 'packages/multi-tenant/package.json', 'packages/multi-tenant/runtime/package.json', 'packages/multi-tenant/runtime/package-lock.json']) {
       copyFileSync(new URL(`../../${file}`, import.meta.url), join(root, file))
     }
     const manifest = join(root, 'scripts/native-host-probe/package.json')
