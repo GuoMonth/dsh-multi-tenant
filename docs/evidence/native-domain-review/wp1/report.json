@@ -1,0 +1,25 @@
+{
+  "dsh": "0.1.5-rc.2",
+  "checks": [
+    "two real dsh web profiles start with isolated homes and native authentication",
+    "same Session identity, preset and MCP name resolve only each domain private marker",
+    "native continuable child and grandchild inherit the domain preset MCP",
+    "native child toolFilter removes MCP schemas and rejects forced tool execution",
+    "native one-shot fork resolves the domain preset MCP",
+    "native blank-session preset switching retains the domain MCP",
+    "native file route reads domain bytes and refuses another host browser cookie",
+    "native raw upload route accepts a domain Session upload",
+    "real host restart preserves cold history and native continuations",
+    "official Web sends messages, reconnects its mux, opens settings and keeps domain lists separate"
+  ],
+  "limitations": [
+    "Test CLI login, not a production authentication gateway.",
+    "No claim of completed WP2-WP4."
+  ],
+  "node": "v24.19.0",
+  "browser": "150.0.7871.128",
+  "cleanup": {
+    "errors": []
+  },
+  "passed": true
+}

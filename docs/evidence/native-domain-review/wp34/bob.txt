@@ -1,0 +1,40 @@
+New Session
+Workspaces
+workspace
+BOB_ROOT
+now
+Settings
+Connected
+BOB_ROOT
+probe
+Chat
+Trajectory
+System prompt
+PROBE_IDENTITY
+16:18
+1 tool call
+
+PROBE_RESULT PROBE_IDENTITY PRIVATE_bob
+
+Ran for 0s
+16:18
+PROBE_IDENTITY browser
+16:18
+1 tool call
+
+PROBE_RESULT PROBE_IDENTITY browser PRIVATE_bob
+
+Ran for 0s
+16:18
+PROBE_IDENTITY reconnect
+16:18
+1 tool call
+
+PROBE_RESULT PROBE_IDENTITY reconnect PRIVATE_bob
+
+Ran for 0s
+16:18
+Message or run a task, / commands, @ files or sessions
+Workspace Write
+probe/probe
+3 turns 6 steps
