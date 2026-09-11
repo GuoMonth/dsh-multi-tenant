@@ -52,20 +52,21 @@ ingress.server.listen(8080, '127.0.0.1')
 
 Provision a profile before `ensure(owner)` can start its Host. `directory.resolve(owner)` provides its opaque domain ID. Supply `authenticator.authenticate(request, signal)` returning `{ owner, signal }` only after authenticating the user; abort the returned signal on logout/expiry to close existing streams. `MemoryDomainSessions` is an in-memory reference adapter: `issue(owner)` is a **trusted server-side** operation, never an unauthenticated login endpoint. Tokens belong in Secure, HttpOnly, host-only cookies with Path=/ and an appropriate SameSite policy; the adapter does not emit cookies or implement an IdP.
 
-Use distinct origins and trusted TLS termination. Preserve the validated external Host/Origin through the reverse proxy; the ingress ignores client forwarding headers. All native HTTP and WebSocket paths share admission. Native browser cookies remain inside the platform; response cookies are not exposed. Platform management has no HTTP route here. The embedding application owns graceful shutdown; always attempt both `ingress.close()` and `runtime.close()` and retain cleanup errors for repair/retry. A reusable embedding example is in `examples/native-domains/platform.mjs`.
+Use distinct hostnames (not only different ports) and trusted TLS termination: browser cookies are not isolated by port. Preserve the validated external Host/Origin through the reverse proxy; the ingress ignores client forwarding headers. All native HTTP and WebSocket paths share admission. Native browser cookies remain inside the platform; response cookies are not exposed. Platform management has no HTTP route here. The embedding application owns graceful shutdown; always attempt both `ingress.close()` and `runtime.close()` and retain cleanup errors for repair/retry. A reusable embedding example is in `examples/native-domains/platform.mjs`.
 
 ## Runtime image and profile contract
 
 The reference provider launches `/opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile web --patch /profile/runtime.patch.json` with Node `--expose-internals` for the pinned native Loader, loopback port 3081 and no browser opener. Install the exact native runtime and copy the exported `dsh-multi-tenant/native/runtime-control.mjs` asset into the image at `/opt/dsh/runtime-control.mjs`. Add this row through the native profile patch:
 
 ```json
-{
-  "insert": [{
-    "id": "domain-runtime-control",
-    "name": "/opt/dsh/runtime-control.mjs",
-    "config": { "runtimeManifest": "/opt/dsh/node_modules/@deepseek-ai/dsh/package.json" }
-  }]
-}
+[
+  { "id": "web-runtime", "config": { "printUrl": false, "openBrowser": false } },
+  { "insert": [{
+      "id": "domain-runtime-control",
+      "name": "/opt/dsh/runtime-control.mjs",
+      "config": { "runtimeManifest": "/opt/dsh/node_modules/@deepseek-ai/dsh/package.json" }
+  }] }
+]
 ```
 
 The asset waits for public `appReady` and uses `connection.authenticatedUrl`, without private scope rebinding or a replacement controller. It is a native Host asset; do not load it into the platform.

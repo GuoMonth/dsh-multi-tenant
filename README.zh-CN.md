@@ -52,7 +52,7 @@ ingress.server.listen(8080, '127.0.0.1')
 
 启动前先配置域的 profile；可信平台可通过 `directory.resolve(owner)` 获取不透明域 ID。`authenticator.authenticate(request, signal)` 必须在真实认证后返回 `{ owner, signal }`；登出或过期时中止返回的 signal，关闭已有流。`MemoryDomainSessions` 仅是内存参考适配器，`issue(owner)` 是可信服务端操作，不能直接做成无需认证的登录接口。登录 token 应由平台写入 Secure、HttpOnly、host-only、Path=/ 且有适当 SameSite 策略的 Cookie；适配器不生成 Cookie 响应，也不实现 IdP。
 
-每域使用独立 origin，由可信反向代理终止 TLS。代理保留经核对的外部 Host/Origin；入口忽略客户端转发身份头。所有原生 HTTP 和 WebSocket 路径统一准入，DSH 内层 Cookie 留在平台，不传给浏览器。这里没有平台管理 HTTP 路由。
+每域使用独立主机名并由可信反向代理终止 TLS；仅区分端口不能隔离浏览器 Cookie。代理保留经核对的外部 Host/Origin；入口忽略客户端转发身份头。所有原生 HTTP 和 WebSocket 路径统一准入，DSH 内层 Cookie 留在平台，不传给浏览器。这里没有平台管理 HTTP 路由。
 
 关闭平台时都要尝试 `ingress.close()` 和 `runtime.close()`，保留失败以便修复后重试。可复用的嵌入示例见 `examples/native-domains/platform.mjs`。
 
@@ -61,13 +61,14 @@ ingress.server.listen(8080, '127.0.0.1')
 Docker provider 启动 `/opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile web --patch /profile/runtime.patch.json`，监听容器内 loopback 3081，不打开浏览器；固定版本 Loader 使用 Node `--expose-internals`。安装精确原生运行时后，将包导出的 `dsh-multi-tenant/native/runtime-control.mjs` 复制到镜像的 `/opt/dsh/runtime-control.mjs`。通过原生 patch 插入：
 
 ```json
-{
-  "insert": [{
-    "id": "domain-runtime-control",
-    "name": "/opt/dsh/runtime-control.mjs",
-    "config": { "runtimeManifest": "/opt/dsh/node_modules/@deepseek-ai/dsh/package.json" }
-  }]
-}
+[
+  { "id": "web-runtime", "config": { "printUrl": false, "openBrowser": false } },
+  { "insert": [{
+      "id": "domain-runtime-control",
+      "name": "/opt/dsh/runtime-control.mjs",
+      "config": { "runtimeManifest": "/opt/dsh/node_modules/@deepseek-ai/dsh/package.json" }
+  }] }
+]
 ```
 
 该资产使用公开 `appReady` 和 `connection.authenticatedUrl`，不修改私有 scope，不替换业务 controller。它属于原生 Host，不要装入平台进程。
