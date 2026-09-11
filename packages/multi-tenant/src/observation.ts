@@ -1,5 +1,6 @@
 /** Product-safe views and bounded, disposable observations of native Session facts. */
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
+import { childSummaries, type NativeChild, type ChildSummary } from './targets.ts'
 import type { AgentId, PrincipalContext } from './types.ts'
 import { CapabilityUnavailableError, ValidationError } from './errors.ts'
 
@@ -12,6 +13,10 @@ export interface SessionReadRequest {
 }
 
 export interface SessionReadSnapshot {
+  readonly header?: SessionHeader
+  readonly inheritedEventCount?: number
+  readonly catalog?: readonly NativeChild[]
+  readonly identity?: { readonly mode: 'one-shot' | 'continuable'; readonly label?: string; readonly seq: number } | null
   readonly events: readonly SessionEvent[]
   readonly cursor: number
   readonly active: boolean
@@ -33,13 +38,14 @@ export interface HistoryItem {
 }
 
 export interface HistoryPage {
+  readonly children?: readonly ChildSummary[]
   readonly items: readonly HistoryItem[]
   readonly cursor: string
   readonly older?: string
   readonly active: boolean
 }
 
-export interface ReadOptions { readonly before?: string; readonly limit?: number; readonly signal?: AbortSignal }
+export interface ReadOptions { readonly before?: string; readonly limit?: number; readonly signal?: AbortSignal; readonly childRef?: string }
 export type ObservationFrame =
   | { readonly type: 'replace' | 'append'; readonly page: HistoryPage }
   | { readonly type: 'status'; readonly active: boolean }
@@ -83,7 +89,9 @@ export function historyPage(target: string, snapshot: SessionReadSnapshot, optio
   })
   const items = after < 0 ? all.slice(-limit) : all.slice(0, limit)
   const cursor = after < 0 || all.length <= limit ? snapshot.cursor : items.at(-1)!.seq
+  const children = childSummaries(target, snapshot)
   return { items, cursor: `${target}:${cursor}`, active: snapshot.active,
+    ...(children === undefined ? {} : { children }),
     ...(after < 0 && all.length > limit ? { older: `${target}:${items[0]!.seq}` } : {}),
   }
 }
@@ -157,7 +165,7 @@ export async function observeLease(target: string, lease: SessionReadLease, sign
         do {
           const page = historyPage(target, snapshot, { limit: 200 }, cursor)
           cursor = Number(page.cursor.slice(target.length + 1))
-          if (page.items.length) queue.push({ type: 'append', page })
+          if (page.items.length || page.children !== undefined) queue.push({ type: 'append', page })
         } while (cursor < snapshot.cursor && !stopped.signal.aborted)
         queue.push({ type: 'status', active: snapshot.active })
       }

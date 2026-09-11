@@ -149,3 +149,11 @@ Web 新增 `POST /_dsh-multi-tenant/agents/:id/messages`，body 为 `{ text, del
 可选安装精确版本 `@deepseek-ai/dsh-session-query-sqlite@0.1.5-rc.2` 后，`service.read(principal, id, { before, limit, signal })` 返回安全的文字与 turn 历史；`service.observe(principal, id, { signal })` 返回可释放的异步流，分为 `replace` 基线、按游标追赶的 `append`、`status` 与按 attempt 区分的 `transient` 文字/重置。Web adapter 基路径下提供已认证 `GET /agents/:id/history` 和 `/events`（SSE）。重连重新替换基线；订阅前的临时文字不回放，最终持久消息替换临时显示。
 
 冷读使用原生 Session observation，不启动 Agent，不申请 MCP 或 Secret。删除根资源、关闭服务、请求取消及 reader provider 可选的授权撤销 signal 都会关闭观察。宿主应为登录/ACL 撤销提供 signal。慢消费者显式失败后重连，禁止静默丢事件。自定义隔离 provider 必须在自己的 partition 实现 `openRead`，默认拒绝。原始事件与内部路径不向产品返回。
+
+### 原生子代理目标
+
+显式安装精确版本 subagent 服务及 in-process spawn/fork provider 后，`children(principal, rootId, { childRef? })` 读取 `subagentCatalog`；`read`、`observe`、`send`、`cancel` 的 options 接受 `childRef`（`cancel` 为第四参数）。引用采用绑定根资源的目录位置，重启后稳定，本身不授予权限；每一层都核验子级自己的 descriptor 和不可变 header。Web 路径为 `/agents/:id/children` 与 `/agents/:id/children/:ref/{history,events,children,messages,cancel}`，观察中包含安全的子级摘要。
+
+one-shot 只读；continuable Queue/Steer 使用官方 host 入口并保留人类消息来源。直接冷子级可以通过活动根恢复；更深的冷链需先通过中间父级自己的 continuation 使其活动。没有本地 Session 事实的远程 run 不构成 Session 目标。根释放/撤销会清理原生 continuation 后代及其 scope。
+
+共享 provider 支持未装配 AgentPresets 的 in-process 子级：同步原生 publication 阶段核验 exact runtime owner，把子 scope 接到父级能力层，继承 scoped MCP/Secret 并保留工具限制。已有不相容 preset scope 的子级明确拒绝；AgentPresets 组合另见 #68。自定义 backend 必须提供自己的读取与控制能力。这是逻辑隔离，不是操作系统文件或容器边界。

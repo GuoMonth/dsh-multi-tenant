@@ -39,6 +39,7 @@ export default apply
 
 export { MultiTenantService } from './service.ts'
 export type { MultiTenantConfig } from './service.ts'
+export type { ChildSummary, NativeChild } from './targets.ts'
 export type { HistoryItem, HistoryPage, ReadOptions, ObservationFrame, AgentObservation, SessionReadRequest, SessionReadSnapshot, SessionReadLease } from './observation.ts'
 
 export {
@@ -73,6 +74,7 @@ export type {
   DshAgentSpecification,
   RuntimePartitionRequest,
   RuntimePartitionLease,
+  ChildControlRequest,
 } from './protocols.ts'
 export {
   StaticSecretProvider,

@@ -8,6 +8,8 @@ import { ReasoningEffortId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { ToolExecutionResult, ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-session-query'
+import type {} from '@deepseek-ai/dsh-subagent'
+import { bindScopeParent, scopeParentOf, scopeChainOf } from '@deepseek-ai/dsh-scope'
 import type { SessionReadLease, SessionReadRequest } from './observation.ts'
 import { CapabilityUnavailableError } from './errors.ts'
 import {
@@ -19,6 +21,7 @@ import {
   type RuntimePartitionLease,
   type RuntimePartitionRequest,
   type TenantAgentRuntime,
+  type ChildControlRequest,
 } from './protocols.ts'
 
 function requireService<K extends 'agents' | 'tools' | 'sessions'>(ctx: Context, key: K): Context[K] {
@@ -63,14 +66,26 @@ function runtimeView(agent: Agent, tools: ToolRuntime): TenantAgentRuntime {
 }
 
 class SharedDshRuntimeDriver implements DshRuntimeDriver {
-  private readonly agents: Pick<AgentRegistry, 'create' | 'resume'>
+  private readonly owned = new Set<Agent>()
+  private readonly agents: AgentRegistry
   private readonly tools: ToolRuntime
   private readonly sessions: Pick<Context['sessions'], 'flush'>
 
-  constructor(ctx: Context) {
+  constructor(private readonly ctx: Context) {
     this.agents = requireService(ctx, 'agents')
     this.tools = requireService(ctx, 'tools')
     this.sessions = requireService(ctx, 'sessions')
+    ctx.on('agent/created', ({ agent }) => {
+      const parent = [...this.owned].find(candidate => this.agents.isOwnedBy(agent.id, candidate))
+      if (!parent) return
+      // A native child is a sibling in the host factory. Join the exact owner's
+      // capability layer before publication completes; own tool restrictions
+      // then constrain inherited MCP definitions as well as global tools.
+      if (scopeParentOf(agent) === undefined) bindScopeParent(agent, parent)
+      if (!scopeChainOf(agent).includes(parent)) throw new CapabilityUnavailableError('Child composition cannot inherit the Principal capability scope.')
+      this.owned.add(agent)
+    })
+    ctx.on('agent/disposed', ({ agent }) => { this.owned.delete(agent) })
   }
 
   create(specification: DshAgentSpecification): Promise<DshRuntimeAgentHandle> {
@@ -122,9 +137,13 @@ class SharedDshRuntimeDriver implements DshRuntimeDriver {
       await handle.dispose().catch(() => undefined)
       throw error
     }
+    this.owned.add(handle.agent)
     return Object.freeze({
       runtime: runtimeView(handle.agent, this.tools),
-      dispose: () => handle.dispose(),
+      dispose: async () => {
+        try { await this.ctx.get('subagents')?.drainContinuableDescendants([handle.agent]) }
+        finally { await handle.dispose(); this.owned.delete(handle.agent) }
+      },
     })
   }
 }
@@ -159,7 +178,12 @@ export class SharedDshRuntimePartitionProvider extends RuntimePartitionProvider 
         if (disposed) throw new CapabilityUnavailableError('Session reader is disposed.')
         const observation = await query.observeSession(id, { signal: request.signal, projectionMode: 'all' })
         try {
-          return { events: observation.events, cursor: observation.cursor, active: this.ctx.agents.get(id)?.status === 'running' }
+          const catalog = observation.projections?.values.subagentCatalog
+          const identity = observation.projections?.values.subagent
+          return { events: observation.events, cursor: observation.cursor, active: this.ctx.get('agents')!.get(id)?.status === 'running',
+            header: observation.header, inheritedEventCount: observation.inheritedEventCount,
+            ...(catalog === undefined ? {} : { catalog }), ...(identity === undefined ? {} : { identity }),
+          }
         } finally { observation[Symbol.dispose]() }
       },
       subscribe: (changed) => {
@@ -182,6 +206,24 @@ export class SharedDshRuntimePartitionProvider extends RuntimePartitionProvider 
       },
       dispose: () => { disposed = true; for (const unsubscribe of subscriptions) unsubscribe() },
     }
+  }
+
+  override async controlChild(request: ChildControlRequest): Promise<void> {
+    request.signal.throwIfAborted()
+    const subagents = this.ctx.get('subagents')
+    if (!subagents) throw new CapabilityUnavailableError('Native subagent runtime is required.')
+    const child = SessionId(request.sessionId)
+    const parentId = SessionId(request.parentSessionId)
+    if (request.command === 'cancel') {
+      subagents.interrupt(child, { kind: 'user', parentSessionId: parentId })
+      return
+    }
+    const parent = this.ctx.get('agents')!.get(parentId)
+    if (!parent) throw new CapabilityUnavailableError('The direct parent must be active for child delivery.')
+    const { queueHostSubagentPrompt, steerHostSubagentPrompt } = await import('@deepseek-ai/dsh-subagent/internal')
+    request.signal.throwIfAborted()
+    const deliver = request.delivery === 'steer' ? steerHostSubagentPrompt : queueHostSubagentPrompt
+    await deliver(subagents, parent, child, [{ type: 'text', text: request.text! }], { kind: 'user' }, request.signal)
   }
 }
 

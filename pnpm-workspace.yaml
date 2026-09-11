@@ -15,6 +15,12 @@ minimumReleaseAge: 1440
 # Upstream package manifests use semver peer ranges. Keep the repository's
 # executable dependency graph on one reviewed DSH identity.
 overrides:
+  '@deepseek-ai/dsh-util-time': 0.1.5-rc.2
+  '@deepseek-ai/dsh-chunked-list': 0.1.5-rc.2
+  '@deepseek-ai/dsh-subagent-in-process-driver': 0.1.5-rc.2
+  '@deepseek-ai/dsh-subagent-fork-in-process': 0.1.5-rc.2
+  '@deepseek-ai/dsh-subagent-spawn-in-process': 0.1.5-rc.2
+  '@deepseek-ai/dsh-subagent': 0.1.5-rc.2
   '@deepseek-ai/dsh-tool-todo': 0.1.5-rc.2
   '@deepseek-ai/dsh-session-title': 0.1.5-rc.2
   '@deepseek-ai/dsh-session-query-sqlite': 0.1.5-rc.2
@@ -53,6 +59,12 @@ overrides:
 # Every exception is an exact package/version from the manually reviewed DSH
 # 0.1.5-rc.2 source identity pinned in scripts/dsh-target.mjs.
 minimumReleaseAgeExclude:
+  - '@deepseek-ai/dsh-util-time@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-chunked-list@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-subagent-in-process-driver@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-subagent-fork-in-process@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-subagent-spawn-in-process@0.1.5-rc.2'
+  - '@deepseek-ai/dsh-subagent@0.1.5-rc.2'
   - '@deepseek-ai/dsh-tool-todo@0.1.5-rc.2'
   - '@deepseek-ai/dsh-session-title@0.1.5-rc.2'
   - '@deepseek-ai/dsh-session-query-sqlite@0.1.5-rc.2'

@@ -211,7 +211,7 @@ export function mountMultiTenantWeb(
     const encoded = pathname.slice(`${agentsPath}/`.length)
     if (encoded.length === 0) throw new AgentNotFoundError()
     const parts = encoded.split('/')
-    if (parts.length > 2) throw new AgentNotFoundError()
+    if (parts.length > 4) throw new AgentNotFoundError()
     let decoded: string
     try {
       decoded = decodeURIComponent(parts[0]!)
@@ -219,7 +219,18 @@ export function mountMultiTenantWeb(
       throw new AgentNotFoundError()
     }
     const id = parseAgentId(decoded)
-    const action = parts[1]
+    let action = parts[1]
+    let childRef: string | undefined
+    if (action === 'children' && parts.length >= 3) {
+      try { childRef = decodeURIComponent(parts[2]!) } catch { throw new AgentNotFoundError() }
+      action = parts[3] ?? 'history'
+    } else if (parts.length > 2) throw new AgentNotFoundError()
+    const target = childRef === undefined ? {} : { childRef }
+    if (action === 'children') {
+      if (req.method !== 'GET') { writeJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }); return }
+      writeJson(res, 200, { children: await service.children(principal, id, target) })
+      return
+    }
     if (action === 'history' || action === 'events') {
       if (req.method !== 'GET') { writeJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }); return }
       const params = new URL(req.url!, 'http://localhost').searchParams
@@ -229,13 +240,13 @@ export function mountMultiTenantWeb(
       res.once('close', disconnected)
       try {
         if (action === 'history') {
-          const page = await service.read(principal, id, { signal: controller.signal,
+          const page = await service.read(principal, id, { ...target, signal: controller.signal,
             ...(params.has('before') ? { before: params.get('before')! } : {}),
             ...(params.has('limit') ? { limit: Number(params.get('limit')) } : {}),
           })
           writeJson(res, 200, page)
         } else {
-          const observation = await service.observe(principal, id, { signal: controller.signal })
+          const observation = await service.observe(principal, id, { ...target, signal: controller.signal })
           try {
             res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', 'x-accel-buffering': 'no' })
             for await (const frame of observation) {
@@ -259,12 +270,12 @@ export function mountMultiTenantWeb(
         const disconnected = () => { if (!res.writableEnded) controller.abort() }
         res.once('close', disconnected)
         try {
-          const receipt = await service.send(principal, id, body.text, { ...(body.delivery === undefined ? {} : { delivery: body.delivery }), signal: controller.signal })
+          const receipt = await service.send(principal, id, body.text, { ...target, ...(body.delivery === undefined ? {} : { delivery: body.delivery }), signal: controller.signal })
           writeJson(res, 202, receipt)
         } finally { res.off('close', disconnected) }
       } else {
         if (body.reason !== undefined && (typeof body.reason !== 'string' || body.reason.length > 1024)) throw new ValidationError('invalid cancellation reason')
-        writeJson(res, 200, await service.cancel(principal, id, body.reason as string | undefined))
+        writeJson(res, 200, await service.cancel(principal, id, body.reason as string | undefined, target))
       }
       return
     }
