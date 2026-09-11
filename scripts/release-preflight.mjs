@@ -24,7 +24,7 @@ if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.tag !== 'latest
 }
 if (pkg.license !== 'MIT') errors.push('license must be MIT')
 if (pkg.dsh) errors.push('obsolete Cordis bundle metadata')
-for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'LICENSE', 'src/native/runtime-control.mjs', 'examples']) {
+for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'LICENSE', 'src/native/runtime-control.mjs', 'examples']) {
   if (!(pkg.files ?? []).includes(file)) errors.push(`package files missing ${file}`)
 }
 

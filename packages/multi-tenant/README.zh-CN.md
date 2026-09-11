@@ -1,10 +1,55 @@
 # dsh-multi-tenant
 
-[English](README.md)
+[English](README.md) · [版本发布](https://github.com/GuoMonth/dsh-multi-tenant/releases) · [更新记录](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CHANGELOG.md)
 
-为每个 `(tenantId, principalId)` 运行独立的原生 DeepSeek Harness Host。平台负责认证、域数据、运行时生命周期和 HTTP/WebSocket 准入；DSH 负责域内会话、workspace、preset、工具及完整原生 Web。
+让每位登录用户拥有自己的原生 DeepSeek Harness 工作环境。用户继续使用 DSH 的聊天、workspace、文件、preset 和子代理，平台负责将不同用户的数据与执行环境隔离。
 
-**0.7.0 是破坏性架构变更。** 原共享进程 Cordis 插件、逐 Agent 资源接口和自定义面板已被替换。使用新的平台数据目录，不提供旧数据库迁移和兼容层。源码版本号不代表已经发布 npm。
+本包面向**搭建多用户 DSH 服务的平台开发者**，提供现有登录系统与独立 DSH Host 之间的集成层。
+
+## 适合哪些场景
+
+| 场景 | 能解决的问题 | 平台需要提供 |
+| --- | --- | --- |
+| 企业研发工作台 | 员工使用原生 DSH，分别持有自己的历史、文件和 MCP 配置 | 企业登录、TLS、私有存储和运行环境 |
+| 多租户应用 | 不同租户的同名用户也得到独立环境，避免身份或数据混用 | 可信租户/用户身份、域名和资源策略 |
+| 原生 DSH 集成与验证 | 复用官方 Web、preset 和子代理行为，减少额外聊天界面的维护 | 固定版本的原生运行时、受审查 profile 和 runtime provider |
+
+典型使用流程是：**用户登录 → 平台确定所属域 → 启动或复用专属 DSH Host → 进入原生 Web**。断线重连仍回到同一个域，每次请求或每个会话都不需要新建 Host。
+
+## 0.7.0 提供什么
+
+- 按 `(tenantId, principalId)` 持久化域归属和期望状态，平台重启后仍能核对身份与撤销状态。
+- 去重启动、generation 校验、暂停/撤销、有时限的停止，以及协调器崩溃后的可验证恢复。
+- 面向原生 Web 的认证 HTTP/WebSocket 入口，保留消息、工具和文件传输，DSH 内层登录凭据留在平台。
+- 受限 Linux Docker 参考 provider、可信开发用本地进程 provider，以及部署方实现其他运行环境的公开接口。
+- 使用原生 preset/MCP/子代理组合，通过安装后的真实运行时验证，替换旧逐 Agent facade。
+
+## 使用前需要了解的边界
+
+**0.7.0 是开发者集成版本。** 内置 Docker provider **没有出站网络**，不能直接调用外部模型 API 或远程 MCP；这些场景需要部署方提供受审查的网络 runtime provider。登录/SSO、TLS、域配置、配额和运维监控由接入平台负责，本包不包含账号管理 UI 或现成托管服务。
+
+授权边界是**租户内的用户**。同一 Principal 的两个 workspace 或会话不承诺互相保密；域内权限、工具过滤、停止、归档、删除和 preset 选择沿用原生语义。本版本不提供团队共享域、项目 ACL、跨用户会话共享、自动空闲回收或跨机调度。
+
+独立 Host 有固定的内存和启动成本，浏览器断开后也可能仍有后台任务。资源限制和域回收时机应根据实际工作负载决定。平台管理权限、登录秘密和 Docker socket 必须始终位于用户域之外。
+
+**从 0.5.x 或更早版本升级：** 0.7.0 改变了集成架构和公开 API，删除共享进程 Cordis 插件、逐 Agent 接口和自定义面板。需要新建平台目录、替换接入代码并单独保留旧数据，不提供旧数据库自动迁移。0.6.0 曾是源码里程碑，没有发布到 npm。
+
+## 从哪里开始
+
+```sh
+npm install dsh-multi-tenant@0.7.0
+# 无需 Docker 或外部模型，先检查已安装的平台 API：
+node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
+```
+
+这个 smoke 使用**模拟 runtime**，不会启动原生 DSH。要给用户提供真实工作台：
+
+1. 按下文准备固定版本的原生镜像，以及每域 profile。
+2. 接入登录/IdP，从可信认证结果取得租户和用户身份，为每域分配独立主机名。
+3. 本地验证可使用无网络 Docker 参考实现；需要模型/MCP 出站访问时，接入受审查的 runtime provider。
+4. 嵌入入口与协调器，配置私有数据，并在平台实现关闭、暂停和恢复流程。
+
+想先体验完整的无外部调用原生 Web 验证，可从源码安装项目和 `scripts/native-host-probe` 依赖，在具备 Docker、Chromium 的环境运行 `pnpm probe:isolated`，见[可复现原生验证](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/scripts/native-host-probe/README.md)。该环境用于验证，不提供公网登录服务。
 
 ## 授权契约
 
@@ -19,13 +64,15 @@
 npm install dsh-multi-tenant@0.7.0
 ```
 
-PR 尚未发布时，先运行 `pnpm --filter dsh-multi-tenant pack`，安装产生的 `.tgz`。
+验证尚未发布的源码时，运行 `pnpm --filter dsh-multi-tenant pack` 并安装生成的 `.tgz`。
 
 平台使用 Node 22.19 或 Node 24+；内置 provider 面向 Linux。Docker provider 要求本机 Docker engine 及预构建的不可变镜像。镜像内固定 **DSH 0.1.5-rc.2**，源码身份 `fb2c4b9e698e30edb738bca4cf0618587db7d203`。协调器使用有 Docker 权限的非 root 用户运行；参考 runtime 的 UID/GID 必须与协调器相同，才能访问双方私有控制文件。平台进程不安装 DSH 运行时。TypeScript 消费者安装 `@types/node`，并在编译选项 `types` 中包含 `node`。
 
 Docker 参考实现使用 `--network none`，适用于本地工具和无外部调用的模型；不能连接外部模型 API 或远程 MCP。需要出站网络的部署应实现经过审查、明确网络策略的 `RuntimeProvider`。本地进程 provider 仅用于可信开发，不是恶意工作负载的隔离边界。
 
 ## 嵌入认证服务
+
+下面是集成片段，`authenticator` 和 `trustedDomainOrigins` 由平台提供。
 
 ```js
 import {

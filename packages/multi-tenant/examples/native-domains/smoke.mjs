@@ -47,3 +47,5 @@ try {
   await rm(root, { recursive: true, force: true })
   for (const result of results) if (result.status === 'rejected') throw result.reason
 }
+
+console.log('Package smoke passed (simulated runtime; no native DSH Host started).')
