@@ -1,7 +1,7 @@
 // Keyless test adapter; all Agent, tool, preset and persistence behavior is native DSH.
 import { createRequire } from 'node:module'
 import { appendFileSync } from 'node:fs'
-const rootRequire = createRequire('/opt/probe/package.json')
+const rootRequire = createRequire(process.env.PROBE_PACKAGE_ROOT ?? '/opt/probe/package.json')
 const { LlmAdapter, ToolCallId } = await import(rootRequire.resolve('@deepseek-ai/dsh-llm'))
 let serial = 0
 const textChunks = text => [
@@ -29,11 +29,13 @@ class ProbeModel extends LlmAdapter {
     const prompt = current[0]?.content.filter(block => block.type === 'text').map(block => block.text).join('\n') ?? ''
     const results = current.flatMap(message => message.content.filter(block => block.type === 'tool-result'))
     const schemas = (options.tools ?? []).map(tool => tool.name)
-    appendFileSync('/domain/model-audit.jsonl', JSON.stringify({ principal: process.env.PROBE_PRINCIPAL, prompt, schemas }) + '\n')
+    appendFileSync(process.env.PROBE_AUDIT ?? '/domain/model-audit.jsonl', JSON.stringify({ principal: process.env.PROBE_PRINCIPAL, prompt, schemas }) + '\n')
     let chunks
     if (results.length) {
       const output = results.flatMap(block => block.content?.filter(item => item.type === 'text').map(item => item.text) ?? []).join('\n')
-      chunks = textChunks(`PROBE_RESULT ${output}`)
+      chunks = textChunks(`PROBE_RESULT ${prompt} ${output}`)
+    } else if (prompt.includes('PROBE_FORK')) {
+      chunks = callChunks('probe_fork', { description: 'fork identity probe', prompt: 'PROBE_IDENTITY' })
     } else if (prompt.includes('PROBE_DELEGATE')) {
       chunks = callChunks('probe_delegate', { description: 'identity probe child', prompt: 'PROBE_IDENTITY', run_in_background: true })
     } else if (prompt.includes('PROBE_RESTRICT')) {

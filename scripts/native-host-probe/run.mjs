@@ -241,7 +241,7 @@ try {
     await input.click()
     await cell.page.keyboard.type(`PROBE_IDENTITY_BROWSER_${cell.principal.toUpperCase()}`)
     await cell.page.keyboard.press('Enter')
-    await until(() => cell.page.locator('body').innerText(), body => body.includes(`PROBE_RESULT TEST_ONLY_${cell.principal.toUpperCase()}_PRIVATE_MARKER`))
+    await until(() => cell.page.locator('body').innerText(), body => body.includes(`PROBE_RESULT PROBE_IDENTITY_BROWSER_${cell.principal.toUpperCase()} TEST_ONLY_${cell.principal.toUpperCase()}_PRIVATE_MARKER`))
     await cell.page.screenshot({ path: join(evidence, `${cell.principal}-official-web.png`), fullPage: true })
     const body = await cell.page.locator('body').innerText()
     await writeFile(join(evidence, `${cell.principal}-official-web.txt`), body)

@@ -23,8 +23,8 @@ if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.tag !== 'latest
   errors.push('publishConfig must be public latest with provenance')
 }
 if (pkg.license !== 'MIT') errors.push('license must be MIT')
-if (pkg.dsh?.bundle?.patch !== './cordis.patch.yml') errors.push('DSH bundle patch missing')
-for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'LICENSE', 'cordis.patch.yml']) {
+if (pkg.dsh) errors.push('obsolete Cordis bundle metadata')
+for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'LICENSE', 'src/native/runtime-control.mjs', 'examples']) {
   if (!(pkg.files ?? []).includes(file)) errors.push(`package files missing ${file}`)
 }
 
@@ -47,13 +47,10 @@ for (const marker of ['workflow_dispatch:', 'environment: npm-release', 'actions
 }
 
 const workspace = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
-for (const marker of [
-  'minimumReleaseAge: 1440',
-  `'@deepseek-ai/dsh-agent': ${DSH_TARGET.version}`,
-  `'@deepseek-ai/dsh-agent@${DSH_TARGET.version}'`,
-]) {
-  if (!workspace.includes(marker)) errors.push(`pnpm exact baseline policy missing ${marker}`)
-}
+if (!workspace.includes('minimumReleaseAge: 1440')) errors.push('platform supply-chain age policy missing')
+const nativePolicy = readFileSync(join(root, 'scripts/native-host-probe/pnpm-workspace.yaml'), 'utf8')
+if (!nativePolicy.includes(`'@deepseek-ai/dsh@${DSH_TARGET.version}'`)) errors.push('native exact baseline policy missing')
+
 
 for (const workflow of filesBelow(join(root, '.github/workflows'))
   .filter(path => path.endsWith('.yml') || path.endsWith('.yaml'))) {

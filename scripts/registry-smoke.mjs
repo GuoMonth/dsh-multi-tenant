@@ -57,7 +57,7 @@ const integrity = npmJson(['view', `${PACKAGE_NAME}@${version}`, 'dist.integrity
 if (!integrity) throw new Error('registry artifact is missing dist.integrity')
 
 // Reuse the exact same installed-consumer contract that validates a local
-// tarball before publication, including the Principal-scoped Agent contract.
+// tarball before publication, including the Principal-isolated domain contract.
 execFileSync('node', [
   'scripts/artifact-consumer-smoke.mjs',
   `${PACKAGE_NAME}@${version}`,

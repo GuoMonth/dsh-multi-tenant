@@ -1,6 +1,7 @@
 # #68 / #71 原生集成重构评估与对抗性审查
 
-日期：2026-09-11。状态：架构评估与原生双 Host 最小技术验证通过，尚未实施产品重构；本文件不宣布 Issue 完成。
+> 契约更新（2026-09-11）：用户已明确采用 Principal 唯一授权边界，取消域内独立根 grant 要求。下文保留原始审查过程与证据，根授权相关阻塞不再属于当前产品验收；当前契约以 [实施方案](native-domain-refactor-plan.zh-CN.md) 为准。
+日期：2026-09-11。本文件保留 #74 的架构评估及原生双 Host 实验证据；后续实施状态见[重构方案](native-domain-refactor-plan.zh-CN.md)和 [WP3/WP4 根授权反例](../evidence/native-domain-review/wp34/README.md)。本文件不宣布 Issue 完成。
 
 ## 结论
 

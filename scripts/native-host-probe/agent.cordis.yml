@@ -21,3 +21,10 @@
     backgroundMode: continuable
     toolFilter:
       allow: []
+- id: fork
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: fork
+    toolName: probe_fork
+    backgroundMode: one-shot
+    enableRunInBackground: false

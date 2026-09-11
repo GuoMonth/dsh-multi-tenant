@@ -1,217 +1,23 @@
 #!/usr/bin/env node
-/** Exercise the exact public surface from an installed tarball or registry spec. */
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { assertExportFiles } from './artifact-contract.mjs'
-import { DSH_TARGET } from './dsh-target.mjs'
-
-const root = fileURLToPath(new URL('..', import.meta.url))
-const requested = process.argv[2]
-if (requested === undefined) {
-  console.error('usage: artifact-consumer-smoke.mjs <package-spec|--local>')
-  process.exit(2)
-}
-const consumer = mkdtempSync(join(tmpdir(), 'dsh-mt-consumer-'))
-const packDirectory = requested === '--local' ? mkdtempSync(join(tmpdir(), 'dsh-mt-pack-')) : undefined
-
-
+import { installArtifact } from './installed-package.mjs'
+const installed = installArtifact(process.argv[2] ?? '--local')
 try {
-  let packageSpec = requested
-  if (packDirectory !== undefined) {
-    execFileSync('pnpm', ['--filter', 'dsh-multi-tenant', 'build'], { cwd: root, stdio: 'ignore' })
-    execFileSync('pnpm', ['--filter', 'dsh-multi-tenant', 'pack', '--pack-destination', packDirectory], {
-      cwd: root,
-      stdio: 'ignore',
-    })
-    const tarball = readdirSync(packDirectory).find(file => file.endsWith('.tgz'))
-    if (tarball === undefined) throw new Error('pnpm pack produced no tarball')
-    packageSpec = join(packDirectory, tarball)
-
-    const packageJson = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.json'), 'utf8'))
-    const listing = execFileSync('tar', ['-tzf', packageSpec], { encoding: 'utf8' }).trim().split('\n')
-    const has = path => listing.some(entry => entry === path || entry.endsWith(`/${path}`))
-    const required = [
-      'package.json', 'README.md', 'README.zh-CN.md', 'LICENSE', 'cordis.patch.yml',
-      'dist/index.mjs', 'dist/mcp.mjs', 'dist/sqlite.mjs', 'dist/web.mjs',
-      'dist/testing.mjs', 'dist/starter-plugin.mjs',
-    ]
-    const missing = required.filter(path => !has(path))
-    if (missing.length > 0) throw new Error(`tarball is missing ${missing.join(', ')}`)
-    assertExportFiles(packageJson.exports, has)
-  }
-
-  writeFileSync(join(consumer, 'package.json'), JSON.stringify({
-    name: 'dsh-multi-tenant-consumer', private: true, type: 'module',
-  }))
-  // Keep the reviewed native identity and JSONL backend build policy in the
-  // independent consumer too; it still installs only registry packages + tarball.
-  writeFileSync(join(consumer, 'pnpm-workspace.yaml'), readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'))
-  try { execFileSync('pnpm', ['add',
-    '@deepseek-ai/cordis@4.0.2',
-    `@deepseek-ai/dsh-agent@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-llm@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-mcp-client@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-session@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-tools@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-agent-loop@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-session-projection@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-system-prompt@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-session-persistence-jsonl@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-session-query-sqlite@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-subagent@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-subagent-spawn-in-process@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-tool-subagent@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-fs-local@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-tool-present@${DSH_TARGET.version}`,
-    `@deepseek-ai/dsh-host-webserver@${DSH_TARGET.version}`,
-    'typescript@6.0.3',
-    packageSpec,
-  ], { cwd: consumer, stdio: 'pipe' }) } catch (error) { throw new Error(`Consumer install failed: ${error.stdout?.toString() ?? ''}${error.stderr?.toString() ?? ''}`) }
-
-  writeFileSync(join(consumer, 'tsconfig.json'), JSON.stringify({
-    compilerOptions: {
-      target: 'ES2024', module: 'NodeNext', moduleResolution: 'NodeNext',
-      strict: true, noEmit: true, skipLibCheck: true,
-    },
-    include: ['provider-contract.ts'],
-  }))
-  writeFileSync(join(consumer, 'provider-contract.ts'), `
-    import {
-      RuntimePartitionProvider, SecretProvider, TenantMcpProvider,
-      type DshAgentSpecification, type PrincipalContext,
-      type RuntimePartitionLease, type RuntimePartitionRequest, type SecretLease,
-      type TenantMcpSnapshot, type MultiTenantService,
-    } from 'dsh-multi-tenant'
-
-    declare const service: MultiTenantService
-    // @ts-expect-error Unauthenticated callers cannot manufacture a Principal from JSON.
-    service.get({ tenantId: 'tenant', principalId: 'user' }, 'not-an-agent-id')
-
-    // @ts-expect-error Callback runtime authority is no longer public.
-    service.withAgent
-
-    export class McpProvider extends TenantMcpProvider {
-      async load(_principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot> {
-        signal.throwIfAborted()
-        return { revision: 'consumer-v1', servers: [] }
-      }
-    }
-    export class Secrets extends SecretProvider {
-      async acquire(
-        _principal: PrincipalContext,
-        _names: readonly string[],
-        signal: AbortSignal,
-      ): Promise<SecretLease> {
-        signal.throwIfAborted()
-        return { revision: 'consumer-v1', values: {}, signal, dispose() {} }
-      }
-    }
-    export class Partitions extends RuntimePartitionProvider {
-      async acquire(request: RuntimePartitionRequest): Promise<RuntimePartitionLease> {
-        request.signal.throwIfAborted()
-        return {
-          isolation: 'logical',
-          driver: {
-            async create(specification: DshAgentSpecification) {
-              specification.signal.throwIfAborted()
-              throw new Error('type-only consumer')
-            },
-            async resume(specification: DshAgentSpecification) {
-              specification.signal.throwIfAborted()
-              throw new Error('type-only consumer')
-            },
-          },
-          dispose() {},
-        }
-      }
-    }
+  execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--save-dev', 'typescript@6.0.3', '@types/node@22.20.0'], { cwd: installed.directory, stdio: 'pipe' })
+  writeFileSync(join(installed.directory, 'contract.ts'), `
+    import { DomainRuntimeCoordinator, SQLiteDomainRepository, createDomainIngress,
+      DSH_RUNTIME_VERSION, type DomainAuthenticator, type RuntimeProvider } from 'dsh-multi-tenant'
+    declare const authentication: DomainAuthenticator
+    declare const provider: RuntimeProvider
+    const repository = new SQLiteDomainRepository('/platform/directory')
+    const runtime = new DomainRuntimeCoordinator(repository, provider, DSH_RUNTIME_VERSION)
+    createDomainIngress({ authenticator: authentication, runtime, originFor: () => 'https://alice.example' })
+    // @ts-expect-error No per-root authorization facade remains.
+    runtime.revokeRoot('session')
   `)
-  execFileSync('pnpm', ['exec', 'tsc'], { cwd: consumer, stdio: 'inherit' })
-
-  writeFileSync(join(consumer, 'smoke.mjs'), `
-    import { Context } from '@deepseek-ai/cordis'
-    import {
-      AgentNotFoundError,
-      createPrincipalContext,
-      EmptyTenantMcpProvider,
-      InMemoryTenantAgentRepository,
-      MultiTenantService,
-      RuntimePartitionProvider,
-      UnavailableSecretProvider,
-    } from 'dsh-multi-tenant'
-    import * as Mcp from 'dsh-multi-tenant/mcp'
-    import SQLiteRepository from 'dsh-multi-tenant/sqlite'
-    import * as Web from 'dsh-multi-tenant/web'
-    import * as Testing from 'dsh-multi-tenant/testing'
-    import * as Starter from 'dsh-multi-tenant/starter'
-
-    const assert = (condition, message) => { if (!condition) throw new Error(message) }
-    assert(typeof Mcp.TenantMcpProvider === 'function', 'MCP provider export missing')
-    assert(typeof Web.mountMultiTenantWeb === 'function', 'Web export missing')
-    assert(typeof Testing.assertTenantAgentRepositoryContract === 'function', 'testing export missing')
-    assert(typeof Starter.apply === 'function', 'starter export missing')
-    await Testing.assertTenantAgentRepositoryContract(ctx => new SQLiteRepository(ctx, { path: ':memory:' }))
-
-    class Partition extends RuntimePartitionProvider {
-      async openRead(request) {
-        request.signal.throwIfAborted()
-        return {
-          async read() { return { events: [], cursor: -1, active: false, catalog: [] } },
-          subscribe() { return () => {} }, dispose() {},
-        }
-      }
-      async acquire() {
-        return {
-          isolation: 'logical',
-          driver: {
-            async create(spec) { return handle(spec.sessionId) },
-            async resume(spec) { return handle(spec.sessionId) },
-          },
-          dispose() {},
-        }
-      }
-    }
-    const handle = sessionId => ({
-      runtime: {
-        followup() {}, steer() {}, inject() {}, cancel() {}, async whenIdle() {},
-        async executeTool(name, args) { return { isError: false, value: { name, args }, content: [] } },
-      },
-      async dispose() {},
-    })
-
-    const ctx = new Context()
-    await ctx.plugin(InMemoryTenantAgentRepository)
-    await ctx.plugin(EmptyTenantMcpProvider)
-    await ctx.plugin(UnavailableSecretProvider)
-    await ctx.plugin(Partition)
-    await ctx.plugin(MultiTenantService)
-    const alice = createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })
-    const bob = createPrincipalContext({ tenantId: 'acme', principalId: 'bob' })
-    const agent = await ctx.multiTenant.create(alice)
-    assert(!JSON.stringify(agent).includes('session'), 'public Agent leaked internal session')
-    let denied = false
-    try { await ctx.multiTenant.get(bob, agent.id) } catch (error) { denied = error instanceof AgentNotFoundError }
-    assert(denied, 'cross-Principal lookup did not fail closed')
-    const tool = await ctx.multiTenant.executeTool(alice, agent.id, 'probe', { ok: true })
-    assert(tool.value.name === 'probe', 'controlled runtime did not execute tool')
-    const page = await ctx.multiTenant.read(alice, agent.id)
-    assert(page.items.length === 0 && !JSON.stringify(page).includes('internal'), 'safe history contract failed')
-    assert((await ctx.multiTenant.children(alice, agent.id)).length === 0, 'scoped child catalog failed')
-    const observation = await ctx.multiTenant.observe(alice, agent.id)
-    const frames = observation[Symbol.asyncIterator]()
-    assert((await frames.next()).value.type === 'replace', 'observation opening baseline failed')
-    await observation.dispose()
-    await ctx.multiTenant.delete(alice, agent.id)
-    await ctx.fiber.dispose()
-    console.log('installed Agent resource contract passed')
-  `)
-  execFileSync(process.execPath, ['smoke.mjs'], { cwd: consumer, stdio: 'inherit' })
-  execFileSync(process.execPath, [join(consumer, 'node_modules/dsh-multi-tenant/examples/scoped-web/smoke.mjs')], { cwd: consumer, stdio: 'inherit' })
-  console.log(`artifact consumer smoke passed: ${packageSpec}`)
-} finally {
-  rmSync(consumer, { recursive: true, force: true })
-  if (packDirectory !== undefined) rmSync(packDirectory, { recursive: true, force: true })
-}
+  execFileSync(process.execPath, ['node_modules/typescript/bin/tsc', '--noEmit', '--strict', '--types', 'node', '--module', 'NodeNext', '--target', 'ES2024', 'contract.ts'], { cwd: installed.directory, stdio: 'inherit' })
+  execFileSync(process.execPath, [join(installed.packageDirectory, 'examples/native-domains/smoke.mjs')], { cwd: installed.directory, stdio: 'inherit' })
+  console.log('Installed domain lifecycle, ingress, native asset and declaration contract passed')
+} finally { installed.close() }

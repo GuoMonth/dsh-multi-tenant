@@ -1,0 +1,7 @@
+*
+!scripts/
+!scripts/native-host-probe/
+!scripts/native-host-probe/package.json
+!scripts/native-host-probe/node_modules/**
+!scripts/native-host-probe/model.mjs
+!scripts/native-host-probe/mcp.mjs

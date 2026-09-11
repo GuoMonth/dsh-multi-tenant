@@ -1,0 +1,13 @@
+{
+  "dsh": "0.1.5-rc.2",
+  "node": "v24.18.0",
+  "checks": [
+    "Two real native Web profiles reach appReady; concurrent enters deduplicate startup",
+    "Native connection routes are active and retain browser authentication",
+    "A failing native sibling plugin never passes readiness and releases its process ownership",
+    "Stopping one native host closes its listener and preserves the other; restart advances generation",
+    "Durable domain revocation rejects new runtime admission and invalidates the old lease",
+    "Clean shutdown releases all native owners and coordinator lock; policy survives reopening"
+  ],
+  "passed": true
+}

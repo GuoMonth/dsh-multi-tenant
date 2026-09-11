@@ -13,6 +13,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-ingress:
+    name: Installed native domains and isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        with:
+          runtime: node@24
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir scripts/native-host-probe install --frozen-lockfile
+      - run: pnpm --dir scripts/native-host-probe exec playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_GC: '1'
+      - run: pnpm probe:isolated
+        env:
+          # Keep native Unix socket paths within Linux's 107-byte limit.
+          PROBE_EVIDENCE_DIR: /tmp/dsh-ci
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: native-ingress-evidence
+          path: |
+            /tmp/dsh-ci/**/report.json
+            /tmp/dsh-ci/**/alice.png
+            /tmp/dsh-ci/**/bob.png
+            /tmp/dsh-ci/**/alice.txt
+            /tmp/dsh-ci/**/bob.txt
+          if-no-files-found: ignore
+
   dsh-source:
     name: Pinned DSH source identity
     runs-on: ubuntu-latest

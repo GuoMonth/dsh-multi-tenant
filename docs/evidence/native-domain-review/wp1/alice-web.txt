@@ -1,0 +1,106 @@
+New Session
+Workspaces
+project
+ALICE_ROOT
+now
+Ungrouped
+Settings
+Connected
+ALICE_ROOT
+/
+4 subagents
+probe
+Chat
+Trajectory
+System prompt
+PROBE_IDENTITY
+15:20
+1 tool call
+
+PROBE_RESULT PROBE_IDENTITY PRIVATE_alice
+
+Ran for 0s
+15:20
+PROBE_DELEGATE
+15:20
+1 tool call
+
+PROBE_RESULT PROBE_DELEGATE started subagent dcf0def0-ba08-4f3f-9eeb-a855e06deade
+
+Ran for 0s
+15:20
+1 tool call
+
+PROBE_RESULT Background subagent dcf0def0-ba08-4f3f-9eeb-a855e06deade finished and will do no further work unless you send it more. Its closing message: PROBE_RESULT PROBE_IDENTITY PRIVATE_alice PRIVATE_alice
+
+Ran for 0s
+15:20
+1 tool call
+
+PROBE_RESULT Background subagent dcf0def0-ba08-4f3f-9eeb-a855e06deade finished and will do no further work unless you send it more. Its closing message: PROBE_RESULT Background subagent e568f6aa-0bfd-4b7e-b9cf-9c3b37accbab finished and will do no further work unless you send it more. Its closing message: PROBE_RESULT PROBE_IDENTITY PRIVATE_alice PRIVATE_alice PRIVATE_alice
+
+Ran for 0s
+15:20
+PROBE_RESTRICT
+15:20
+1 tool call
+
+PROBE_RESULT PROBE_RESTRICT started subagent e140831a-eb5e-4bcc-9297-30cbef5cbd0e
+
+Ran for 0s
+15:20
+Thought for a while
+
+FILTER_BROKEN Background subagent e140831a-eb5e-4bcc-9297-30cbef5cbd0e finished and will do no further work unless you send it more. Its closing message: FILTER_OK PROBE_CHECK_FILTER
+
+Ran for 0s
+15:20
+1 tool call
+
+PROBE_RESULT Background subagent e140831a-eb5e-4bcc-9297-30cbef5cbd0e finished and will do no further work unless you send it more. Its closing message: PROBE_RESULT PROBE_FORCE_IDENTITY Error: unknown tool "mcp__principal__identity" PRIVATE_alice
+
+Ran for 0s
+15:20
+PROBE_FORK
+15:20
+1 tool call
+
+PROBE_RESULT PROBE_FORK PROBE_RESULT PROBE_IDENTITY PRIVATE_alice
+
+Ran for 0s
+15:20
+System prompt
+PROBE_AFTER_RESTART
+15:20
+
+PROBE_REPLY alice PROBE_AFTER_RESTART
+
+Ran for 0s
+15:20
+Thought for a while
+
+PROBE_REPLY alice Background subagent dcf0def0-ba08-4f3f-9eeb-a855e06deade finished and will do no further work unless you send it more. Its closing message: PROBE_REPLY alice PROBE_COLD_CONTINUATION
+
+Ran for 0s
+15:20
+Context injection
+subagent-settled
+Background subagent e140831a-eb5e-4bcc-9297-30cbef5cbd0e finished and will do no further work unless you send it more.
+PROBE_BROWSER_SEND
+15:20
+
+PROBE_REPLY alice PROBE_BROWSER_SEND
+
+Ran for 0s
+15:20
+PROBE_BROWSER_RECONNECT
+15:20
+
+PROBE_REPLY alice PROBE_BROWSER_RECONNECT
+
+Ran for 0s
+15:20
+Message or run a task, / commands, @ files or sessions
+Workspace Write
+probe/probe
+13 turns 21 steps

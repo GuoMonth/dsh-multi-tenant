@@ -1,0 +1,8 @@
+*
+!Dockerfile
+!package.json
+!node_modules/**
+!launch.mjs
+!model.mjs
+!mcp.mjs
+!profile.patch.yml
