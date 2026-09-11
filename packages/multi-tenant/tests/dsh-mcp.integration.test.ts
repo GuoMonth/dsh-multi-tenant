@@ -3,16 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
-import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import LlmRuntime, { createUserMessage } from '@deepseek-ai/dsh-llm'
-import SessionQuerySqlite from '@deepseek-ai/dsh-session-query-sqlite'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { SessionAlreadyOwnedError } from '@deepseek-ai/dsh-session-persistence'
-import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
 import { TestModel } from './fixtures/model.ts'
 import {
@@ -20,77 +13,11 @@ import {
   AgentProvisioningError,
   CapabilityUnavailableError,
   createPrincipalContext,
-  MultiTenantService,
   RuntimePartitionProvider,
-  SecretProvider,
-  SharedDshRuntimePartitionProvider,
-  TenantMcpProvider,
 } from '../src/index.ts'
-import type { TenantMcpSnapshot } from '../src/mcp.ts'
-import type { SecretLease } from '../src/protocols.ts'
-import { SQLiteTenantAgentRepository } from '../src/sqlite.ts'
 import type { AgentId, PrincipalContext } from '../src/types.ts'
 
-const fixture = fileURLToPath(new URL('./fixtures/mcp-server.mjs', import.meta.url))
-
-class PrincipalMcpProvider extends TenantMcpProvider {
-  override async load(principal: PrincipalContext, signal: AbortSignal): Promise<TenantMcpSnapshot> {
-    signal.throwIfAborted()
-    return {
-      revision: 'fixture-v1',
-      servers: [{
-        transport: 'stdio',
-        serverName: 'shared',
-        command: process.execPath,
-        args: [fixture],
-        env: {
-          TENANT_ID: principal.tenantId,
-          PRINCIPAL_ID: principal.principalId,
-        },
-        secretEnv: { API_TOKEN: { secret: 'api-token', prefix: 'token:' } },
-        reconnect: { enabled: false },
-        toolCallTimeoutMs: 5_000,
-      }],
-    }
-  }
-}
-
-class PrincipalSecretProvider extends SecretProvider {
-  override async acquire(
-    principal: PrincipalContext,
-    _names: readonly string[],
-    signal: AbortSignal,
-  ): Promise<SecretLease> {
-    signal.throwIfAborted()
-    return {
-      revision: `secret:${principal.tenantId}:${principal.principalId}`,
-      values: { 'api-token': `${principal.tenantId}/${principal.principalId}` },
-      signal: new AbortController().signal,
-      dispose() {},
-    }
-  }
-}
-
-async function openRuntime(database: string, sessions: string, persistence = true): Promise<Context> {
-  const ctx = new Context()
-  await ctx.plugin(LlmRuntime)
-  await ctx.plugin(SessionStore)
-  await ctx.plugin(SessionProjectionRegistry)
-  await ctx.plugin(SystemPrompt)
-  await ctx.plugin(ToolRuntime)
-  await ctx.plugin(AgentRegistry)
-  await ctx.plugin(AgentLoop, { agents: [] })
-  if (persistence) {
-    await ctx.plugin(JsonlSessionPersistence, { root: sessions, compression: 'none' })
-    await ctx.plugin(SessionQuerySqlite, { path: database + '.query' })
-  }
-  await ctx.plugin(SQLiteTenantAgentRepository, { path: database })
-  await ctx.plugin(PrincipalMcpProvider)
-  await ctx.plugin(PrincipalSecretProvider)
-  await ctx.plugin(SharedDshRuntimePartitionProvider)
-  await ctx.plugin(MultiTenantService)
-  return ctx
-}
+import { openRuntime } from './fixtures/runtime.ts'
 
 async function identity(ctx: Context, principal: PrincipalContext, id: AgentId): Promise<unknown> {
   const result: any = await ctx.multiTenant.executeTool(principal, id, 'mcp__shared__identity', {})

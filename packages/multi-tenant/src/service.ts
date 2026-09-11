@@ -2,6 +2,7 @@
 
 import { ActivationOperations, abortableWait } from './activation.ts'
 import { historyPage, observeLease, readBounds, type ReadOptions, type HistoryPage, type AgentObservation, type SessionReadLease } from './observation.ts'
+import { assertChild, childPath, childSummaries, type ChildSummary } from './targets.ts'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import { ValidationError } from './errors.ts'
@@ -205,10 +206,20 @@ export class MultiTenantService extends Service {
   }
 
   /** Admit a human message without waiting for a model turn or a durability checkpoint. */
-  async send(principal: PrincipalContext, id: AgentId, text: string, options: { delivery?: 'queue' | 'steer'; signal?: AbortSignal } = {}): Promise<{ accepted: true }> {
+  async send(principal: PrincipalContext, id: AgentId, text: string, options: { delivery?: 'queue' | 'steer'; signal?: AbortSignal; childRef?: string } = {}): Promise<{ accepted: true }> {
     if (typeof text !== 'string' || !text.trim() || text.length > 65536) throw new ValidationError('message must contain text within 65536 characters')
     const delivery = options.delivery ?? 'queue'
     if (delivery !== 'queue' && delivery !== 'steer') throw new ValidationError('invalid delivery')
+    if (options.childRef !== undefined) {
+      const target = await this.openReader(principal, id, options.signal, options.childRef)
+      try {
+        if (target.mode !== 'continuable') throw new CapabilityUnavailableError('One-shot children are read-only.')
+        return await this.operate(principal, id, target.signal, async (_runtime, signal) => {
+          await this.partitions.controlChild({ principal, agentId: id, sessionId: target.sessionId, parentSessionId: target.parentSessionId!, command: 'message', text, delivery, signal })
+          return { accepted: true as const }
+        })
+      } finally { await target.lease.dispose() }
+    }
     const message = createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
     return this.operate(principal, id, options.signal, runtime => {
       if (delivery === 'steer') runtime.steer(message)
@@ -218,7 +229,15 @@ export class MultiTenantService extends Service {
   }
 
   /** Cancel only a currently live generation; never activate a cold resource. */
-  async cancel(principal: PrincipalContext, id: AgentId, reason = 'user stop'): Promise<{ status: 'cancelled' | 'inactive' }> {
+  async cancel(principal: PrincipalContext, id: AgentId, reason = 'user stop', options: { childRef?: string; signal?: AbortSignal } = {}): Promise<{ status: 'cancelled' | 'inactive' }> {
+    if (options.childRef !== undefined) {
+      const target = await this.openReader(principal, id, options.signal, options.childRef)
+      try {
+        if (target.mode !== 'continuable') throw new CapabilityUnavailableError('One-shot children are read-only.')
+        await this.partitions.controlChild({ principal, agentId: id, sessionId: target.sessionId, parentSessionId: target.parentSessionId!, command: 'cancel', signal: target.signal })
+        return { status: 'cancelled' }
+      } finally { await target.lease.dispose() }
+    }
     this.assertAccepting()
     assertPrincipalContext(principal)
     const parsed = parseAgentId(id)
@@ -278,30 +297,66 @@ export class MultiTenantService extends Service {
   }
 
   async read(principal: PrincipalContext, id: AgentId, options: ReadOptions = {}): Promise<HistoryPage> {
-    readBounds(id, options)
-    const { lease, signal } = await this.openReader(principal, id, options.signal)
+    const target = options.childRef ?? id
+    readBounds(target, options)
+    const { lease, signal } = await this.openReader(principal, id, options.signal, options.childRef)
     try {
       const snapshot = await lease.read()
       signal.throwIfAborted()
       lease.signal?.throwIfAborted()
-      return historyPage(id, snapshot, options)
+      return historyPage(target, snapshot, options)
     } finally { await lease.dispose() }
   }
 
-  async observe(principal: PrincipalContext, id: AgentId, options: { signal?: AbortSignal } = {}): Promise<AgentObservation> {
-    const { lease, signal } = await this.openReader(principal, id, options.signal)
-    return observeLease(id, lease, signal)
+  async observe(principal: PrincipalContext, id: AgentId, options: { signal?: AbortSignal; childRef?: string } = {}): Promise<AgentObservation> {
+    const { lease, signal } = await this.openReader(principal, id, options.signal, options.childRef)
+    return observeLease(options.childRef ?? id, lease, signal)
   }
 
-  private async openReader(principal: PrincipalContext, id: AgentId, request?: AbortSignal): Promise<{ lease: SessionReadLease; signal: AbortSignal }> {
+  async children(principal: PrincipalContext, id: AgentId, options: { signal?: AbortSignal; childRef?: string } = {}): Promise<readonly ChildSummary[]> {
+    const { lease, signal } = await this.openReader(principal, id, options.signal, options.childRef)
+    try {
+      const snapshot = await lease.read()
+      signal.throwIfAborted()
+      lease.signal?.throwIfAborted()
+      const children = childSummaries(options.childRef ?? id, snapshot)
+      if (!children) throw new CapabilityUnavailableError('Native subagent catalog projection is required.')
+      return children
+    } finally { await lease.dispose() }
+  }
+
+  private async openReader(principal: PrincipalContext, id: AgentId, request?: AbortSignal, childRef?: string): Promise<{ lease: SessionReadLease; signal: AbortSignal; sessionId: string; parentSessionId?: string; mode?: 'one-shot' | 'continuable' }> {
     this.assertAccepting()
     const parsed = parseAgentId(id)
     const record = await this.readyRecord(principal, parsed)
-    const signal = AbortSignal.any([this.lifecycle.signal, this.cutoff(parsed).signal, ...(request ? [request] : [])])
+    const path = childPath(parsed, childRef)
+    let signal = AbortSignal.any([this.lifecycle.signal, this.cutoff(parsed).signal, ...(request ? [request] : [])])
     signal.throwIfAborted()
-    const lease = await this.partitions.openRead({ principal, agentId: parsed, sessionId: record.sessionId, signal })
-    if (signal.aborted) { await lease.dispose(); signal.throwIfAborted() }
-    return { lease, signal }
+    let sessionId = record.sessionId
+    let parentSessionId: string | undefined
+    let mode: 'one-shot' | 'continuable' | undefined
+    let lease = await this.partitions.openRead({ principal, agentId: parsed, sessionId, signal })
+    try {
+      for (const index of path) {
+        if (lease.signal) signal = AbortSignal.any([signal, lease.signal])
+        signal.throwIfAborted()
+        const snapshot = await lease.read()
+        signal.throwIfAborted()
+        const child = snapshot.catalog?.[index]
+        if (!child) throw new AgentNotFoundError()
+        await lease.dispose()
+        parentSessionId = sessionId
+        sessionId = child.id
+        mode = child.mode
+        lease = await this.partitions.openRead({ principal, agentId: parsed, sessionId, signal })
+        const childSnapshot = await lease.read()
+        signal.throwIfAborted()
+        assertChild(childSnapshot, parentSessionId, child)
+      }
+      if (lease.signal) signal = AbortSignal.any([signal, lease.signal])
+      signal.throwIfAborted()
+      return { lease, signal, sessionId, ...(parentSessionId === undefined ? {} : { parentSessionId }), ...(mode === undefined ? {} : { mode }) }
+    } catch (error) { await lease.dispose(); throw error }
   }
 
   async delete(principal: PrincipalContext, id: AgentId): Promise<void> {

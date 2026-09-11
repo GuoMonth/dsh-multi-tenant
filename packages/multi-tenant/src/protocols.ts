@@ -103,4 +103,16 @@ export abstract class RuntimePartitionProvider extends Service {
   async openRead(_request: SessionReadRequest): Promise<SessionReadLease> {
     throw new CapabilityUnavailableError('This runtime partition does not provide session reading.')
   }
+
+  async controlChild(_request: ChildControlRequest): Promise<void> {
+    throw new CapabilityUnavailableError('This runtime partition does not provide child control.')
+  }
+}
+
+/** Internal addresses resolved from authorized root/catalog/descriptor facts. */
+export interface ChildControlRequest extends SessionReadRequest {
+  readonly parentSessionId: string
+  readonly command: 'message' | 'cancel'
+  readonly text?: string
+  readonly delivery?: 'queue' | 'steer'
 }

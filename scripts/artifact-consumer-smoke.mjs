@@ -143,6 +143,13 @@ try {
     await Testing.assertTenantAgentRepositoryContract(ctx => new SQLiteRepository(ctx, { path: ':memory:' }))
 
     class Partition extends RuntimePartitionProvider {
+      async openRead(request) {
+        request.signal.throwIfAborted()
+        return {
+          async read() { return { events: [], cursor: -1, active: false, catalog: [] } },
+          subscribe() { return () => {} }, dispose() {},
+        }
+      }
       async acquire() {
         return {
           isolation: 'logical',
@@ -177,6 +184,13 @@ try {
     assert(denied, 'cross-Principal lookup did not fail closed')
     const tool = await ctx.multiTenant.executeTool(alice, agent.id, 'probe', { ok: true })
     assert(tool.value.name === 'probe', 'controlled runtime did not execute tool')
+    const page = await ctx.multiTenant.read(alice, agent.id)
+    assert(page.items.length === 0 && !JSON.stringify(page).includes('internal'), 'safe history contract failed')
+    assert((await ctx.multiTenant.children(alice, agent.id)).length === 0, 'scoped child catalog failed')
+    const observation = await ctx.multiTenant.observe(alice, agent.id)
+    const frames = observation[Symbol.asyncIterator]()
+    assert((await frames.next()).value.type === 'replace', 'observation opening baseline failed')
+    await observation.dispose()
     await ctx.multiTenant.delete(alice, agent.id)
     await ctx.fiber.dispose()
     console.log('installed Agent resource contract passed')
