@@ -55,6 +55,14 @@ export class DockerRuntimeProvider implements RuntimeProvider {
     return values[0]
   }
 
+  private async remove(id: string): Promise<void> {
+    const errors: unknown[] = []
+    // Give native persistence a bounded graceful exit, then remove the whole cgroup.
+    try { await this.docker(['container', 'stop', '--time', '5', id]) } catch (error) { errors.push(error) }
+    try { await this.docker(['container', 'rm', '--force', id]) } catch (error) { errors.push(error) }
+    if (errors.length) throw new AggregateError(errors, 'Container stop or removal failed')
+  }
+
   async recover(spec: RuntimeSpec): Promise<void> {
     const location = await this.location(spec)
     const found = await this.existing(location.name)
@@ -64,7 +72,7 @@ export class DockerRuntimeProvider implements RuntimeProvider {
         throw new Error('Refusing to recover a foreign runtime generation')
       }
       // Docker removes the complete container cgroup, including setsid descendants.
-      await this.docker(['container', 'rm', '--force', found.Id])
+      await this.remove(found.Id)
     }
     if (await this.existing(location.name)) throw new Error('Runtime remains after recovery')
     await rm(location.control, { recursive: true, force: true })
@@ -146,7 +154,7 @@ export class DockerRuntimeProvider implements RuntimeProvider {
         }
         if (id) {
           const current = location ? await this.existing(location.name) : undefined
-          if (current?.Id === id) await this.docker(['container', 'rm', '--force', id])
+          if (current?.Id === id) await this.remove(id)
           id = undefined
         }
         if (owned && location && !await this.existing(location.name)) await rm(location.control, { recursive: true, force: true })

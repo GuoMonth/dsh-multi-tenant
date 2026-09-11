@@ -9,8 +9,8 @@
     "Login revocation closes an existing native mux; domain revocation stops its runtime and preserves the other domain"
   ],
   "measurements": {
-    "twoColdHostsMs": 3630,
-    "aliceContainer": "{\"BlockIO\":\"0B / 65.5kB\",\"CPUPerc\":\"0.14%\",\"Container\":\"4c03ce0aebb5c5675c7410765a373d8abe1de15515889abaa9c8486f07cff381\",\"ID\":\"4c03ce0aebb5\",\"MemPerc\":\"28.88%\",\"MemUsage\":\"295.7MiB / 1GiB\",\"Name\":\"dsh-domain-8da8050763596436-3aa8a480-d9b6-4cf1-99af-cca53680d5ea\",\"NetIO\":\"0B / 0B\",\"PIDs\":\"23\"}"
+    "twoColdHostsMs": 3931,
+    "aliceContainer": "{\"BlockIO\":\"4.1kB / 65.5kB\",\"CPUPerc\":\"0.15%\",\"Container\":\"7d6dfed2e4be8cecc9359b47a225977548e8ed9743377675f888fafe08cd1011\",\"ID\":\"7d6dfed2e4be\",\"MemPerc\":\"30.11%\",\"MemUsage\":\"308.3MiB / 1GiB\",\"Name\":\"dsh-domain-4619cb5eaea55ea5-fd713560-bdff-4524-8d83-1702e83f723f\",\"NetIO\":\"0B / 0B\",\"PIDs\":\"23\"}"
   },
   "passed": true,
   "browser": "150.0.7871.128",

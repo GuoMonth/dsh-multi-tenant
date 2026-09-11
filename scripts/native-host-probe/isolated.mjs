@@ -3,7 +3,7 @@ import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { once } from 'node:events'
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -19,7 +19,9 @@ import { MemoryDomainSessions } from '../../packages/multi-tenant/src/ingress/au
 const exec = promisify(execFile)
 const docker = async args => (await exec('docker', args, { maxBuffer: 2_000_000 })).stdout.trim()
 const image = process.env.PROBE_IMAGE ?? await docker(['image', 'inspect', 'dsh-runtime-wp4-probe', '--format', '{{.Id}}'])
-const root = await mkdtemp(join(tmpdir(), 'dsh-wp34-'))
+const evidenceParent = process.env.PROBE_EVIDENCE_DIR ? resolve(process.env.PROBE_EVIDENCE_DIR) : tmpdir()
+await mkdir(evidenceParent, { recursive: true, mode: 0o700 })
+const root = await mkdtemp(join(evidenceParent, 'dsh-wp34-'))
 const profiles = join(root, 'profiles')
 const runtimeDirectory = join(root, 'runtime')
 const repository = new SQLiteDomainRepository(join(root, 'directory'))

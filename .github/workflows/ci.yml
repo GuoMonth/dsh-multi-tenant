@@ -13,6 +13,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-ingress:
+    name: Native isolated ingress and authorization counterexample
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        with:
+          runtime: node@24
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir scripts/native-host-probe install --frozen-lockfile
+      - run: pnpm --dir scripts/native-host-probe exec playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_GC: '1'
+      - run: docker build -f scripts/native-host-probe/Dockerfile.runtime -t dsh-runtime-wp4-probe .
+      - run: pnpm probe:isolated
+        env:
+          PROBE_EVIDENCE_DIR: ${{ runner.temp }}/dsh-native-ingress
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: native-ingress-evidence
+          path: |
+            ${{ runner.temp }}/dsh-native-ingress/**/report.json
+            ${{ runner.temp }}/dsh-native-ingress/**/alice.png
+            ${{ runner.temp }}/dsh-native-ingress/**/bob.png
+            ${{ runner.temp }}/dsh-native-ingress/**/alice.txt
+            ${{ runner.temp }}/dsh-native-ingress/**/bob.txt
+          if-no-files-found: ignore
+
   dsh-source:
     name: Pinned DSH source identity
     runs-on: ubuntu-latest
