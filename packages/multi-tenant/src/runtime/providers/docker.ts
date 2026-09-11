@@ -44,6 +44,10 @@ export class DockerRuntimeProvider implements RuntimeProvider {
     if (!/^[a-f0-9-]{36}$/.test(spec.domainId)) throw new TypeError('Invalid domain id')
     await mkdir(resolve(this.options.directory), { recursive: true, mode: 0o700 })
     const root = await realpath(this.options.directory)
+    // Linux sockaddr_un reserves one of its 108 bytes for the terminator.
+    if (Buffer.byteLength(join(root, 'control', spec.domainId, 'http.sock')) > 107) {
+      throw new Error('Runtime directory is too long for a Linux Unix socket; use a shorter platform directory')
+    }
     const owner = createHash('sha256').update(root).digest('hex').slice(0, 16)
     return { root, owner, name: `dsh-domain-${owner}-${spec.domainId}`, control: join(root, 'control', spec.domainId), data: join(root, 'data', spec.domainId) }
   }

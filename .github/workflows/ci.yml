@@ -31,17 +31,18 @@ jobs:
       - run: docker build -f scripts/native-host-probe/Dockerfile.runtime -t dsh-runtime-wp4-probe .
       - run: pnpm probe:isolated
         env:
-          PROBE_EVIDENCE_DIR: ${{ runner.temp }}/dsh-native-ingress
+          # Keep native Unix socket paths within Linux's 107-byte limit.
+          PROBE_EVIDENCE_DIR: /tmp/dsh-ci
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: native-ingress-evidence
           path: |
-            ${{ runner.temp }}/dsh-native-ingress/**/report.json
-            ${{ runner.temp }}/dsh-native-ingress/**/alice.png
-            ${{ runner.temp }}/dsh-native-ingress/**/bob.png
-            ${{ runner.temp }}/dsh-native-ingress/**/alice.txt
-            ${{ runner.temp }}/dsh-native-ingress/**/bob.txt
+            /tmp/dsh-ci/**/report.json
+            /tmp/dsh-ci/**/alice.png
+            /tmp/dsh-ci/**/bob.png
+            /tmp/dsh-ci/**/alice.txt
+            /tmp/dsh-ci/**/bob.txt
           if-no-files-found: ignore
 
   dsh-source:

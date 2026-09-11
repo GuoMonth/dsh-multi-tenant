@@ -87,7 +87,7 @@ it('streams raw binary without rewriting bytes and preserves HEAD', async () => 
   const t = await setup()
   const body = Buffer.alloc(2 * 1024 * 1024, 0xa7)
   const response = await fetch(`${t.origin}/echo`, { method: 'POST', headers: t.headers, body })
-  expect(Buffer.from(await response.arrayBuffer())).toEqual(body)
+  expect(Buffer.from(await response.arrayBuffer()).equals(body)).toBe(true)
   const head = await fetch(t.origin, { method: 'HEAD', headers: t.headers })
   expect(head.status).toBe(200)
   expect(await head.text()).toBe('')
