@@ -16,7 +16,7 @@ This package is for **developers building a multi-user DSH service**. It provide
 
 A typical visit is: **sign in → resolve the user's domain → start or reuse its DSH Host → open native DSH Web**. A browser reconnect returns to the same domain; it does not create a new Host for every request or session.
 
-## What 0.7.0 delivers
+## What 0.7.1 delivers
 
 - A domain directory keyed by `(tenantId, principalId)`, keeping identity and desired state across platform restarts.
 - Deduplicated Host startup, generation checks, suspension/revocation, bounded shutdown and verified recovery after a coordinator crash.
@@ -26,18 +26,20 @@ A typical visit is: **sign in → resolve the user's domain → start or reuse i
 
 ## Decide whether this version suits your deployment
 
-**This is a developer integration package.** Docker uses bridge networking by default, allowing external model APIs and remote MCP. Set `network: 'none'` when offline operation is needed. This change is unreleased; published 0.7.0 still defaults to no network. Login/SSO, TLS, domain provisioning, quotas and operational monitoring are responsibilities of the embedding platform; an account-management UI or a ready-made hosted service is not included.
+**This is a developer integration package.** Docker uses bridge networking by default, allowing external model APIs and remote MCP. Set `network: 'none'` when offline operation is needed. Starting with 0.7.1, bridge replaces the offline default in 0.7.0. Login/SSO, TLS, domain provisioning, quotas and operational monitoring are responsibilities of the embedding platform; an account-management UI or a ready-made hosted service is not included.
 
 The security boundary is the **user within a tenant**, not each project or conversation. Two workspaces belonging to one Principal are not promised to be mutually confidential. Native permissions, tool filters, stop/archive/delete and preset selection retain native semantics. Team-shared domains, project ACLs, cross-user session sharing, automatic idle eviction and multi-machine scheduling are outside this version.
 
 Independent Hosts have a fixed memory and startup cost; an inactive browser can still have background work. Choose resource limits and when to stop domains from your workload. Platform administration, authentication secrets and the Docker socket must stay outside every native Host.
+
+**Upgrading from 0.7.0:** Existing domain data and integration APIs retain their structure. The network default changes: explicitly set `network: 'none'` before upgrading if offline restrictions must remain. To adopt the included Dockerfile, rebuild the image, stop existing Hosts, update the image ID and restart.
 
 **Upgrading from 0.5.x or earlier:** 0.7.0 changes the integration architecture and public API. The shared-process Cordis plugin, per-Agent resource API and custom panel are removed. Start with a new platform directory, replace the integration code and preserve old data separately; there is no automatic legacy-data migration. The 0.6.0 source milestone was not published to npm.
 
 ## First steps
 
 ```sh
-npm install dsh-multi-tenant@0.7.0
+npm install dsh-multi-tenant@0.7.1
 # Check the installed platform API without Docker or an external model:
 node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
 ```
@@ -61,7 +63,7 @@ For a complete keyless native Web demonstration from source, install the reposit
 ## Install and prerequisites
 
 ```sh
-npm install dsh-multi-tenant@0.7.0
+npm install dsh-multi-tenant@0.7.1
 ```
 
 To test an unreleased checkout, build and install its tarball with `pnpm --filter dsh-multi-tenant pack`.

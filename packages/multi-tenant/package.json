@@ -1,6 +1,6 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Principal-isolated native DeepSeek Harness Hosts: domain directory, runtime lifecycle and authenticated HTTP/WebSocket ingress.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",

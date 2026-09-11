@@ -16,7 +16,7 @@
 
 典型使用流程是：**用户登录 → 平台确定所属域 → 启动或复用专属 DSH Host → 进入原生 Web**。断线重连仍回到同一个域，每次请求或每个会话都不需要新建 Host。
 
-## 0.7.0 提供什么
+## 0.7.1 提供什么
 
 - 按 `(tenantId, principalId)` 持久化域归属和期望状态，平台重启后仍能核对身份与撤销状态。
 - 去重启动、generation 校验、暂停/撤销、有时限的停止，以及协调器崩溃后的可验证恢复。
@@ -26,18 +26,20 @@
 
 ## 使用前需要了解的边界
 
-**本包面向开发者集成。** Docker 默认使用 bridge 网络，允许访问外部模型 API 和远程 MCP；需要离线运行时设置 `network: 'none'`。此改动尚未发布，已发布的 0.7.0 仍默认无网络。登录/SSO、TLS、域配置、配额和运维监控由接入平台负责，本包不包含账号管理 UI 或现成托管服务。
+**本包面向开发者集成。** Docker 默认使用 bridge 网络，允许访问外部模型 API 和远程 MCP；需要离线运行时设置 `network: 'none'`。从 0.7.1 起，bridge 替代 0.7.0 的默认无网络配置。登录/SSO、TLS、域配置、配额和运维监控由接入平台负责，本包不包含账号管理 UI 或现成托管服务。
 
 授权边界是**租户内的用户**。同一 Principal 的两个 workspace 或会话不承诺互相保密；域内权限、工具过滤、停止、归档、删除和 preset 选择沿用原生语义。本版本不提供团队共享域、项目 ACL、跨用户会话共享、自动空闲回收或跨机调度。
 
 独立 Host 有固定的内存和启动成本，浏览器断开后也可能仍有后台任务。资源限制和域回收时机应根据实际工作负载决定。平台管理权限、登录秘密和 Docker socket 必须始终位于用户域之外。
+
+**从 0.7.0 升级：** 域数据和平台接入 API 沿用现有结构。默认网络行为发生变化：需要保留离线限制时，在升级前显式设置 `network: 'none'`。使用新 Dockerfile 时重新构建镜像，停止旧 Host 后更新镜像 ID 并重新启动。
 
 **从 0.5.x 或更早版本升级：** 0.7.0 改变了集成架构和公开 API，删除共享进程 Cordis 插件、逐 Agent 接口和自定义面板。需要新建平台目录、替换接入代码并单独保留旧数据，不提供旧数据库自动迁移。0.6.0 曾是源码里程碑，没有发布到 npm。
 
 ## 从哪里开始
 
 ```sh
-npm install dsh-multi-tenant@0.7.0
+npm install dsh-multi-tenant@0.7.1
 # 无需 Docker 或外部模型，先检查已安装的平台 API：
 node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
 ```
@@ -61,7 +63,7 @@ node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
 ## 安装与环境
 
 ```sh
-npm install dsh-multi-tenant@0.7.0
+npm install dsh-multi-tenant@0.7.1
 ```
 
 验证尚未发布的源码时，运行 `pnpm --filter dsh-multi-tenant pack` 并安装生成的 `.tgz`。
