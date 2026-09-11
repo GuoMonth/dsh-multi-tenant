@@ -24,7 +24,7 @@ authenticated request
   -> opaque AgentId + Principal-scoped directory lookup
   -> capability and isolation checks
   -> DSH Agent create/resume with Agent-scoped MCP
-  -> controlled withAgent() runtime view
+  -> controlled send/executeTool runtime view
 ```
 
 The shared runtime provides logical isolation, not a hostile-code security boundary. Stock DSH `/api` remains private/administrative. The plugin does not become an authentication gateway, distributed ownership coordinator, sandbox, or process supervisor.

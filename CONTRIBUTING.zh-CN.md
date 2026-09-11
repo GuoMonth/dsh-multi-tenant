@@ -12,7 +12,7 @@ Authority 链路是：
   -> Principal-scoped Agent Directory
   -> capability/isolation lease
   -> DSH Agent + Agent-scoped MCP
-  -> 受控 withAgent() runtime
+  -> 受控 send/executeTool runtime
 ```
 
 优先使用 Cordis service 和 DSH 原生 Agent/MCP lifecycle。多个真实 integration 尚未证明需求前，不要增加第二套 DI/lifecycle system 或通用框架。

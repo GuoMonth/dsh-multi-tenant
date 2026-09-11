@@ -45,7 +45,7 @@ export interface ExecuteToolOptions {
   readonly signal?: AbortSignal
 }
 
-/** Safe projection of a live DSH Agent. It deliberately omits ids, Context, and disposal. */
+/** Host-provider runtime protocol. Never returned to product callers. */
 export interface TenantAgentRuntime {
   followup(message: UserMessage): void
   steer(message: UserMessage): void

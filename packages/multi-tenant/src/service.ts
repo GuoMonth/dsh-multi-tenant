@@ -1,5 +1,9 @@
 /** Multi-tenant authority kernel and owned DSH Agent lifecycle. */
 
+import { ActivationOperations, abortableWait } from './activation.ts'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { UserMessage } from '@deepseek-ai/dsh-session'
+import { ValidationError } from './errors.ts'
 import { createHash } from 'node:crypto'
 import { Service, type Context } from '@deepseek-ai/cordis'
 import {
@@ -64,17 +68,13 @@ interface PreparedCapabilities {
   readonly capabilityRevision: string
 }
 
-interface RuntimeScope {
-  readonly runtime: TenantAgentRuntime
-  invalidate(): void
-}
-
 interface LiveAgent {
   readonly handle: DshRuntimeAgentHandle
   readonly secret: SecretLease
   readonly partition: RuntimePartitionLease
   readonly capabilityRevision: string
-  readonly scopes: Set<RuntimeScope>
+  readonly operations: ActivationOperations
+  readonly generation: number
   detachRevocation(): void
   invalidated: boolean
 }
@@ -91,50 +91,6 @@ function summary(record: TenantAgentRecord): TenantAgent {
 
 function meets(actual: IsolationLevel, required: IsolationLevel): boolean {
   return required === 'logical' || actual === 'strong'
-}
-
-function controlledRuntime(runtime: TenantAgentRuntime, available: () => boolean): RuntimeScope {
-  let active = true
-  const assertActive = (): void => {
-    if (!active || !available()) {
-      throw new CapabilityUnavailableError('The Agent runtime scope is no longer active.')
-    }
-  }
-  return {
-    runtime: Object.freeze({
-      followup(message: Parameters<TenantAgentRuntime['followup']>[0]) {
-        assertActive()
-        runtime.followup(message)
-      },
-      steer(message: Parameters<TenantAgentRuntime['steer']>[0]) {
-        assertActive()
-        runtime.steer(message)
-      },
-      inject(message: Parameters<TenantAgentRuntime['inject']>[0]) {
-        assertActive()
-        runtime.inject(message)
-      },
-      cancel(reason?: string) {
-        assertActive()
-        runtime.cancel(reason)
-      },
-      whenIdle() {
-        assertActive()
-        return runtime.whenIdle()
-      },
-      executeTool(
-        name: string,
-        args: unknown,
-        options?: Parameters<TenantAgentRuntime['executeTool']>[2],
-      ) {
-        assertActive()
-        return runtime.executeTool(name, args, options)
-      },
-    }),
-    invalidate() {
-      active = false
-    },
-  }
 }
 
 function capabilityRevision(snapshot: TenantMcpSnapshot, secret: SecretLease, isolation: IsolationLevel): string {
@@ -160,6 +116,8 @@ export class MultiTenantService extends Service {
   private readonly lifecycle = new AbortController()
   private readonly live = new Map<AgentId, LiveAgent>()
   private readonly tails = new Map<AgentId, Promise<void>>()
+  private generation = 0
+  private readonly cutoffs = new Map<AgentId, AbortController>()
   private accepting = true
   private closing: Promise<void> | undefined
 
@@ -245,28 +203,77 @@ export class MultiTenantService extends Service {
     return Object.freeze(records.filter(record => record.state === 'ready').map(summary))
   }
 
-  async withAgent<T>(
-    principal: PrincipalContext,
-    id: AgentId,
-    use: (runtime: TenantAgentRuntime) => Promise<T>,
-  ): Promise<T> {
+  /** Admit a human message without waiting for a model turn or a durability checkpoint. */
+  async send(principal: PrincipalContext, id: AgentId, text: string, options: { delivery?: 'queue' | 'steer'; signal?: AbortSignal } = {}): Promise<{ accepted: true }> {
+    if (typeof text !== 'string' || !text.trim() || text.length > 65536) throw new ValidationError('message must contain text within 65536 characters')
+    const delivery = options.delivery ?? 'queue'
+    if (delivery !== 'queue' && delivery !== 'steer') throw new ValidationError('invalid delivery')
+    const message = createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
+    return this.operate(principal, id, options.signal, runtime => {
+      if (delivery === 'steer') runtime.steer(message)
+      else runtime.followup(message)
+      return { accepted: true as const }
+    })
+  }
+
+  /** Cancel only a currently live generation; never activate a cold resource. */
+  async cancel(principal: PrincipalContext, id: AgentId, reason = 'user stop'): Promise<{ status: 'cancelled' | 'inactive' }> {
     this.assertAccepting()
     assertPrincipalContext(principal)
-    if (typeof use !== 'function') throw new TypeError('Agent callback must be a function')
     const parsed = parseAgentId(id)
-    return this.serial(parsed, async () => {
+    await this.readyRecord(principal, parsed)
+    this.assertAccepting()
+    const entry = this.live.get(parsed)
+    if (!entry || entry.invalidated || entry.secret.signal.aborted) return { status: 'inactive' }
+    entry.operations.cancel(reason)
+    entry.handle.runtime.cancel(reason)
+    return { status: 'cancelled' }
+  }
+
+  /** Wait for activity only. A cold resource is already idle. */
+  async whenIdle(principal: PrincipalContext, id: AgentId, options: { signal?: AbortSignal } = {}): Promise<void> {
+    this.assertAccepting()
+    assertPrincipalContext(principal)
+    const parsed = parseAgentId(id)
+    await this.readyRecord(principal, parsed)
+    this.assertAccepting()
+    options.signal?.throwIfAborted()
+    const entry = this.live.get(parsed)
+    if (!entry || entry.invalidated) return
+    await entry.operations.run(options.signal, signal => abortableWait(entry.handle.runtime.whenIdle(), signal))
+  }
+
+  /** Trusted host tool execution; not exposed as an arbitrary Web tool endpoint. */
+  executeTool(principal: PrincipalContext, id: AgentId, name: string, args: unknown, options: { signal?: AbortSignal } = {}) {
+    return this.operate(principal, id, options.signal, (runtime, signal) => runtime.executeTool(name, args, { signal }))
+  }
+
+  /** Trusted host context injection, using the native message/source vocabulary. */
+  inject(principal: PrincipalContext, id: AgentId, message: UserMessage): Promise<void> {
+    return this.operate(principal, id, undefined, runtime => runtime.inject(message))
+  }
+
+  private async operate<T>(principal: PrincipalContext, id: AgentId, signal: AbortSignal | undefined, use: (runtime: TenantAgentRuntime, signal: AbortSignal) => T | PromiseLike<T>): Promise<T> {
+    this.assertAccepting()
+    assertPrincipalContext(principal)
+    const parsed = parseAgentId(id)
+    signal?.throwIfAborted()
+    const admitted = await this.serial(parsed, async () => {
       const record = await this.readyRecord(principal, parsed)
       const live = await this.ensureLive(principal, record)
+      this.assertAccepting()
+      this.cutoff(parsed).signal.throwIfAborted()
       if (live.invalidated || live.secret.signal.aborted) throw new CapabilityUnavailableError('Agent capabilities were revoked.')
-      const scope = controlledRuntime(live.handle.runtime, () => !live.invalidated && !live.secret.signal.aborted)
-      live.scopes.add(scope)
-      try {
-        return await use(scope.runtime)
-      } finally {
-        scope.invalidate()
-        live.scopes.delete(scope)
-      }
+      // Do not await this promise inside the lifecycle queue.
+      return { operation: live.operations.run(signal, active => use(live.handle.runtime, active)) }
     })
+    return admitted.operation
+  }
+
+  private cutoff(id: AgentId): AbortController {
+    let controller = this.cutoffs.get(id)
+    if (!controller) { controller = new AbortController(); this.cutoffs.set(id, controller) }
+    return controller
   }
 
   async delete(principal: PrincipalContext, id: AgentId): Promise<void> {
@@ -274,23 +281,25 @@ export class MultiTenantService extends Service {
     assertPrincipalContext(principal)
     const parsed = parseAgentId(id)
     // Start scoped authorization without yielding, then reserve the deletion
-    // barrier synchronously so a later withAgent() cannot overtake it. Only an
+    // barrier synchronously so a later command cannot overtake it. Only an
     // authorized delete may revoke the currently live runtime.
     const authorized = this.readyRecord(principal, parsed)
     void authorized.then(() => {
+      this.cutoff(parsed).abort(new CapabilityUnavailableError('Agent deleted'))
       const live = this.live.get(parsed)
       if (live !== undefined) this.invalidateLive(live, 'Agent deleted')
     }, () => undefined)
     return this.serial(parsed, async () => {
       await authorized
       const record = await this.readyRecord(principal, parsed)
-      const deleted = await this.repository.transition(principal, parsed, record.revision, {
-        from: 'ready',
-        to: 'deleted',
-        at: new Date().toISOString(),
-      })
-      if (deleted === undefined) throw new AgentNotFoundError()
-      await this.disposeLive(parsed)
+      try {
+        const deleted = await this.repository.transition(principal, parsed, record.revision, {
+          from: 'ready', to: 'deleted', at: new Date().toISOString(),
+        })
+        if (deleted === undefined) throw new AgentNotFoundError()
+      } finally {
+        await this.disposeLive(parsed)
+      }
     })
   }
 
@@ -303,6 +312,7 @@ export class MultiTenantService extends Service {
       await Promise.allSettled([...this.tails.values()])
       const results = await Promise.allSettled([...this.live.keys()].map(id => this.disposeLive(id)))
       const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
+      this.cutoffs.clear()
       if (errors.length > 0) throw new AggregateError(errors, 'multi-tenant Agent teardown failed')
     })()
     return this.closing
@@ -354,13 +364,14 @@ export class MultiTenantService extends Service {
 
   private async prepareCapabilities(principal: PrincipalContext, id: AgentId): Promise<PreparedCapabilities> {
     this.assertLifecycle()
-    const lifecycle = this.lifecycle.signal
+    this.cutoff(id).signal.throwIfAborted()
+    const lifecycle = AbortSignal.any([this.lifecycle.signal, this.cutoff(id).signal])
     let snapshot: TenantMcpSnapshot
     try {
       snapshot = normalizeTenantMcpSnapshot(await this.mcp.load(principal, lifecycle))
       this.assertLifecycle()
     } catch (error) {
-      if (lifecycle.aborted) throw new ServiceClosedError()
+      if (this.lifecycle.signal.aborted) throw new ServiceClosedError()
       if (error instanceof CapabilityUnavailableError) throw error
       throw new CapabilityUnavailableError('Tenant MCP configuration is unavailable.', { cause: error })
     }
@@ -373,9 +384,9 @@ export class MultiTenantService extends Service {
           await this.secrets.acquire(principal, names, lifecycle),
           normalizeSecretLease,
         )
-      this.assertLifecycle()
+      // The acquired lease is owned by the cleanup block below, including late abort.
     } catch (error) {
-      if (lifecycle.aborted) throw new ServiceClosedError()
+      if (this.lifecycle.signal.aborted) throw new ServiceClosedError()
       if (error instanceof CapabilityUnavailableError) throw error
       throw new CapabilityUnavailableError('Required Agent secrets are unavailable.', { cause: error })
     }
@@ -406,7 +417,7 @@ export class MultiTenantService extends Service {
       if (partition !== undefined) cleanup.push(() => partition!.dispose())
       cleanup.push(() => secret.dispose())
       await settleDisposers(cleanup, 'capability preparation cleanup failed').catch(() => undefined)
-      if (lifecycle.aborted) throw new ServiceClosedError()
+      if (this.lifecycle.signal.aborted) throw new ServiceClosedError()
       if (secret.signal.aborted) throw new CapabilityUnavailableError('Agent capabilities were revoked.')
       if (error instanceof CapabilityUnavailableError || error instanceof IsolationUnavailableError) throw error
       throw new CapabilityUnavailableError('A runtime partition is unavailable.', { cause: error })
@@ -467,7 +478,8 @@ export class MultiTenantService extends Service {
       secret: prepared.secret,
       partition: prepared.partition,
       capabilityRevision: prepared.capabilityRevision,
-      scopes: new Set(),
+      operations: new ActivationOperations(),
+      generation: ++this.generation,
       invalidated: false,
       detachRevocation() {},
     }
@@ -491,8 +503,7 @@ export class MultiTenantService extends Service {
   private invalidateLive(entry: LiveAgent, reason: string): void {
     if (entry.invalidated) return
     entry.invalidated = true
-    for (const scope of entry.scopes) scope.invalidate()
-    entry.scopes.clear()
+    entry.operations.invalidate(reason)
     entry.handle.runtime.cancel(reason)
   }
 
@@ -502,6 +513,7 @@ export class MultiTenantService extends Service {
     this.live.delete(id)
     entry.detachRevocation()
     this.invalidateLive(entry, 'multi-tenant runtime released')
+    await entry.operations.drain()
     await settleDisposers([
       () => entry.handle.dispose(),
       () => entry.partition.dispose(),

@@ -53,6 +53,16 @@ async function webHarness(resolveAgentProfile?: AgentProfileResolver) {
   const receivedCreateOptions: Array<CreateAgentOptions | undefined> = []
   let lastPrincipal: PrincipalContext | undefined
   const service = {
+    async send(principal: PrincipalContext, id: AgentId) {
+      assertPrincipalContext(principal)
+      if (id !== knownId || deleted) throw new AgentNotFoundError()
+      return { accepted: true }
+    },
+    async cancel(principal: PrincipalContext, id: AgentId) {
+      assertPrincipalContext(principal)
+      if (id !== knownId || deleted) throw new AgentNotFoundError()
+      return { status: 'inactive' }
+    },
     async create(principal: PrincipalContext, options?: CreateAgentOptions): Promise<TenantAgent> {
       assertPrincipalContext(principal)
       lastPrincipal = principal
@@ -122,6 +132,21 @@ async function webHarness(resolveAgentProfile?: AgentProfileResolver) {
 const authenticated = { authorization: 'Bearer alice' }
 
 describe('authenticated Web adapter', () => {
+  it('admits only authenticated product messages and cancellation inputs', async () => {
+    const test = await webHarness()
+    const url = `${test.base}/agents/${test.knownId}`
+    expect((await fetch(`${url}/messages`, { method: 'POST', body: '{"text":"hello"}' })).status).toBe(401)
+    const send = await fetch(`${url}/messages`, { method: 'POST', headers: authenticated, body: '{"text":"hello","delivery":"steer"}' })
+    expect(send.status).toBe(202)
+    expect(await send.json()).toEqual({ accepted: true })
+    for (const field of ['source', 'sessionId', 'principalId', 'agentOptions']) {
+      const forged = await fetch(`${url}/messages`, { method: 'POST', headers: authenticated, body: JSON.stringify({ text: 'hello', [field]: 'forged' }) })
+      expect(forged.status).toBe(400)
+    }
+    const cancelled = await fetch(`${url}/cancel`, { method: 'POST', headers: authenticated, body: '{}' })
+    expect(await cancelled.json()).toEqual({ status: 'inactive' })
+    expect((await fetch(`${url}/executeTool`, { method: 'POST', headers: authenticated })).status).toBe(404)
+  })
   it('provides Agent CRUD without accepting identity or exposing internal authority', async () => {
     const test = await webHarness()
     const unauthenticated = await fetch(`${test.base}/agents`)

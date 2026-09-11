@@ -47,8 +47,10 @@ const principal = createPrincipalContext({
 
 const agent = await ctx.multiTenant.create(principal)
 
-const result = await ctx.multiTenant.withAgent(principal, agent.id, runtime =>
-  runtime.executeTool('mcp__erp__find_customer', { customerId: 'C-42' }),
+await ctx.multiTenant.send(principal, agent.id, 'Hello', { delivery: 'queue' })
+await ctx.multiTenant.cancel(principal, agent.id)
+const result = await ctx.multiTenant.executeTool(
+  principal, agent.id, 'mcp__erp__find_customer', { customerId: 'C-42' },
 )
 
 await ctx.multiTenant.delete(principal, agent.id)
@@ -56,13 +58,9 @@ await ctx.multiTenant.delete(principal, agent.id)
 
 `create()` on the shared driver checkpoints the new DSH session before the Directory becomes ready, including when there are no messages. Missing or failing durability listeners reject creation and dispose the acquired Agent. Custom persistent runtime drivers must also establish their durability boundary before returning success.
 
-`create()` generates both the public `AgentId` and a separate internal DSH session id. `get`, `list`, `withAgent`, and `delete` scope every lookup by Agent, Tenant, and Principal. Unknown, foreign, failed, and deleted resources all appear as `AgentNotFoundError`.
 
-`withAgent()` is the only trusted execution entry. Its callback receives `followup`, `steer`, `inject`, `cancel`, `whenIdle`, and `executeTool`; it cannot obtain a DSH session id, Agent handle, Cordis context, or disposer.
 
-`whenIdle()` waits for Agent activity only. It does not flush the durable session log. Trusted host persistence inspection must explicitly flush and close its read handle; these capabilities are not exposed through the tenant runtime view.
 
-Each runtime view is callback-scoped. It expires when the callback resolves or rejects, and also on delete, capability revocation/refresh, and service shutdown. Retained views reject every operation with `CapabilityUnavailableError`.
 
 ## Real MCP configuration
 
@@ -134,7 +132,6 @@ Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tena
 
 ## Guarantees and boundaries
 
-- SQLite records use CAS revisions and Principal-scoped SQL. An authorized delete immediately invalidates active callback views and reserves a serialized barrier; later `withAgent()` calls cannot overtake it and see only not-found after the scrubbed tombstone is committed.
 - Provisioning is unpublished until DSH setup, the shared driver session checkpoint, and the database ready transition all succeed.
 - Per-Agent create/resume/refresh/delete is serialized; concurrent opens single-flight; plugin shutdown cancels and drains every owned handle.
 - The lifecycle contract propagates abort through MCP, Secret, RuntimePartition, and DSH setup and validates provider results before use. Drain remains cooperative: code that ignores abort or never settles can delay delete or shutdown indefinitely; forced interruption and arbitrary default timeouts are out of scope.
@@ -146,3 +143,11 @@ Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tena
 - No Typert public adapter is shipped because stock Typert does not establish a trusted Principal binding. Keep stock DSH `/api` private/administrative.
 
 Public code/API subpaths are exactly `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`. `./cordis.patch.yml` is additionally exported as a DSH loader configuration artifact, not a JavaScript API.
+
+## Runtime commands
+
+`send(principal, id, text, { delivery: 'queue' | 'steer' })` returns `{ accepted: true }` after native input admission, without waiting for the model. This is not a durability receipt. `cancel()` targets only the current live generation and returns `cancelled` or `inactive`; it does not resume cold Agents. `whenIdle()` waits for current activity without activating a cold resource. `executeTool()` and `inject()` are trusted-host methods.
+
+The callback API has been removed. Long tool operations and idle waits do not hold the lifecycle queue. Delete, refresh, revocation and shutdown close the generation, cancel admitted work and drain before releasing the handle and provider leases. A failed durable delete stays closed to new commands until the owner retries deletion in this process.
+
+Web adds `POST /_dsh-multi-tenant/agents/:id/messages` with `{ text, delivery? }` and `POST .../:id/cancel` with `{ reason? }`. Message source is host-established. There is no arbitrary Web tool execution endpoint.

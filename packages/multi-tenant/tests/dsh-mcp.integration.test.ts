@@ -13,6 +13,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
+import { TestModel } from './fixtures/model.ts'
 import {
   AgentNotFoundError,
   AgentProvisioningError,
@@ -88,23 +89,19 @@ async function openRuntime(database: string, sessions: string, persistence = tru
 }
 
 async function identity(ctx: Context, principal: PrincipalContext, id: AgentId): Promise<unknown> {
-  return ctx.multiTenant.withAgent(principal, id, async runtime => {
-    const result: any = await runtime.executeTool('mcp__shared__identity', {})
-    expect(result.isError).toBe(false)
-    const responseText = result.value?.content?.find((block: any) => block.type === 'text')?.text
-    if (typeof responseText !== 'string') throw new Error('MCP identity tool returned no text')
-    return JSON.parse(responseText)
-  })
+  const result: any = await ctx.multiTenant.executeTool(principal, id, 'mcp__shared__identity', {})
+  expect(result.isError).toBe(false)
+  const responseText = result.value?.content?.find((block: any) => block.type === 'text')?.text
+  if (typeof responseText !== 'string') throw new Error('MCP identity tool returned no text')
+  return JSON.parse(responseText)
 }
 
 async function injectMarker(ctx: Context, principal: PrincipalContext, id: AgentId, marker: string): Promise<void> {
-  await ctx.multiTenant.withAgent(principal, id, async runtime => {
-    runtime.inject(createUserMessage({
-      content: [{ type: 'text', text: marker }],
-      source: { kind: 'plugin', plugin: 'dsh-multi-tenant-test' },
-    }))
-    await runtime.whenIdle()
-  })
+  await ctx.multiTenant.inject(principal, id, createUserMessage({
+    content: [{ type: 'text', text: marker }],
+    source: { kind: 'plugin', plugin: 'dsh-multi-tenant-test' },
+  }))
+  await ctx.multiTenant.whenIdle(principal, id)
 }
 
 /** Observe durable state, rather than treating Agent idleness as a write barrier. */
@@ -120,6 +117,31 @@ async function readStored(ctx: Context, id: ReturnType<typeof SessionId>) {
 }
 
 describe('DSH 0.1.5-rc.2 native Agent/Session/MCP lifecycle', () => {
+  it('accepts sends and stops a real model call without waiting for its turn', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-controls-'))
+    const ctx = await openRuntime(join(directory, 'agents.sqlite'), join(directory, 'sessions'))
+    const model = new TestModel()
+    model.before = options => new Promise((_, reject) => {
+      if (options.signal?.aborted) reject(options.signal.reason)
+      else options.signal?.addEventListener('abort', () => reject(options.signal!.reason), { once: true })
+    })
+    ctx.llm.registerAdapter(['controlled'], model)
+    try {
+      const owner = createPrincipalContext({ tenantId: 'acme', principalId: 'alice' })
+      const resource = await ctx.multiTenant.create(owner, { agentOptions: { provider: 'controlled', model: 'test' } })
+      await expect(ctx.multiTenant.send(owner, resource.id, 'start')).resolves.toEqual({ accepted: true })
+      await model.entered.promise
+      await expect(ctx.multiTenant.send(owner, resource.id, 'steer', { delivery: 'steer' })).resolves.toEqual({ accepted: true })
+      await expect(ctx.multiTenant.cancel(owner, resource.id)).resolves.toEqual({ status: 'cancelled' })
+      await ctx.multiTenant.whenIdle(owner, resource.id)
+      const record = await ctx.tenantAgentRepository.get(owner, resource.id)
+      const stored = await readStored(ctx, SessionId(record!.sessionId))
+      expect(stored.events.some(event => event.type === 'turn/end')).toBe(true)
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
   it('refuses to publish a shared Agent without a durability checkpoint', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'dsh-mt-no-persistence-'))
     let ctx: Context | undefined
@@ -246,9 +268,9 @@ describe('DSH 0.1.5-rc.2 native Agent/Session/MCP lifecycle', () => {
       const restartedBob = createPrincipalContext({ tenantId: 'acme', principalId: 'bob' })
       const globexAlice = createPrincipalContext({ tenantId: 'globex', principalId: 'alice' })
 
-      await expect(second.multiTenant.withAgent(restartedBob, aliceAgent.id, async () => undefined))
+      await expect(second.multiTenant.executeTool(restartedBob, aliceAgent.id, 'probe', {}))
         .rejects.toThrow(AgentNotFoundError)
-      await expect(second.multiTenant.withAgent(globexAlice, aliceAgent.id, async () => undefined))
+      await expect(second.multiTenant.executeTool(globexAlice, aliceAgent.id, 'probe', {}))
         .rejects.toThrow(AgentNotFoundError)
       expect(second.agents.get(SessionId(aliceRecord.sessionId))).toBeUndefined()
 
