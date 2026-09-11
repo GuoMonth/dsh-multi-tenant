@@ -1,9 +1,0 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tenant workspace · DSH</title><link rel="stylesheet" href="/demo/panel.css"></head><body>
-<header><h1>Tenant workspace</h1><p>DSH 0.1.5-rc.2 · scoped adapter example</p><label>Demo identity <select id="identity"><option>acme-alice</option><option>acme-bob</option><option>globex-alice</option></select></label><button id="login">Switch identity</button><span id="account">Not signed in</span></header>
-<p class="note">Local demonstration with a keyless model. Use <code>/hold</code> to test Stop, <code>/delegate</code> for a native child, and <code>/present</code> for a report.</p>
-<main><aside><button id="create">New Agent</button><button id="refresh">Refresh list</button><ul id="agents"></ul></aside><section>
-<div class="toolbar"><h2 id="target">Select an Agent</h2><span id="activity">Inactive</span><button id="reconnect">Reconnect</button><button id="remove">Delete root</button></div>
-<div id="children"></div><div id="history" aria-label="Message history"></div><p id="transient" aria-live="polite"></p>
-<form id="composer"><label>Message <textarea id="message" required></textarea></label><label>Delivery <select id="delivery"><option value="queue">Queue</option><option value="steer">Steer</option></select></label><button type="submit">Send</button><button type="button" id="stop">Stop</button></form>
-<h3>Deliveries</h3><div id="deliveries"></div><iframe id="preview" title="Delivery preview" sandbox></iframe>
-</section></main><p id="notice" role="status"></p><script type="module" src="/demo/panel.js"></script></body></html>

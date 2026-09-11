@@ -2,23 +2,27 @@ import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { once } from 'node:events'
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, readlink, realpath } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { chromium } from 'playwright'
 import WebSocket from 'ws'
-import { SQLiteDomainRepository } from '../../packages/multi-tenant/src/domain/sqlite.ts'
-import { DomainRuntimeCoordinator } from '../../packages/multi-tenant/src/runtime/coordinator.ts'
-import { DockerRuntimeProvider } from '../../packages/multi-tenant/src/runtime/providers/docker.ts'
-import { createDomainIngress } from '../../packages/multi-tenant/src/ingress/server.ts'
-import { MemoryDomainSessions } from '../../packages/multi-tenant/src/ingress/authentication.ts'
+import { installArtifact, repositoryRoot } from '../installed-package.mjs'
+const installed = installArtifact()
+const { SQLiteDomainRepository, DomainRuntimeCoordinator, DockerRuntimeProvider, createDomainIngress, MemoryDomainSessions } =
+  await import(new URL(`file://${installed.packageDirectory}/dist/index.mjs`))
 
 const exec = promisify(execFile)
 const docker = async args => (await exec('docker', args, { maxBuffer: 2_000_000 })).stdout.trim()
-const image = process.env.PROBE_IMAGE ?? await docker(['image', 'inspect', 'dsh-runtime-wp4-probe', '--format', '{{.Id}}'])
+let image
+try {
+  if (!process.env.PROBE_IMAGE) await exec('docker', ['build', '--build-context', `domain-package=${installed.packageDirectory}`,
+    '-f', 'scripts/native-host-probe/Dockerfile.runtime', '-t', 'dsh-runtime-wp4-probe', '.'], { cwd: repositoryRoot, maxBuffer: 4_000_000 })
+  image = process.env.PROBE_IMAGE ?? await docker(['image', 'inspect', 'dsh-runtime-wp4-probe', '--format', '{{.Id}}'])
+} catch (error) { installed.close(); throw error }
 const evidenceParent = process.env.PROBE_EVIDENCE_DIR ? resolve(process.env.PROBE_EVIDENCE_DIR) : tmpdir()
 await mkdir(evidenceParent, { recursive: true, mode: 0o700 })
 const root = await mkdtemp(join(evidenceParent, 'dsh-wp34-'))
@@ -31,7 +35,7 @@ const sessions = new MemoryDomainSessions('domain-session')
 const origins = new Map()
 const domains = []
 let browser
-const report = { dsh: '0.1.5-rc.2', checks: [], measurements: {}, passed: false }
+const report = { consumer: 'installed tarball, including native control asset', authority: '(tenantId, principalId); no independent root grants', dsh: '0.1.5-rc.2', checks: [], measurements: {}, passed: false }
 let failure
 async function rpc(domain, method, args) {
   const response = await fetch(`${domain.origin}/api/${method}`, { method: 'POST', headers: { ...domain.headers, 'content-type': 'application/json' },
@@ -42,6 +46,7 @@ async function rpc(domain, method, args) {
   return envelope.result.value
 }
 async function snapshot(domain, sessionId) {
+  const address = typeof sessionId === 'string' ? { kind: 'session', sessionId } : sessionId
   const socket = new WebSocket(domain.origin.replace('http:', 'ws:') + '/api/remote.mux', { headers: domain.headers })
   try {
     await once(socket, 'open')
@@ -54,10 +59,28 @@ async function snapshot(domain, sessionId) {
         if (value.type === 'error') { clearTimeout(timer); reject(new Error(JSON.stringify(value))) }
       })
       socket.send(JSON.stringify({ type: 'open', streamId: 'probe', endpoint: 'session/follow',
-        payload: { args: { request: { address: { kind: 'session', sessionId } } } } }))
+        payload: { args: { request: { address } } } }))
     })
   } finally { socket.terminate() }
 }
+async function until(description, operation) {
+  for (let attempt = 0; attempt < 150; attempt++) {
+    const value = await operation()
+    if (value) return value
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  throw new Error(`Timeout: ${description}`)
+}
+async function prompt(domain, sessionId, text) {
+  return rpc(domain, 'session/prompt', { request: { sessionId, requestId: randomUUID(), mode: 'queue', content: [{ type: 'text', text }] } })
+}
+async function childPrompt(domain, parentSessionId, childSessionId, text) {
+  return rpc(domain, 'subagents/prompt', { request: { parentSessionId, childSessionId, requestId: randomUUID(), mode: 'continuable', delivery: 'queue', content: [{ type: 'text', text }] } })
+}
+async function waitText(domain, address, text) {
+  return until(text, async () => { const value = await snapshot(domain, address); return value.includes(text) && value })
+}
+
 try {
   for (const principalId of ['alice', 'bob']) {
     const owner = { tenantId: 'probe', principalId }
@@ -67,11 +90,16 @@ try {
     await mkdir(join(profile, 'presets', 'probe'), { recursive: true })
     await mkdir(join(data, 'workspace'), { recursive: true })
     await writeFile(join(data, 'identity.txt'), `PRIVATE_${principalId}`)
-    await writeFile(join(profile, 'presets', 'probe', 'agent.cordis.yml'), JSON.stringify([
+    const preset = [
       { id: 'principal-mcp', name: '@deepseek-ai/dsh-mcp-client', config: { transport: 'stdio', serverName: 'principal', command: '/usr/local/bin/node',
-        args: ['/opt/dsh/fixtures/mcp.mjs'], env: { PROBE_PACKAGE_ROOT: '/opt/dsh/package.json', PROBE_MARKER: '/domain/identity.txt' }, reconnect: { enabled: false } } },
+        args: ['/opt/dsh/fixtures/mcp.mjs'], env: { PROBE_PACKAGE_ROOT: '/opt/dsh/package.json', PROBE_MARKER: '/domain/identity.txt', PROBE_STUBBORN: '1' }, reconnect: { enabled: false } } },
       { id: 'delegate', name: '@deepseek-ai/dsh-tool-subagent', config: { provider: 'spawn', toolName: 'probe_delegate', backgroundMode: 'continuable' } },
-    ]))
+      { id: 'restricted', name: '@deepseek-ai/dsh-tool-subagent', config: { provider: 'spawn', toolName: 'probe_restricted', backgroundMode: 'continuable', toolFilter: { allow: [] } } },
+      { id: 'fork', name: '@deepseek-ai/dsh-tool-subagent', config: { provider: 'fork', toolName: 'probe_fork', backgroundMode: 'one-shot', enableRunInBackground: false } },
+    ]
+    await writeFile(join(profile, 'presets', 'probe', 'agent.cordis.yml'), JSON.stringify(preset))
+    await mkdir(join(profile, 'presets', 'probe-alt'), { recursive: true })
+    await writeFile(join(profile, 'presets', 'probe-alt', 'agent.cordis.yml'), JSON.stringify(preset))
     await writeFile(join(profile, 'runtime.patch.json'), JSON.stringify([
       { id: 'web-runtime', config: { printUrl: false, openBrowser: false } },
       ...['llm-deepseek', 'llm-pi-ai', 'session-title-llm', 'session-telemetry-otel'].map(id => ({ id, disabled: true })),
@@ -118,6 +146,71 @@ try {
     assert.equal(await response.text(), `PRIVATE_${domain.owner.principalId}`)
   }
   const [a, b] = domains
+  await prompt(a, '00000000-0000-4000-8000-000000000001', 'PROBE_DELEGATE')
+  const catalog = await until('native child catalog', async () => {
+    const value = await rpc(a, 'subagents/list', { parentSessionId: '00000000-0000-4000-8000-000000000001' })
+    return value.entries.length && value
+  })
+  const child = catalog.entries.find(entry => entry.kind === 'child')
+  const childAddress = { kind: 'subagent', mode: 'continuable', parentSessionId: '00000000-0000-4000-8000-000000000001', childSessionId: child.id }
+  await waitText(a, childAddress, 'PRIVATE_alice')
+  await childPrompt(a, '00000000-0000-4000-8000-000000000001', child.id, 'PROBE_DELEGATE')
+  const grandchildren = await until('grandchild', async () => {
+    const value = await rpc(a, 'subagents/list', { parentSessionId: child.id })
+    return value.entries.length && value.entries
+  })
+  await waitText(a, { kind: 'subagent', mode: 'continuable', parentSessionId: child.id, childSessionId: grandchildren[0].id }, 'PRIVATE_alice')
+  report.checks.push('native continuable child and grandchild inherit the domain preset MCP')
+  await prompt(a, '00000000-0000-4000-8000-000000000001', 'PROBE_RESTRICT')
+  const restricted = await until('restricted child', async () => {
+    const value = await rpc(a, 'subagents/list', { parentSessionId: '00000000-0000-4000-8000-000000000001' })
+    return value.entries.find(entry => entry.label === 'restricted probe child')
+  })
+  const restrictedAddress = { kind: 'subagent', mode: 'continuable', parentSessionId: '00000000-0000-4000-8000-000000000001', childSessionId: restricted.id }
+  await waitText(a, restrictedAddress, 'FILTER_OK')
+  await childPrompt(a, '00000000-0000-4000-8000-000000000001', restricted.id, 'PROBE_FORCE_IDENTITY')
+  const denied = await waitText(a, restrictedAddress, 'unknown tool')
+  assert.ok(!JSON.stringify(denied).includes('PRIVATE_alice'))
+  report.checks.push('native child toolFilter removes MCP schemas and rejects forced tool execution')
+  await prompt(a, '00000000-0000-4000-8000-000000000001', 'PROBE_FORK')
+  const fork = await until('one-shot fork', async () => {
+    const value = await rpc(a, 'subagents/list', { parentSessionId: '00000000-0000-4000-8000-000000000001' })
+    return value.entries.find(entry => entry.mode === 'one-shot')
+  })
+  await waitText(a, { kind: 'subagent', mode: 'one-shot', parentSessionId: '00000000-0000-4000-8000-000000000001', childSessionId: fork.id }, 'PRIVATE_alice')
+  report.checks.push('native one-shot fork resolves the domain preset MCP')
+  await rpc(a, 'session/create', { request: { cwd: '/domain/workspace', sessionId: '00000000-0000-4000-8000-000000000002', agentPreset: 'probe' } })
+  await rpc(a, 'agentPresets/select', { agentId: '00000000-0000-4000-8000-000000000002', agentPreset: 'probe-alt' })
+  await prompt(a, '00000000-0000-4000-8000-000000000002', 'PROBE_IDENTITY')
+  await waitText(a, { kind: 'session', sessionId: '00000000-0000-4000-8000-000000000002' }, 'PRIVATE_alice')
+  report.checks.push('native blank-session preset switching retains the domain MCP')
+
+  const secretRef = 'PROBE_DOMAIN_SECRET'
+  await rpc(a, 'credentials/set', { ref: secretRef, value: 'FAKE_ALICE_SECRET_V1' })
+  assert.equal((await rpc(a, 'credentials/describe', { refs: [secretRef] }))[secretRef].configured, true)
+  assert.equal((await rpc(b, 'credentials/describe', { refs: [secretRef] }))[secretRef].configured, false)
+  const settings = await rpc(a, 'settings/describe', {})
+  assert.ok(!JSON.stringify(settings).includes('FAKE_ALICE_SECRET'))
+  assert.equal(await rpc(a, 'settings/canOpenAgentPresetDirectory', {}), false)
+  await rpc(a, 'credentials/set', { ref: secretRef, value: 'FAKE_ALICE_SECRET_V2' })
+  await rpc(a, 'credentials/unset', { ref: secretRef })
+  assert.equal((await rpc(a, 'credentials/describe', { refs: [secretRef] }))[secretRef].configured, false)
+  report.checks.push('Native settings/credentials remain domain-owned; same credential reference does not cross domains; no desktop opener')
+  const uploadStarted = performance.now()
+  const binary = Buffer.alloc(2 * 1024 * 1024, 0x91)
+  const uploaded = await fetch(`${a.origin}/api/session/uploadFileBinary?sessionId=${sessionId}&name=probe.bin`, {
+    method: 'POST', headers: { ...a.headers, 'content-type': 'application/octet-stream' }, body: binary,
+  })
+  assert.equal(uploaded.status, 200)
+  const uploadedResult = await uploaded.json()
+  assert.equal(uploadedResult.ok, true, JSON.stringify(uploadedResult))
+  assert.equal(uploadedResult.value.file.bytes, binary.length)
+  report.measurements.binaryUpload2MiBMs = Math.round(performance.now() - uploadStarted)
+  report.checks.push('Installed ingress carries a real 2 MiB native upload')
+  const warmStarted = performance.now()
+  const warm = await Promise.all(Array.from({ length: 40 }, () => coordinator.ensure(a.owner)))
+  assert.ok(warm.every(value => value.generation === admissions[0].generation))
+  report.measurements.fortyWarmAdmissionsMs = Math.round(performance.now() - warmStarted)
   assert.equal((await fetch(b.origin, { headers: a.headers })).status, 403)
   assert.equal((await fetch(a.origin, { headers: { ...a.headers, origin: b.origin } })).status, 403)
   report.checks.push('Native HTML, RPC, mux and MCP work; same Session/tool/path resolve only the authenticated domain')
@@ -135,6 +228,15 @@ try {
     fetch('http://1.1.1.1',{signal:AbortSignal.timeout(1000)}).then(()=>process.exit(2),()=>{});
   `])
   report.checks.push('Execution denies other-domain/platform files, Docker socket, profile/root writes and network egress')
+  // A workload may replace its transport path, but the platform connects to the captured inode.
+  await docker(['exec', container.Id, 'node', '-e', `
+    const fs=require('node:fs'); fs.renameSync('/control/http.sock','/control/original.sock');
+    fs.symlinkSync('/var/run/docker.sock','/control/http.sock');
+    if (!fs.readFileSync('/domain/mcp-descendants.txt','utf8').trim()) process.exit(3);
+  `])
+  const afterReplacement = await fetch(`${a.origin}/api/file?path=/domain/identity.txt`, { headers: a.headers })
+  assert.equal(await afterReplacement.text(), 'PRIVATE_alice')
+  report.checks.push('A workload socket symlink cannot redirect platform connections; MCP has an independently detached descendant')
   report.measurements.aliceContainer = await docker(['stats', '--no-stream', '--format', '{{json .}}', container.Id])
   browser = await chromium.launch({ headless: true, ...(process.env.PROBE_CHROMIUM ? { executablePath: process.env.PROBE_CHROMIUM } : {}), args: ['--no-sandbox'] })
   report.browser = browser.version()
@@ -155,6 +257,7 @@ try {
     await composer.fill('PROBE_IDENTITY browser')
     await composer.press('Enter')
     await page.getByText('PROBE_RESULT PROBE_IDENTITY browser', { exact: false }).first().waitFor({ timeout: 20_000 })
+    const reconnectStarted = performance.now()
     const beforeReconnect = websockets
     await context.setOffline(true)
     await page.waitForTimeout(500)
@@ -165,13 +268,31 @@ try {
     await composer.press('Enter')
     await page.getByText('PROBE_RESULT PROBE_IDENTITY reconnect', { exact: false }).first().waitFor({ timeout: 20_000 })
     await page.getByText('Connected', { exact: true }).last().waitFor({ timeout: 20_000 })
+    report.measurements[`${domain.owner.principalId}BrowserReconnectMs`] = Math.round(performance.now() - reconnectStarted)
     assert.deepEqual(pageErrors, [])
     await writeFile(join(root, `${domain.owner.principalId}.txt`), await page.locator('body').innerText())
     await page.screenshot({ path: join(root, `${domain.owner.principalId}.png`), fullPage: true })
     await context.close()
   }
   report.checks.push('Official Web sends native tool calls and reconnects through authenticated isolated ingress')
-  // Challenge the proposed root boundary: a public publication veto is NOT a read authority.
+  const replacementStarted = performance.now()
+  await coordinator.setDesired(a.record.id, 'suspended')
+  await assert.rejects(coordinator.ensure(a.owner), /not enabled/)
+  assert.equal((await fetch(a.origin, { headers: a.headers })).status, 503)
+  await coordinator.setDesired(a.record.id, 'enabled')
+  const restarted = await coordinator.ensure(a.owner)
+  assert.ok(restarted.generation > admissions[0].generation)
+  report.measurements.suspendAndRestartMs = Math.round(performance.now() - replacementStarted)
+  await waitText(a, childAddress, 'PRIVATE_alice')
+  await prompt(a, sessionId, 'PROBE_AFTER_RESTART')
+  await waitText(a, sessionId, 'PROBE_REPLY undefined PROBE_AFTER_RESTART')
+  await childPrompt(a, sessionId, child.id, 'PROBE_IDENTITY cold-continuation')
+  await waitText(a, childAddress, 'PROBE_RESULT PROBE_IDENTITY cold-continuation')
+  await childPrompt(a, sessionId, restricted.id, 'PROBE_FORCE_IDENTITY_AFTER_RESTART')
+  const coldDenied = await waitText(a, restrictedAddress, 'PROBE_RESULT PROBE_FORCE_IDENTITY_AFTER_RESTART')
+  assert.ok(coldDenied.includes('unknown tool') && !coldDenied.includes('PRIVATE_alice'))
+  report.checks.push('Native cold continuations preserve MCP composition and toolFilter after generation replacement')
+  // Boundary regression: same-Principal history remains readable; no root grants promised.
   await coordinator.stop(a.record.id)
   const aProfile = join(profiles, a.record.id)
   await writeFile(join(aProfile, 'root-veto.mjs'), `
@@ -203,7 +324,7 @@ try {
   const requirePackage = createRequire(new URL('../../packages/multi-tenant/package.json', import.meta.url))
   const controller = spawn(process.execPath, ['--import', requirePackage.resolve('tsx'),
     fileURLToPath(new URL('../../packages/multi-tenant/tests/runtime/docker-controller.fixture.mjs', import.meta.url))], {
-    stdio: ['ignore', 'ignore', 'ignore', 'ipc'], env: { ...process.env, PROBE_DOCKER_CONFIG: JSON.stringify(crashConfig) },
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc'], env: { ...process.env, PROBE_INSTALLED_ENTRY: `${installed.packageDirectory}/dist/index.mjs`, PROBE_DOCKER_CONFIG: JSON.stringify(crashConfig) },
   })
   const controllerExit = once(controller, 'exit')
   let recovered
@@ -234,21 +355,39 @@ try {
   sessions.revoke(a.token)
   await closed
   assert.equal((await fetch(a.origin, { headers: a.headers })).status, 401)
+  const revokeStarted = performance.now()
   await coordinator.setDesired(a.record.id, 'revoked')
+  report.measurements.domainRevokeMs = Math.round(performance.now() - revokeStarted)
   assert.equal(admissions[0].signal.aborted, true)
   assert.equal(admissions[1].signal.aborted, false)
-  report.checks.push('Login revocation closes an existing native mux; domain revocation stops its runtime and preserves the other domain')
+  assert.equal((await fetch(b.origin, { headers: b.headers })).status, 200)
+  await coordinator.close()
+  const reopened = new SQLiteDomainRepository(join(root, 'directory'))
+  try {
+    assert.equal(reopened.get(a.record.id).desired, 'revoked')
+    assert.throws(() => reopened.begin(a.record.id), /disabled/)
+    assert.throws(() => reopened.setDesired(a.record.id, 'enabled'), /cannot be re-enabled/)
+  } finally { reopened.close() }
+  report.checks.push('Login revocation closes an existing native mux; domain revocation preserves the other domain and rejects after directory restart')
 } catch (error) { failure = error }
 finally {
   const results = await Promise.allSettled([browser?.close(), ...domains.map(domain => domain.ingress.close())])
   sessions.close()
   try { await coordinator.close() } catch (error) { results.push({ status: 'rejected', reason: error }) }
+  try {
+    const owner = createHash('sha256').update(await realpath(runtimeDirectory)).digest('hex').slice(0, 16)
+    assert.equal(await docker(['container', 'ls', '-a', '--filter', `label=dsh.owner=${owner}`, '--format', '{{.ID}}']), '')
+    const descriptors = await Promise.all((await readdir('/proc/self/fd')).map(name => readlink(`/proc/self/fd/${name}`).catch(() => '')))
+    assert.equal(descriptors.filter(value => value.startsWith(runtimeDirectory)).length, 0)
+    report.checks.push('Cleanup leaves no owned container (including detached MCP descendants) or pinned runtime descriptor')
+  } catch (error) { results.push({ status: 'rejected', reason: error }) }
   const errors = results.filter(result => result.status === 'rejected').map(result => result.reason)
   if (errors.length) failure = new AggregateError([...(failure ? [failure] : []), ...errors], 'Isolated proof cleanup failed')
   if (!failure) { await rm(runtimeDirectory, { recursive: true, force: true }); await rm(profiles, { recursive: true, force: true }) }
   report.passed = !failure
   if (failure) report.error = String(failure)
   await writeFile(join(root, 'report.json'), JSON.stringify(report, null, 2) + '\n')
+  installed.close()
   console.log(`Isolated native ingress evidence: ${root}`)
 }
 if (failure) throw failure

@@ -40,6 +40,7 @@ async function until<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 export function createDomainIngress(options: DomainIngressOptions) {
   const active = new Set<AbortController>()
   let closing = false
+  let closeTask: Promise<void> | undefined
   const maximum = options.maxConnections ?? 1_024
   if (!Number.isSafeInteger(maximum) || maximum < 1) throw new TypeError('Invalid connection limit')
 
@@ -157,9 +158,14 @@ export function createDomainIngress(options: DomainIngressOptions) {
   return {
     server,
     close: async () => {
+      if (closeTask) return closeTask
       closing = true
       for (const abort of active) abort.abort()
-      await new Promise<void>((resolve, reject) => server.close(error => { if (error) reject(error); else resolve() }))
+      closeTask = new Promise<void>((resolve, reject) => server.close(error => {
+        if (error && (error as NodeJS.ErrnoException).code !== 'ERR_SERVER_NOT_RUNNING') reject(error)
+        else resolve()
+      })).catch(error => { closeTask = undefined; throw error })
+      return closeTask
     },
   }
 }

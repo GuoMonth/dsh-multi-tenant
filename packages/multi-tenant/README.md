@@ -1,179 +1,92 @@
-[简体中文](./README.zh-CN.md) | English
-
 # dsh-multi-tenant
 
-`dsh-multi-tenant@0.6.0` is a DSH multi-tenant plugin for Node 22.19+ and Node 24, pinned to DSH `0.1.5-rc.2` at source commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`.
+[简体中文](README.zh-CN.md)
 
-Version 0.6.0 replaces the runtime callback with explicit commands and adds scoped readers, child controls and delivery providers. The SQLite root ownership schema remains unchanged. Only the exact target is supported, without a multi-version compatibility layer. The host owns authentication and any isolation stronger than the bundled logical boundary.
+Run one native DeepSeek Harness Host per `(tenantId, principalId)`. The platform owns authentication, domain storage, runtime lifecycle and HTTP/WebSocket admission. DSH owns sessions, workspaces, presets, tools and its complete native Web UI.
 
-## Install
+**0.7.0 is a breaking architecture change.** It replaces the shared-process Cordis plugin and per-Agent resource API. Use a new platform directory; no legacy database migration or compatibility facade is provided. This source version is not a statement of npm publication.
 
-The release identity is `v0.6.0`, using npm's `latest` dist-tag. Pin the plugin and its exact DSH peers together:
+## Authority contract
 
-```bash
-pnpm add dsh-multi-tenant@0.6.0 @deepseek-ai/cordis@4.0.2 \
-  @deepseek-ai/dsh-agent@0.1.5-rc.2 @deepseek-ai/dsh-llm@0.1.5-rc.2 \
-  @deepseek-ai/dsh-mcp-client@0.1.5-rc.2 @deepseek-ai/dsh-session@0.1.5-rc.2 \
-  @deepseek-ai/dsh-tools@0.1.5-rc.2
+- Different Principals, including the same principal name in different tenants, receive separate data and execution environments.
+- Sessions and workspaces inside a Principal's domain are not independent authorization domains. Native permissions, tool filters, stop/archive/delete and preset selection retain native semantics; they are not root read ACLs.
+- Platform administration, authentication secrets, the domain directory and Docker socket stay outside every native Host. Native settings and credentials belong only to that domain.
+- The platform is trusted code. Do not mount its API in the native Web server or derive domain identity, image, profile paths, runtime endpoints or origins from browser parameters.
+
+## Install and prerequisites
+
+```sh
+npm install dsh-multi-tenant@0.7.0
 ```
 
-DSH remains pre-stable. Upgrade the host's entire DSH dependency graph together. Its supported historical logs may migrate to V3; the plugin does not implement data migration. Stop the host and back up its Directory and DSH data before upgrading. Rollback requires the corresponding old runtime and pre-upgrade data together: old retained logs do not contain V3 additions.
+When testing this PR before publication, install the `.tgz` produced by `pnpm --filter dsh-multi-tenant pack` instead.
 
-Load the plugin after the DSH `agents`, `tools`, and `sessions` services, with a persistence backend such as JSONL mounted before creating Agents. With no host replacements it uses `.dsh-multi-tenant/agents.sqlite`, an empty MCP declaration, and DSH's shared in-process runtime:
+The coordinator requires Node 22.19 or Node 24+. The included providers target Linux. `DockerRuntimeProvider` requires a local Docker engine and a prebuilt immutable image containing **DSH 0.1.5-rc.2**, pinned source `fb2c4b9e698e30edb738bca4cf0618587db7d203`. Run the coordinator as a non-root user with Docker access; the reference runtime UID/GID must match that user so both sides can access the private control files. It does not download DSH into the platform process. TypeScript consumers should install `@types/node` and include `node` in compiler `types`.
 
-```ts
-import * as MultiTenant from 'dsh-multi-tenant'
+The Docker reference intentionally uses `--network none`: keyless/local tools work; external model APIs and remote MCP do not. Deployments needing egress must supply a reviewed `RuntimeProvider` with explicit network policy. The local process provider is for trusted development, not hostile workloads.
 
-await ctx.plugin(MultiTenant, {
-  minimumIsolation: 'logical',
-})
-```
+## Embed in an authenticated server
 
-On Unix, the default directory is enforced as `0700` and its database as `0600`, including when they already exist; inability to enforce either mode fails startup. Set `DSH_MULTI_TENANT_DB_PATH` or `sqlite.path` to use a host-managed path. The plugin does not chmod a configured path or its parent: its ACL, backups, and encryption are the host's responsibility. Windows deployments must apply an equivalent host ACL. Existing `0.3` ownership data and unpublished candidate schemas are deliberately not migrated.
-
-Opening the built-in SQLite repository atomically changes every abandoned `provisioning` record to terminal `failed` before the service is installed, completing [#49](https://github.com/GuoMonth/dsh-multi-tenant/issues/49). Such resources stay product-level not-found and are never resumed; a retry receives fresh Agent and session identities. This assumes the host guarantees one active process for the database.
-
-## Minimal API
-
-The host authenticates first, then mints a `PrincipalContext`. Request JSON is never a Principal.
-
-```ts
-import { createPrincipalContext } from 'dsh-multi-tenant'
-
-const principal = createPrincipalContext({
-  tenantId: authenticated.tenantId,
-  principalId: authenticated.subjectId,
-})
-
-const agent = await ctx.multiTenant.create(principal)
-
-await ctx.multiTenant.send(principal, agent.id, 'Hello', { delivery: 'queue' })
-await ctx.multiTenant.cancel(principal, agent.id)
-const result = await ctx.multiTenant.executeTool(
-  principal, agent.id, 'mcp__erp__find_customer', { customerId: 'C-42' },
-)
-
-await ctx.multiTenant.delete(principal, agent.id)
-```
-
-`create()` on the shared driver checkpoints the new DSH session before the Directory becomes ready, including when there are no messages. Missing or failing durability listeners reject creation and dispose the acquired Agent. Custom persistent runtime drivers must also establish their durability boundary before returning success.
-
-
-
-
-
-## Real MCP configuration
-
-Register host providers before the root plugin. The official `dsh-mcp-client` is loaded inside each unpublished Agent setup, so two Agents may use the same logical `serverName` without hashing it:
-
-```ts
+```js
 import {
-  StaticSecretProvider,
-  StaticTenantMcpProvider,
+  SQLiteDomainRepository, DomainRuntimeCoordinator,
+  DockerRuntimeProvider, createDomainIngress, DSH_RUNTIME_VERSION,
 } from 'dsh-multi-tenant'
 
-await ctx.plugin(StaticTenantMcpProvider, {
-  revision: 'erp-v1',
-  servers: [{
-    transport: 'stdio',
-    serverName: 'erp',
-    command: process.execPath,
-    args: ['/opt/my-erp-mcp/server.mjs'],
-    secretEnv: {
-      API_TOKEN: { secret: 'erp-token', prefix: 'Bearer ' },
-    },
-  }],
+const directory = new SQLiteDomainRepository('/srv/dsh/control')
+const runtime = new DomainRuntimeCoordinator(directory,
+  new DockerRuntimeProvider({
+    directory: '/srv/dsh/runtime',
+    image: 'sha256:<immutable-image-id>',
+    profileDirectory: domainId => `/srv/dsh/profiles/${domainId}`,
+    uid: process.getuid(), gid: process.getgid(),
+  }), DSH_RUNTIME_VERSION, 45_000, 20_000)
+
+const ingress = createDomainIngress({
+  authenticator, // your trusted login/IdP adapter, implementing DomainAuthenticator
+  runtime,
+  originFor: owner => trustedDomainOrigins.get(JSON.stringify([owner.tenantId, owner.principalId])),
 })
-await ctx.plugin(StaticSecretProvider, {
-  revision: 'dev-secrets-v1',
-  values: { 'erp-token': process.env.ERP_TOKEN! },
-})
-await ctx.plugin(MultiTenant)
+ingress.server.listen(8080, '127.0.0.1')
 ```
 
-The static providers are development conveniences. Production hosts normally implement `TenantMcpProvider` and `SecretProvider`; a `SecretLease` keeps values in memory and supplies a revision, revocation signal, and disposer. Revocation cancels and disposes the live Agent. The next authorized use acquires a new lease and resumes the same internal session.
+Provision a profile before `ensure(owner)` can start its Host. `directory.resolve(owner)` provides its opaque domain ID. Supply `authenticator.authenticate(request, signal)` returning `{ owner, signal }` only after authenticating the user; abort the returned signal on logout/expiry to close existing streams. `MemoryDomainSessions` is an in-memory reference adapter: `issue(owner)` is a **trusted server-side** operation, never an unauthenticated login endpoint. Tokens belong in Secure, HttpOnly, host-only cookies with Path=/ and an appropriate SameSite policy; the adapter does not emit cookies or implement an IdP.
 
-Host provider acquisition receives a required lifecycle signal, completing [#50](https://github.com/GuoMonth/dsh-multi-tenant/issues/50). MCP and Secret providers receive the service signal; runtime partitions and DSH drivers receive its combination with SecretLease revocation:
+Use distinct origins and trusted TLS termination. Preserve the validated external Host/Origin through the reverse proxy; the ingress ignores client forwarding headers. All native HTTP and WebSocket paths share admission. Native browser cookies remain inside the platform; response cookies are not exposed. Platform management has no HTTP route here. The embedding application owns graceful shutdown; always attempt both `ingress.close()` and `runtime.close()` and retain cleanup errors for repair/retry. A reusable embedding example is in `examples/native-domains/platform.mjs`.
 
-```ts
-load(principal, signal: AbortSignal): Promise<TenantMcpSnapshot>
-acquire(principal, names, signal: AbortSignal): Promise<SecretLease>
-acquire({ principal, agentId, requiredIsolation, signal }): Promise<RuntimePartitionLease>
+## Runtime image and profile contract
+
+The reference provider launches `/opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile web --patch /profile/runtime.patch.json` with Node `--expose-internals` for the pinned native Loader, loopback port 3081 and no browser opener. Install the exact native runtime and copy the exported `dsh-multi-tenant/native/runtime-control.mjs` asset into the image at `/opt/dsh/runtime-control.mjs`. Add this row through the native profile patch:
+
+```json
+{
+  "insert": [{
+    "id": "domain-runtime-control",
+    "name": "/opt/dsh/runtime-control.mjs",
+    "config": { "runtimeManifest": "/opt/dsh/node_modules/@deepseek-ai/dsh/package.json" }
+  }]
+}
 ```
 
-Providers should check the signal before work, stop promptly when practical, return stable revisions, and make disposal idempotent. The plugin validates and freezes their returned capability view before DSH work. Abort remains cooperative; it cannot forcibly terminate arbitrary host code.
+The asset waits for public `appReady` and uses `connection.authenticatedUrl`, without private scope rebinding or a replacement controller. It is a native Host asset; do not load it into the platform.
 
-## Web adapter
+Data mounts at `/domain`, the trusted profile at `/profile` read-only, and the narrow readiness/transport directory at `/control`. The native Host has no platform credentials or management socket. Runtime root is read-only, UID/GID non-root, capabilities dropped, no-new-privileges enabled. Defaults: 1 GiB memory, 1 CPU, 160 PIDs and 128 MiB temporary storage. These are configurable reference limits, not measured production capacity. Existing platform directories must have private ownership/permissions. The original socket pathname must fit Linux's 107-byte limit. Connections use a pinned socket inode, so a workload cannot redirect the platform through a substituted symlink. Readiness refuses symlinks/nonregular files and is bounded to 16 KiB.
 
-`dsh-multi-tenant/web` mounts authenticated CRUD through the existing DSH `ctx.webServer.register()` seam:
+Native user settings, user-installed domain plugins and domain credentials are inside this execution boundary. They may affect every session in that Principal. Do not put platform secrets in native environment variables, profiles, credentials or mounts. Image/network updates require a new reviewed runtime and regression tests; full native UI reuse does not grant platform administration.
 
-```ts
-import { mountMultiTenantWeb } from 'dsh-multi-tenant/web'
+## Stop, revoke, rotate and recover
 
-mountMultiTenantWeb(ctx, ctx.multiTenant, {
-  principalProvider: {
-    async authenticate(request) {
-      const identity = await authenticateProductRequest(request)
-      return identity && createPrincipalContext(identity)
-    },
-  },
-  resolveAgentProfile(principal, profile) {
-    if (profile === 'coding') {
-      return {
-        agentOptions: { provider: 'trusted-provider', model: 'trusted-coder' },
-        meta: { cwd: trustedWorkspaceFor(principal) },
-      }
-    }
-  },
-})
-```
+- `runtime.stop(id)` invalidates current connections, stops the Host and leaves the domain enabled. A later admission starts a new generation.
+- `runtime.setDesired(id, 'suspended')` persists suspension before stopping. New admissions fail until explicitly enabled.
+- `runtime.setDesired(id, 'revoked')` is terminal and persists across restart. It revokes domain access, not retained data or credentials at an external service. Data retention/deletion is an explicit platform operation after verified stop.
+- For domain capability/credential rotation: suspend, await confirmed cleanup, replace trusted assets or revoke external credentials, then enable. External revocation failures must leave the domain suspended. Native credential editing inside the domain remains native behavior; hot MCP credential rotation is not promised.
+- A failed stop retains ownership and prevents a new writer. Repair the cause and retry; do not remove the directory lock or clear `unresolved` manually.
+- After a coordinator crash, use `runtime.recover(id)` for unresolved records before reopening. The Docker provider checks exact domain/generation/owner labels and removes the previous container before storage reuse. It refuses foreign ownership. The local process provider cannot automatically prove recovery.
 
-Routes are `POST/GET /_dsh-multi-tenant/agents` and `GET/DELETE /_dsh-multi-tenant/agents/:id`. A create body is exactly `{}` for host defaults or `{ "profile": "coding" }`; the authenticated host resolver is the only place a name can become trusted DSH options. Identity, session, raw Agent options, metadata, and unknown fields are rejected. Responses use 401, 400, 404, 503, and 502 for authentication, input, hidden resource, unavailable capability/isolation, and DSH provisioning failure respectively.
+One coordinator owns each local SQLite directory. This is not a multi-machine scheduler or storage fence. Domains stay running until explicitly stopped; automatic idle eviction is not provided because a disconnected browser may have active background work. Choose quotas and scheduling in the embedding platform from workload measurements.
 
-## Guarantees and boundaries
+## Verification and scope
 
-- Provisioning is unpublished until DSH setup, the shared driver session checkpoint, and the database ready transition all succeed.
-- Per-Agent create/resume/refresh/delete is serialized; concurrent opens single-flight; plugin shutdown cancels and drains every owned handle.
-- The lifecycle contract propagates abort through MCP, Secret, RuntimePartition, and DSH setup and validates provider results before use. Drain remains cooperative: code that ignores abort or never settles can delay delete or shutdown indefinitely; forced interruption and arbitrary default timeouts are out of scope.
-- A configured `strong` minimum fails closed before DSH Agent creation when the provider offers only `logical` isolation.
-- `TenantAgentRepository`, `TenantMcpProvider`, `SecretProvider`, `RuntimePartitionProvider`, and `DshRuntimeDriver` are the host replacement protocols. They compose through Cordis services; there is no second DI system.
-- The bundled shared provider is process-local logical separation. It does not isolate hostile plugins, tools, filesystem access, subprocesses, memory, or network traffic.
-- SQLite is a local, single-node, single-active-process default. The host deployment must maintain that invariant; the plugin does not enforce it with locks, heartbeats, or fencing. Startup deterministically fails abandoned provisioning before Agent operations. A custom `TenantAgentRepository` must complete the recovery required by its own topology before registration; replace it when deployment requires multi-process coordination or a different persistence boundary.
-- Delete does not claim physical erasure of DSH persistent logs.
-- No Typert public adapter is shipped because stock Typert does not establish a trusted Principal binding. Keep stock DSH `/api` private/administrative.
+`pnpm release:check` verifies exports, declarations, lifecycle, ingress, persistence and an independent tarball consumer. `pnpm --dir scripts/native-host-probe install --frozen-lockfile` followed by `pnpm probe:isolated` exercises the installed package with real native Hosts and Playwright (install Chromium first or set `PROBE_CHROMIUM`). The probe builds a pinned test image, uses only fake credentials/keyless model/local MCP and cleans its runtimes. It does not make external model calls.
 
-Public code/API subpaths are exactly `/mcp`, `/sqlite`, `/web`, `/testing`, and `/starter`. `./cordis.patch.yml` is additionally exported as a DSH loader configuration artifact, not a JavaScript API.
-
-## Runtime commands
-
-`send(principal, id, text, { delivery: 'queue' | 'steer' })` returns `{ accepted: true }` after native input admission, without waiting for the model. This is not a durability receipt. `cancel()` targets only the current live generation and returns `cancelled` or `inactive`; it does not resume cold Agents. `whenIdle()` waits for current activity without activating a cold resource. `executeTool()` and `inject()` are trusted-host methods.
-
-The callback API has been removed. Long tool operations and idle waits do not hold the lifecycle queue. Delete, refresh, revocation and shutdown close the generation, cancel admitted work and drain before releasing the handle and provider leases. A failed durable delete stays closed to new commands until the owner retries deletion in this process.
-
-Web adds `POST /_dsh-multi-tenant/agents/:id/messages` with `{ text, delivery? }` and `POST .../:id/cancel` with `{ reason? }`. Message source is host-established. There is no arbitrary Web tool execution endpoint.
-
-### Scoped history and observations
-
-With the optional exact `@deepseek-ai/dsh-session-query-sqlite@0.1.5-rc.2` service installed, `service.read(principal, id, { before, limit, signal })` returns safe text/turn history. `service.observe(principal, id, { signal })` returns a disposable async stream: `replace` baseline, cursor-based `append`, `status`, and separate per-attempt `transient` text/reset frames. HTTP exposes authenticated `GET /agents/:id/history` and `/events` (SSE) below the adapter base path. A reconnect replaces the baseline; live text received before subscribing is not replayed, and durable assistant messages replace partial text when committed.
-
-Cold reads use native Session observations without Agent activation, MCP, or Secret acquisition. Root deletion, shutdown, request cancellation, and an optional reader-provider authorization signal close observations. Hosts must supply revocation signals for changes in login/ACL authority. Slow consumers fail and reconnect instead of losing events silently. Custom isolation providers must implement `openRead` in their own partition; the default refuses it. Raw Session events and internal paths are never product responses.
-
-### Native subagent targets
-
-Opt in to the exact native subagent service and in-process spawn/fork providers. `children(principal, rootId, { childRef? })` reads `subagentCatalog`; `read`, `observe`, `send` and `cancel` accept `childRef` in their options (the fourth argument for `cancel`). References are root-bound catalog positions, stable across restart, and confer no authority. Each traversal verifies the child's own descriptor and immutable header. Web paths are `/agents/:id/children` and `/agents/:id/children/:ref/{history,events,children,messages,cancel}`. Observations include safe child summaries.
-
-One-shot children are read-only; continuable Queue/Steer use the official host delivery adapter with human provenance. Direct cold children can resume through an active root; a cold intermediate parent must become active through its own continuation before controlling deeper descendants. Remote runs without local Session facts are not Session targets. Root teardown/revocation drains native continuation descendants and owned scopes.
-
-The shared provider supports rosterless in-process children: synchronous native publication joins the exact runtime parent's capability scope, preserving scoped MCP/Secrets and inherited tool restrictions. A child already bound to an incompatible preset scope is rejected. AgentPresets composition is tracked separately in #68; custom backends must supply their own child-control and reading capability. This is logical isolation, not an OS filesystem/container boundary.
-
-### Authorized file deliveries
-
-`deliveries(principal, rootId, { childRef? })` lists own native `deliverables/presented` facts. `file(principal, rootId, ref, { childRef?, signal? })` resolves a target-bound event/index reference and returns a disposable byte stream. Web exposes `GET /agents/:id/deliveries` and `GET|HEAD /agents/:id/deliveries/:ref`, also below child targets; `?download=1` forces download. Every request authenticates again. References are not bearer links and never accept a path parameter.
-
-File access is disabled until the host implements `RuntimePartitionProvider.openFile` in the correct execution world. The optional `dsh-multi-tenant/deliveries` helper `openNativeDelivery(request, { fs, workspace, signal?, dispose })` accepts an explicitly authorized native FS and trusted Principal workspace, checks canonical containment, refuses final symlinks/directories, and reads bounded current bytes. It never treats a Session cwd as an authorization root or falls back to global host FS. Native backend containment and alias/race guarantees still apply. The default limit is 16 MiB (`maximumDeliveryBytes`, at most 256 MiB); the helper buffers at most that limit before streaming bounded chunks.
-
-Source edits appear on the next request; removed files return 404. Responses use no-store, nosniff, safe filenames and sandbox CSP; HTML/SVG are inert text, unknown formats download. Disconnect, authority revocation, deletion and shutdown abort responses and release readers. Already sent bytes cannot be recalled. No immutable archive or desktop-open endpoint is provided.
-
-### Optional Web profile
-
-See [the packaged scoped-web example](./examples/scoped-web/README.md) for a loopback Cordis profile, an optional official sidebar/main panel, and a reproducible three-identity browser check. The profile omits stock Connection and privileged controllers. Full stock UI integration and AgentPresets scope composition remain in issues #71 and #68.
+Root/subagent composition, cold continuation, raw transport, browser reconnection, domain credentials, revocation and cgroup recovery are checked against exact rc.2. The historical root-publication counterexample remains a boundary regression: same-Principal history is readable, as intended. Passing these checks is not a general security certification or a claim of shared-Host multi-user support.

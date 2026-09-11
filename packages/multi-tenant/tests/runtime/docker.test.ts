@@ -9,7 +9,7 @@ it('rejects an unconnectable Unix socket path before acquiring a container', asy
   try {
     const provider = new DockerRuntimeProvider({ image: `sha256:${'a'.repeat(64)}`,
       directory: join(root, 'long-platform-directory-'.repeat(5)),
-      profileDirectory: () => { throw new Error('must reject before provisioning') }, uid: 1000, gid: 1000 })
+      profileDirectory: () => { throw new Error('must reject before provisioning') }, uid: process.getuid!(), gid: process.getgid!() })
     const handle = provider.acquire({ domainId: '00000000-0000-4000-8000-000000000001', generation: 1, version: '0.1.5-rc.2' }, new AbortController().signal)
     await expect(handle.ready).rejects.toThrow('too long for a Linux Unix socket')
     await handle.stop()

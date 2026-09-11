@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   native-ingress:
-    name: Native isolated ingress and authorization counterexample
+    name: Installed native domains and isolation
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -28,7 +28,6 @@ jobs:
       - run: pnpm --dir scripts/native-host-probe exec playwright install --with-deps chromium
         env:
           PLAYWRIGHT_SKIP_BROWSER_GC: '1'
-      - run: docker build -f scripts/native-host-probe/Dockerfile.runtime -t dsh-runtime-wp4-probe .
       - run: pnpm probe:isolated
         env:
           # Keep native Unix socket paths within Linux's 107-byte limit.

@@ -1,0 +1,40 @@
+{
+  "consumer": "installed tarball, including native control asset",
+  "authority": "(tenantId, principalId); no independent root grants",
+  "dsh": "0.1.5-rc.2",
+  "checks": [
+    "Two isolated native hosts are admitted through private Unix sockets without network ports",
+    "native continuable child and grandchild inherit the domain preset MCP",
+    "native child toolFilter removes MCP schemas and rejects forced tool execution",
+    "native one-shot fork resolves the domain preset MCP",
+    "native blank-session preset switching retains the domain MCP",
+    "Native settings/credentials remain domain-owned; same credential reference does not cross domains; no desktop opener",
+    "Installed ingress carries a real 2 MiB native upload",
+    "Native HTML, RPC, mux and MCP work; same Session/tool/path resolve only the authenticated domain",
+    "Execution denies other-domain/platform files, Docker socket, profile/root writes and network egress",
+    "A workload socket symlink cannot redirect platform connections; MCP has an independently detached descendant",
+    "Official Web sends native tool calls and reconnects through authenticated isolated ingress",
+    "Native cold continuations preserve MCP composition and toolFilter after generation replacement",
+    "SIGKILL recovery removes the exact orphan container before reusing storage in a new generation",
+    "Login revocation closes an existing native mux; domain revocation preserves the other domain and rejects after directory restart",
+    "Cleanup leaves no owned container (including detached MCP descendants) or pinned runtime descriptor"
+  ],
+  "measurements": {
+    "twoColdHostsMs": 3850,
+    "binaryUpload2MiBMs": 20,
+    "fortyWarmAdmissionsMs": 1,
+    "aliceContainer": "{\"BlockIO\":\"0B / 2.83MB\",\"CPUPerc\":\"0.17%\",\"Container\":\"36c990e6d6251afab3519d0b2353a729d6d734821ce1c8ae2aae46db01c63db6\",\"ID\":\"36c990e6d625\",\"MemPerc\":\"39.76%\",\"MemUsage\":\"407.2MiB / 1GiB\",\"Name\":\"dsh-domain-f209c83d11f9440d-5fa589ae-0240-4977-9b7e-3cea50268086\",\"NetIO\":\"0B / 0B\",\"PIDs\":\"48\"}",
+    "aliceBrowserReconnectMs": 1066,
+    "bobBrowserReconnectMs": 1117,
+    "suspendAndRestartMs": 3981,
+    "domainRevokeMs": 571
+  },
+  "passed": true,
+  "browser": "150.0.7871.128",
+  "rootAuthorityCounterexample": {
+    "publicationVetoRejectsResume": true,
+    "coldListStillVisible": true,
+    "coldHistoryStillReadable": true,
+    "conclusion": "A native publication veto plus Principal Host isolation is insufficient for independent root read revocation."
+  }
+}

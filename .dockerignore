@@ -5,7 +5,3 @@
 !scripts/native-host-probe/node_modules/**
 !scripts/native-host-probe/model.mjs
 !scripts/native-host-probe/mcp.mjs
-!packages/
-!packages/multi-tenant/
-!packages/multi-tenant/src/
-!packages/multi-tenant/src/native/**

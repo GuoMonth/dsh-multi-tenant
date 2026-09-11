@@ -127,5 +127,6 @@ it('expires sessions and closes pending admission even if the authenticator neve
   const failed = expect(pending).rejects.toThrow()
   await new Promise(resolve => setTimeout(resolve, 25))
   await ingress.close()
+  await ingress.close()
   await failed
 })

@@ -1,6 +1,4 @@
-import { SQLiteDomainRepository } from '../../src/domain/sqlite.ts'
-import { DomainRuntimeCoordinator } from '../../src/runtime/coordinator.ts'
-import { DockerRuntimeProvider } from '../../src/runtime/providers/docker.ts'
+const { SQLiteDomainRepository, DomainRuntimeCoordinator, DockerRuntimeProvider } = await import(process.env.PROBE_INSTALLED_ENTRY)
 const config = JSON.parse(process.env.PROBE_DOCKER_CONFIG)
 const repository = new SQLiteDomainRepository(config.directory)
 const provider = new DockerRuntimeProvider({ ...config.provider, profileDirectory: () => config.profile })

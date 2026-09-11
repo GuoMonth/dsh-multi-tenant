@@ -1,0 +1,91 @@
+New Session
+Workspaces
+workspace
+ALICE_ROOT
+now
+Ungrouped
+Settings
+Connected
+ALICE_ROOT
+/
+4 subagents
+probe
+Chat
+Trajectory
+System prompt
+PROBE_IDENTITY
+17:02
+1 tool call
+
+PROBE_RESULT PROBE_IDENTITY PRIVATE_alice
+
+Ran for 0s
+17:02
+PROBE_DELEGATE
+17:02
+1 tool call
+
+PROBE_RESULT PROBE_DELEGATE started subagent 0cb66845-df62-4c2d-a4f9-6235154647ef
+
+Ran for 0s
+17:02
+1 tool call
+
+PROBE_RESULT Background subagent 0cb66845-df62-4c2d-a4f9-6235154647ef finished and will do no further work unless you send it more. Its closing message: PROBE_RESULT PROBE_IDENTITY PRIVATE_alice PRIVATE_alice
+
+Ran for 0s
+17:02
+1 tool call
+
+PROBE_RESULT Background subagent 0cb66845-df62-4c2d-a4f9-6235154647ef finished and will do no further work unless you send it more. Its closing message: PROBE_RESULT Background subagent 201b7b19-fc51-41b4-bf25-d6cc80b77598 finished and will do no further work unless you send it more. Its closing message: PROBE_RESULT PROBE_IDENTITY PRIVATE_alice PRIVATE_alice PRIVATE_alice
+
+Ran for 0s
+17:02
+PROBE_RESTRICT
+17:02
+1 tool call
+
+PROBE_RESULT PROBE_RESTRICT started subagent 26c05555-d1f2-4e0f-b90f-7c4627f50841
+
+Ran for 0s
+17:02
+Thought for a while
+
+FILTER_BROKEN Background subagent 26c05555-d1f2-4e0f-b90f-7c4627f50841 finished and will do no further work unless you send it more. Its closing message: FILTER_OK PROBE_CHECK_FILTER
+
+Ran for 0s
+17:02
+1 tool call
+
+PROBE_RESULT Background subagent 26c05555-d1f2-4e0f-b90f-7c4627f50841 finished and will do no further work unless you send it more. Its closing message: PROBE_RESULT PROBE_FORCE_IDENTITY Error: unknown tool "mcp__principal__identity" PRIVATE_alice
+
+Ran for 0s
+17:02
+PROBE_FORK
+17:02
+1 tool call
+
+PROBE_RESULT PROBE_FORK PROBE_RESULT PROBE_IDENTITY PRIVATE_alice
+
+Ran for 0s
+17:02
+PROBE_IDENTITY browser
+17:02
+1 tool call
+
+PROBE_RESULT PROBE_IDENTITY browser PRIVATE_alice
+
+Ran for 0s
+17:02
+PROBE_IDENTITY reconnect
+17:02
+1 tool call
+
+PROBE_RESULT PROBE_IDENTITY reconnect PRIVATE_alice
+
+Ran for 0s
+17:02
+Message or run a task, / commands, @ files or sessions
+Workspace Write
+probe/probe
+10 turns 19 steps

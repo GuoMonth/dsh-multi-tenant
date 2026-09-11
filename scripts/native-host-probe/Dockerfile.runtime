@@ -2,7 +2,7 @@ FROM node:24-bookworm-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed6116
 WORKDIR /opt/dsh
 COPY scripts/native-host-probe/package.json ./
 COPY scripts/native-host-probe/node_modules ./node_modules
-COPY packages/multi-tenant/src/native/runtime-control.mjs ./runtime-control.mjs
+COPY --from=domain-package src/native/runtime-control.mjs ./runtime-control.mjs
 COPY scripts/native-host-probe/model.mjs scripts/native-host-probe/mcp.mjs ./fixtures/
 ENV PROBE_PACKAGE_ROOT=/opt/dsh/package.json PROBE_AUDIT=/domain/model-audit.jsonl PROBE_MARKER=/domain/identity.txt
 USER 1000:1000

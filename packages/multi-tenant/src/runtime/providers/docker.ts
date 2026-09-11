@@ -1,10 +1,12 @@
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, realpath, rm } from 'node:fs/promises'
+import { mkdir, realpath, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import type { RuntimeHandle, RuntimeProvider, RuntimeReady, RuntimeSpec } from '../provider.ts'
+
+import { openPrivateSocket, readRuntimeReady } from './private-control.ts'
 
 const exec = promisify(execFile)
 export interface DockerRuntimeOptions {
@@ -30,13 +32,16 @@ export class DockerRuntimeProvider implements RuntimeProvider {
     if (process.platform !== 'linux') throw new Error('Docker provider requires Linux')
     if (!/^(sha256:[a-f0-9]{64}|[^\s]+@sha256:[a-f0-9]{64})$/.test(options.image)) throw new TypeError('Pin the runtime image by digest')
     for (const id of [options.uid, options.gid]) if (!Number.isSafeInteger(id) || id < 1) throw new TypeError('Runtime requires a non-root uid/gid')
+    if (options.uid !== process.getuid!() || options.gid !== process.getgid!()) {
+      throw new Error('Local Docker transport requires the non-root coordinator and runtime to use the same uid/gid')
+    }
     for (const value of [options.memoryMb ?? 1_024, options.cpus ?? 1, options.pids ?? 160]) {
       if (!Number.isFinite(value) || value <= 0) throw new TypeError('Invalid runtime resource limit')
     }
   }
 
   private async docker(args: string[]): Promise<string> {
-    const result = await exec('docker', args, { maxBuffer: 1_048_576 })
+    const result = await exec('docker', args, { maxBuffer: 1_048_576, ...(args[1] === 'wait' ? {} : { timeout: 15_000 }) })
     return result.stdout.trim()
   }
 
@@ -85,6 +90,7 @@ export class DockerRuntimeProvider implements RuntimeProvider {
   acquire(spec: RuntimeSpec, signal: AbortSignal): RuntimeHandle {
     signal.throwIfAborted()
     let id: string | undefined
+    let transport: Awaited<ReturnType<typeof openPrivateSocket>> | undefined
     const claim = randomUUID()
     let attemptedCreate = false
     let owned = false
@@ -131,7 +137,7 @@ export class DockerRuntimeProvider implements RuntimeProvider {
       for (;;) {
         if (stopping || signal.aborted || cancelled.signal.aborted) throw new Error('Runtime start cancelled')
         let value: unknown
-        try { value = JSON.parse(await readFile(join(location!.control, 'ready.json'), 'utf8')) }
+        try { value = await readRuntimeReady(join(location!.control, 'ready.json')) }
         catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
         if (value !== undefined) {
           const candidate = value as RuntimeReady
@@ -139,7 +145,8 @@ export class DockerRuntimeProvider implements RuntimeProvider {
             || candidate.endpoint !== 'http://127.0.0.1:3081' || !candidate.authentication?.cookie || /[\r\n]/.test(candidate.authentication.cookie)) {
             throw new Error('Isolated runtime readiness mismatch')
           }
-          return { ...spec, endpoint: candidate.endpoint, authentication: { cookie: candidate.authentication.cookie }, socketPath: join(location!.control, 'http.sock') }
+          transport = await openPrivateSocket(join(location!.control, 'http.sock'))
+          return { ...spec, endpoint: candidate.endpoint, authentication: { cookie: candidate.authentication.cookie }, socketPath: transport.path }
         }
         await delay(25)
       }
@@ -152,16 +159,26 @@ export class DockerRuntimeProvider implements RuntimeProvider {
       if (stopTask) return stopTask
       stopTask = Promise.resolve().then(async () => {
         await acquisition.catch(() => {})
-        if (!id && attemptedCreate && location) {
-          const uncertain = await this.existing(location.name)
-          if (uncertain?.Config.Labels['dsh.claim'] === claim) { id = uncertain.Id; owned = true }
-        }
-        if (id) {
-          const current = location ? await this.existing(location.name) : undefined
-          if (current?.Id === id) await this.remove(id)
-          id = undefined
-        }
-        if (owned && location && !await this.existing(location.name)) await rm(location.control, { recursive: true, force: true })
+        await ready.catch(() => {})
+        const errors: unknown[] = []
+        const attempt = async (operation: () => Promise<void>) => { try { await operation() } catch (error) { errors.push(error) } }
+        await attempt(async () => { if (transport) { await transport.file.close(); transport = undefined } })
+        await attempt(async () => {
+          if (!id && attemptedCreate && location) {
+            const uncertain = await this.existing(location.name)
+            if (uncertain?.Config.Labels['dsh.claim'] === claim) { id = uncertain.Id; owned = true }
+          }
+          if (id) {
+            const current = location ? await this.existing(location.name) : undefined
+            if (current?.Id === id) await this.remove(id)
+            id = undefined
+          }
+        })
+        await attempt(async () => {
+          if (owned && location && !await this.existing(location.name)) await rm(location.control, { recursive: true, force: true })
+        })
+        if (errors.length === 1) throw errors[0]
+        if (errors.length) throw new AggregateError(errors, 'Runtime transport and container cleanup failed')
         exit()
       }).catch(error => { stopTask = undefined; throw error })
       return stopTask

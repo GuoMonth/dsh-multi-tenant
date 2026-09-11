@@ -13,20 +13,20 @@ test('declared exports must exist, including declarations', () => {
   assert.throws(() => assertExportFiles({}, () => true), /exports missing/)
 })
 
-test('a wrong exact upstream peer fails the executable baseline gate', () => {
+test('a wrong exact native runtime dependency fails the executable baseline gate', () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-baseline-negative-'))
   try {
-    mkdirSync(join(root, 'scripts'))
+    mkdirSync(join(root, 'scripts/native-host-probe'), { recursive: true })
     mkdirSync(join(root, 'packages/multi-tenant'), { recursive: true })
-    for (const file of ['scripts/verify-contract.mjs', 'scripts/dsh-target.mjs', 'pnpm-lock.yaml', 'packages/multi-tenant/package.json']) {
+    for (const file of ['scripts/verify-contract.mjs', 'scripts/dsh-target.mjs', 'scripts/native-host-probe/pnpm-lock.yaml', 'scripts/native-host-probe/package.json', 'packages/multi-tenant/package.json']) {
       copyFileSync(new URL(`../../${file}`, import.meta.url), join(root, file))
     }
-    const manifest = join(root, 'packages/multi-tenant/package.json')
+    const manifest = join(root, 'scripts/native-host-probe/package.json')
     const pkg = JSON.parse(readFileSync(manifest, 'utf8'))
-    pkg.peerDependencies['@deepseek-ai/dsh-agent'] = '0.0.0'
+    pkg.dependencies['@deepseek-ai/dsh'] = '0.0.0'
     writeFileSync(manifest, JSON.stringify(pkg))
     assert.throws(() => execFileSync(process.execPath, [join(root, 'scripts/verify-contract.mjs')], { stdio: 'pipe' }), error => {
-      assert.match(String(error.stderr), /dsh-agent peer must be exact/)
+      assert.match(String(error.stderr), /dsh runtime dependency must be exact/)
       return true
     })
   } finally { rmSync(root, { recursive: true, force: true }) }

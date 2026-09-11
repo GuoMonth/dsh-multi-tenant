@@ -132,6 +132,12 @@ WP2 的新协调器与真实原生 CLI 联调可独立运行：`pnpm probe:runti
 域生命周期、完整入口授权、根/Principal 撤销、真正的执行隔离和容量验收由 WP2–WP4 完成。
 本实验不表示三个 Issue 已解决，也不宣称支持一个共享 Host 内的多 Principal 授权。
 
-## Authenticated isolated runtime experiment
+## Installed Principal-domain acceptance (WP5)
 
-`pnpm probe:isolated` exercises the new ingress and Docker provider with the real native Web. Build its image first with `docker build -f scripts/native-host-probe/Dockerfile.runtime -t dsh-runtime-wp4-probe .` from the repository root. See the [WP3/WP4 report](../../docs/evidence/native-domain-review/wp34/README.md) for requirements, successful checks, and the root-authorization counterexample that still blocks WP5. This image is an offline test fixture, not a production release.
+`pnpm probe:isolated` packs and installs the new platform package into an independent temporary consumer, then builds its pinned image using the **installed** native control asset. It runs the full native Web through the installed ingress and Docker provider. Do not build `Dockerfile.runtime` directly without its named `domain-package` build context; the runner provides it. Install this fixture's frozen dependencies and Playwright Chromium first, or set `PROBE_CHROMIUM`.
+
+This is the current release proof. It includes native child/grandchild/fork/filtered tool/cold continuation, settings and domain credentials, uploads, browser reconnection, domain suspension/revocation/restart, controller SIGKILL recovery, detached MCP descendants and adversarial socket replacement. It uses `--network none`, so it does not consume shared Docker bridge pools or call external services.
+
+The user-approved authority boundary is `(tenantId, principalId)`. The root publication counterexample remains as documentation of native semantics, not a WP5 blocker: independent root read grants are not part of this product. See [the current plan](../../docs/reference/native-domain-refactor-plan.zh-CN.md) and [WP5 evidence](../../docs/evidence/native-domain-review/wp5/README.md). Earlier probe variants and reports above are retained as historical/reference evidence.
+
+The runner retains reports/screenshots in its printed temporary directory; `PROBE_EVIDENCE_DIR` may select a short private parent. Do not use a long CI checkout path because native Unix socket names are limited to 107 bytes. On failure private runtime/profile directories may remain for local diagnosis; CI uploads only report.json and browser screenshots/text. Do not publish data directories or native credentials. This image is an offline fixture, not a production deployment image.
