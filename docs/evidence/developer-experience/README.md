@@ -2,8 +2,8 @@
 
 2026-09-12, issue #78, source 0.8.0, Linux x64, Node 24.18.0, local Docker 29.6.2, Google Chrome via Playwright. Source is not published.
 
-- `pnpm release:check`: passed; 40 package tests, 3 script tests, typecheck/build, SQLite recovery probe, independently installed SDK consumer.
-- `scripts/experience-smoke.mjs`: passed against the local image built from runtime/Dockerfile, using an independently packed/installed npm package and its real CLI.
+- `pnpm release:check`: passed; 40 package tests, 4 script tests, typecheck/build, SQLite recovery probe, independently installed SDK consumer.
+- `scripts/experience-smoke.mjs`: passed against the local image built from runtime/Dockerfile, using an independently packed/installed npm package, npm bin resolution and its real CLI.
 - Browser: one-time bootstrap, Alice/Bob distinct localhost origins, real native DSH Web, private sample MCP, file creation, native child catalog, restart and retained file. Direct unauthenticated/native token-exchange access to the worker relay returns 401.
 - The restart test removes the local seeding marker to cover interrupted publication; native session facts prevent duplicate creation.
 - `linux-report.json` is the runner result. Its launchMs measures the final CLI process readiness, not image download or first native Host startup; it is not a product performance claim. Screenshots show the native entry state.

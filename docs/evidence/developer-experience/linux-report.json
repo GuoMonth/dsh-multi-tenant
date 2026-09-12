@@ -5,7 +5,7 @@
     "Stop/start keeps native history and generated files in the same domain"
   ],
   "measurements": {
-    "launchMs": 74.80340199999773
+    "launchMs": 74.58803599999737
   },
   "passed": true
 }

@@ -15,6 +15,7 @@ const cli = join(installed.packageDirectory, 'dist/cli.mjs')
 assert.match(execFileSync('npm', ['exec', '--offline', '--', 'dsh-multi-tenant', '--help'], { cwd: installed.directory, encoding: 'utf8' }), /start\|status\|stop\|doctor/)
 let child, browser, failure
 const report = { checks: [], measurements: {}, passed: false }
+const safeError = error => String(error).replace(/(https?:\/\/[^\s#]+)#[A-Za-z0-9_-]+/g, '$1#[redacted]')
 const run = (...args) => execFileSync(process.execPath, [cli, ...args, '--data-dir', directory], { encoding: 'utf8' })
 async function launch() {
   const started = performance.now()
@@ -92,10 +93,10 @@ try {
   assert.match(execFileSync('docker',['exec',output,'cat','/domain/workspace/demo-output.md'],{encoding:'utf8'}), /Created for alice/)
   report.checks.push('Stop/start keeps native history and generated files in the same domain')
   report.passed = true
-} catch (error) { failure = error; report.error = String(error) }
+} catch (error) { failure = error; report.error = safeError(error) }
 finally {
   if (browser) await browser.close()
-  try { await stop() } catch (error) { failure ??= error; report.passed = false; report.cleanupError = String(error) }
+  try { await stop() } catch (error) { failure ??= error; report.passed = false; report.cleanupError = safeError(error) }
   // Only this exact test instance is eligible for volume cleanup.
   if (!failure) {
     const config = JSON.parse(await readFile(join(directory, 'instance.json')))
@@ -107,4 +108,4 @@ finally {
   installed.close()
   console.log(`CLI evidence: ${root}\n${JSON.stringify(report,null,2)}`)
 }
-if (failure) throw failure
+if (failure) { console.error(safeError(failure)); process.exitCode = 1 }
