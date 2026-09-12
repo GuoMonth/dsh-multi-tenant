@@ -6,9 +6,10 @@ import { tmpdir } from 'node:os'
 import { once } from 'node:events'
 import { chromium } from './native-host-probe/node_modules/playwright/index.mjs'
 import { installArtifact } from './installed-package.mjs'
+const spec = process.argv[2] ?? '--local'
 const image = process.env.DSH_EXPERIENCE_IMAGE
-assert.match(image ?? '', /^(sha256:[a-f0-9]{64}|[^\s]+@sha256:[a-f0-9]{64})$/)
-const installed = installArtifact()
+if (spec !== '--local' && image) throw new Error('Registry CLI proof must use the bundled image, not an override')
+const installed = installArtifact(spec)
 const root = await mkdtemp(join(tmpdir(), 'dsh-cli-'))
 const directory = join(root, 'state')
 const cli = join(installed.packageDirectory, 'dist/cli.mjs')
@@ -19,7 +20,7 @@ const safeError = error => String(error).replace(/(https?:\/\/[^\s#]+)#[A-Za-z0-
 const run = (...args) => execFileSync(process.execPath, [cli, ...args, '--data-dir', directory], { encoding: 'utf8' })
 async function launch() {
   const started = performance.now()
-  child = spawn(process.execPath, [cli, 'start', '--no-open', '--port', '0', '--image', image, '--data-dir', directory], { stdio: ['ignore', 'pipe', 'pipe'] })
+  child = spawn(process.execPath, [cli, 'start', '--no-open', '--port', '0', ...(image ? ['--image', image] : []), '--data-dir', directory], { stdio: ['ignore', 'pipe', 'pipe'] })
   let output = ''; let ready = false
   return await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('CLI readiness timeout')), 120_000)
@@ -50,6 +51,11 @@ async function send(page, text, expected) {
   await page.waitForFunction(value => document.body.innerText.includes(value), expected, { timeout: 60_000 })
 }
 try {
+  const manifest = JSON.parse(await readFile(join(installed.packageDirectory, 'runtime-manifest.json'), 'utf8'))
+  if (image) assert.match(image, /^(sha256:[a-f0-9]{64}|[^\s]+@sha256:[a-f0-9]{64})$/)
+  else assert.match(manifest.image ?? '', /^ghcr\.io\/[^\s]+@sha256:[a-f0-9]{64}$/, 'Published CLI must contain a verified GHCR digest')
+  report.artifact = spec
+  report.imageSource = image ? 'explicit local test image' : 'installed runtime-manifest.json'
   const url = await launch()
   browser = await chromium.launch({ headless: true, ...(process.env.PROBE_CHROMIUM ? { executablePath: process.env.PROBE_CHROMIUM } : {}) })
   const aContext = await browser.newContext(), bContext = await browser.newContext()

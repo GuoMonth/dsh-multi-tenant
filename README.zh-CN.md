@@ -1,17 +1,36 @@
 # dsh-multi-tenant
 
-> **0.8.0 源码：一行启动体验（尚未发布）**。新增 CLI，自动准备原生运行镜像并打开本机工作台。0.7.1 不包含此命令。
->
-> 发布后：`npx -y dsh-multi-tenant@latest start`
->
-> 只需 Node/npm 与可用 Docker；默认免 API key。参见[快速体验与源码验证](docs/reference/quickstart.zh-CN.md)。以下保留平台 SDK 的完整接入说明。
-
-
 [English](README.md) · [版本发布](https://github.com/GuoMonth/dsh-multi-tenant/releases) · [更新记录](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CHANGELOG.md)
 
 让每位登录用户拥有自己的原生 DeepSeek Harness 工作环境。用户继续使用 DSH 的聊天、workspace、文件、preset 和子代理，平台负责将不同用户的数据与执行环境隔离。
 
-本包面向**搭建多用户 DSH 服务的平台开发者**，提供现有登录系统与独立 DSH Host 之间的集成层。
+提供两种入口：用 CLI 在本机体验完整工作台，或用 SDK 将独立 DSH Host 接入现有登录系统。项目负责启动和管理 DSH；它不是安装进共享 DSH Host 的多用户插件。
+
+## 一行体验
+
+需要 Node 22.19.x 或更新的 22.x，或 Node 24+，以及正在运行的本机 Docker（Linux 容器）。无需手动安装 DSH、构建镜像或准备 API key。
+
+```sh
+npx -y dsh-multi-tenant@0.8.0 start
+```
+
+本文对应 0.8.0；运行前可用 `npm view dsh-multi-tenant@0.8.0 version` 确认发布状态。如果尚不可用，使用[源码验证流程](docs/reference/quickstart.zh-CN.md)，旧版 0.7.1 没有 CLI。发布后也可用 `@latest` 获取当前稳定版。
+
+浏览器中选择 Alice 或 Bob，进入各自的原生 DSH 工作台。默认确定性演示模型支持读取样例、生成文件和委派子代理；真实 AI 需要在原生 Settings 配置模型凭据。Ctrl-C 停止运行并保留数据。Linux amd64/arm64 已通过 CI；macOS/Windows Docker Desktop 暂为实验支持。
+
+[完整启动、停止与排错说明](docs/reference/quickstart.zh-CN.md)
+
+## 让 AI 帮你使用或开发
+
+将下面这段话交给你的 coding agent：
+
+```text
+请阅读 https://raw.githubusercontent.com/GuoMonth/dsh-multi-tenant/main/packages/multi-tenant/AI.md，
+核对当前 npm 版本和本机环境，帮我启动并验证 dsh-multi-tenant。
+如果要修改项目源码，先阅读仓库根目录 AGENTS.md，并说明你要运行哪些相关验证。
+```
+
+[AI 项目导航](packages/multi-tenant/AI.md)覆盖体验、SDK 集成、源码定位与排错；[AGENTS.md](AGENTS.md)提供仓库开发约定。npm 包内也包含 `AI.md`，已安装的包应优先使用随包指引。
 
 ## 适合哪些场景
 
@@ -23,7 +42,7 @@
 
 典型使用流程是：**用户登录 → 平台确定所属域 → 启动或复用专属 DSH Host → 进入原生 Web**。断线重连仍回到同一个域，每次请求或每个会话都不需要新建 Host。
 
-## 0.7.1 提供什么
+## 平台 SDK 提供什么
 
 - 按 `(tenantId, principalId)` 持久化域归属和期望状态，平台重启后仍能核对身份与撤销状态。
 - 去重启动、generation 校验、暂停/撤销、有时限的停止，以及协调器崩溃后的可验证恢复。
@@ -33,20 +52,22 @@
 
 ## 使用前需要了解的边界
 
-**本包面向开发者集成。** Docker 默认使用 bridge 网络，允许访问外部模型 API 和远程 MCP；需要离线运行时设置 `network: 'none'`。从 0.7.1 起，bridge 替代 0.7.0 的默认无网络配置。登录/SSO、TLS、域配置、配额和运维监控由接入平台负责，本包不包含账号管理 UI 或现成托管服务。
+**本包面向开发者集成。** Docker 默认使用 bridge 网络，允许访问外部模型 API 和远程 MCP；需要离线运行时设置 `network: 'none'`。从 0.7.1 起，bridge 替代 0.7.0 的默认无网络配置。登录/SSO、TLS、域配置、配额和运维监控由接入平台负责，CLI 的本地演示身份不替代账号管理 UI 或托管服务。
 
 授权边界是**租户内的用户**。同一 Principal 的两个 workspace 或会话不承诺互相保密；域内权限、工具过滤、停止、归档、删除和 preset 选择沿用原生语义。本版本不提供团队共享域、项目 ACL、跨用户会话共享、自动空闲回收或跨机调度。
 
 独立 Host 有固定的内存和启动成本，浏览器断开后也可能仍有后台任务。资源限制和域回收时机应根据实际工作负载决定。平台管理权限、登录秘密和 Docker socket 必须始终位于用户域之外。
 
+**从 0.7.1 升级到 0.8.0：** 既有 SDK API 保持不变；新增 CLI 使用独立状态目录与固定镜像的 Docker 命名卷，不自动导入平台数据。
+
 **从 0.7.0 升级：** 域数据和平台接入 API 沿用现有结构。默认网络行为发生变化：需要保留离线限制时，在升级前显式设置 `network: 'none'`。使用新 Dockerfile 时重新构建镜像，停止旧 Host 后更新镜像 ID 并重新启动。
 
 **从 0.5.x 或更早版本升级：** 0.7.0 改变了集成架构和公开 API，删除共享进程 Cordis 插件、逐 Agent 接口和自定义面板。需要新建平台目录、替换接入代码并单独保留旧数据，不提供旧数据库自动迁移。0.6.0 曾是源码里程碑，没有发布到 npm。
 
-## 从哪里开始
+## SDK 接入入口
 
 ```sh
-npm install dsh-multi-tenant@0.7.1
+npm install dsh-multi-tenant@0.8.0
 # 无需 Docker 或外部模型，先检查已安装的平台 API：
 node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
 ```
@@ -67,10 +88,10 @@ node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
 - 平台管理权限始终在用户域之外。域目录、认证秘密、Docker socket 和平台管理接口不得进入原生 Host；原生 settings 与 credentials 只属于当前域。
 - 所有公开 TypeScript API 都供可信平台使用。不能把协调器挂到用户的原生 Web，不能从浏览器参数生成身份、镜像、profile 路径、后端地址或可信 origin。
 
-## 安装与环境
+## SDK 安装与环境
 
 ```sh
-npm install dsh-multi-tenant@0.7.1
+npm install dsh-multi-tenant@0.8.0
 ```
 
 验证尚未发布的源码时，运行 `pnpm --filter dsh-multi-tenant pack` 并安装生成的 `.tgz`。
@@ -123,7 +144,7 @@ docker build -f packages/multi-tenant/runtime/Dockerfile -t dsh-domain-runtime:l
 docker image inspect dsh-domain-runtime:local --format '{{.Id}}'
 ```
 
-将输出的 `sha256:...` 传给 provider 的 `image`，并按下文准备每域 profile。Dockerfile 和依赖锁随 npm 包发布，不含测试模型、测试 MCP 或真实凭据。基础镜像固定 digest，DSH 及 npm 依赖由 lockfile 固定；系统工具使用 Debian 仓库的当前安全更新，因此构建结果以最终镜像 ID 为准。
+将输出的 `sha256:...` 传给 provider 的 `image`，并按下文准备每域 profile。Dockerfile 和依赖锁随 npm 包发布，包含明确标识的 CLI 演示模型与 MCP，不包含真实凭据；SDK 的 profile 不会自动启用这些演示功能。基础镜像固定 digest，DSH 及 npm 依赖由 lockfile 固定；系统工具使用 Debian 仓库的当前安全更新，因此构建结果以最终镜像 ID 为准。
 
 内置 Bash、Git/SSH 客户端、curl/wget、jq、ripgrep、常用文本/归档工具、Python 3/venv/pip、C/C++ 编译工具，以及基础镜像提供的 Node/npm。不预装需要账号的 AI CLI、浏览器或所有语言 SDK；可通过派生镜像按项目补充。运行时根目录只读，新增 Python 依赖可放在 `/domain/.venv`，Node 项目依赖放在 `/domain` 的项目目录。`/tmp` 为 noexec，编译或安装工具需要执行临时文件时，将 `TMPDIR` 指向 `/domain` 内可写目录。Provider 会覆盖镜像默认用户，使用平台配置的非 root UID/GID。
 

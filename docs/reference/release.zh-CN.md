@@ -1,27 +1,37 @@
-# 发布检查
+# 发布准备与正式发布
 
-Release identity 是 `dsh-multi-tenant@0.6.0`，对应 Git tag 为 `v0.6.0`。npm 分发使用 `latest` dist-tag。唯一支持的 Harness 基线是 DSH `0.1.5-rc.2`，对应 commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`。
+当前候选版本为 `dsh-multi-tenant@0.8.0`，目标 npm 通道为 `latest`，Git tag 为 `v0.8.0`。源码版本不代表已经发布；用 `npm view dsh-multi-tenant version dist-tags --json` 查询实际状态。包 manifest 是版本事实来源，`scripts/dsh-target.mjs` 固定 DSH 基线，发布说明在 `docs/releases/v0.8.0.md`。
 
-```bash
+## 准备发布 PR
+
+```sh
 pnpm install --frozen-lockfile
 pnpm release:check
+node scripts/registry-preflight.mjs 0.8.0
 ```
 
-`release:check` 会验证公共面和精确 DSH target、release metadata、peer dependency 一致性、类型声明、unit/contract/Web/真实 MCP 测试、build 产物、SQLite restart 与遗留 provisioning 恢复、lifecycle abort、Secret 泄漏探针，以及带 provider contract typecheck 的全新安装 tarball consumer。
+以上命令不执行发布。完整检查覆盖元数据、固定依赖/Actions、公开类型、测试、构建、SQLite 恢复和独立安装的 SDK tarball。同步根目录及 npm 包的双语 README、AI.md、changelog 和发布说明。源码 `runtime-manifest.json` 保持 `image: null`，只有发布工作流向产物写入经过验证的 digest。
 
-CI 在 Node 22.19 和 Node 24 上重复执行，并单独 checkout DSH commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`，核对精确的 `0.1.5-rc.2` 源码身份。
+PR 及其合入 main 后的精确提交必须通过 CI：Node 22.19/24、固定 DSH 源码身份、真实原生域隔离，以及 Linux amd64/arm64 原生 runner 上的安装后 CLI 验证。macOS/Windows Docker Desktop 在实机验收前保持实验支持，不以 Linux CI 代替。
 
-Preflight 会拒绝项目 workflow 中任何可变的第三方 `uses:`，已审核 Action 全部固定到完整 commit SHA。pnpm 明确执行 1,440 分钟 release-age 延迟，只有已审核的 exact DSH 包及逐项列出的 native addon 产物可以例外。官方 JSONL 测试 backend 仅是 dev dependency；其 `koffi` install 是唯一允许的 native dependency build，冗余的 `esbuild` postinstall 仍被明确拒绝。
+## 发布前提
 
-这些命令不会发布 npm、创建 Git tag 或创建 GitHub Release。源码 tag、npm artifact 和 GitHub Release 是可以分别核验的 release 产物。
+- npm Trusted Publishing 已授权本仓库的 `release.yml` 和 `npm-release` environment；工作流使用 Node 24/npm >=11.5.1，不增加本地 npm token 发布路径。见 [npm 官方说明](https://docs.npmjs.com/trusted-publishers/)。
+- GHCR 包 `ghcr.io/guomonth/dsh-multi-tenant-runtime` 允许工作流发布，并允许匿名拉取。首次创建的包默认私有：首次 candidate push 后，所有者需在包设置中将可见性改为 **Public**。见 [GitHub Container registry 文档](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)。Git 仓库公开不代表镜像包公开。
+- 如果包尚不存在，首次获授权的发布运行可以创建候选镜像，然后在匿名拉取门禁停止。将已创建的包设为公开，再对同一次运行重跑失败 jobs。此门禁失败时 npm 尚未发布；不能绕过或虚构 digest。
 
-分发必须显式手动触发 workflow，并要求待发布的精确 `main` commit 已有成功的 CI 结果。该 workflow 通过 npm Trusted Publishing 和 provenance 发布，验证 registry artifact 与 `latest` dist-tag，复用指向同一提交的源码 tag（不存在时才创建），最后创建对应 GitHub Release；如果已有 tag 指向其他提交则直接失败。
+## 发布经过审查的 main 提交
 
-源码版本与 npm 通道以 `packages/multi-tenant/package.json` 为准；DSH 身份以 `scripts/dsh-target.mjs` 为准。Contract/preflight 检查读取这两个来源，不再复制版本常量。JSONL writer 使用 `@deepseek-ai/node-addon-system@0.1.2` 平台产物；frozen install 与原生测试必须覆盖完整依赖集合。
+1. 合并发布 PR，记录 main SHA，等待这个精确提交的 **push CI** 成功；PR CI 或旧 main CI 不能替代。
+2. 获得发布授权后，打开 **Actions → Publish package → Run workflow**，选择 `main`。CLI 等价命令是 `gh workflow run release.yml --ref main`。记录运行的 head SHA，核对它就是待发布源码。
+3. 工作流在两个原生架构上构建镜像并验证安装后的 CLI/浏览器，推送候选镜像、组装多平台 digest，并匿名拉取。随后执行包检查、registry 归属/版本检查、digest 绑定，再用独立安装的本地 tarball 验证**不传 `--image`** 的启动流程。
+4. npm Trusted Publishing 携带 provenance 发布；工作流下载精确 npm 版本，检查 SDK/类型、dist-tag，以及使用包内 digest 的真实 CLI/原生浏览器流程，最后创建相同源码提交的 tag 与 GitHub Release。
+5. 核对 npm `latest=0.8.0`、`v0.8.0` 指向运行 SHA、GitHub Release 存在。全新本地环境执行 `npx -y dsh-multi-tenant@0.8.0 start`，验证原生 Web、停止重启后的文件与历史。工作流的 Linux 消费者证据不替代 Desktop 验收。
 
-## 发布 0.6.0
+npm 包通过固定镜像引用管理 DSH。使用者不需要 GHCR 登录、DSH 源码或本机构建镜像。本项目尚未配置 DockerHub 分发。
 
-1. 将发布 PR 合入 `main`，确认已提交的 package version 为 `0.6.0`。
-2. 等待这个精确 `main` commit 触发的 **CI** workflow 成功。PR 的 CI 或旧 main commit 的 CI 不能替代本次发布门禁。
-3. 打开 **Actions → Publish package → Run workflow**，选择 `main` 并触发。Workflow 的 registry preflight 在目标版本已存在时跳过 npm publish，继续验证产物与通道。
-4. 核对 `dsh-multi-tenant@0.6.0`、npm `latest`、Git tag `v0.6.0` 和对应 GitHub Release。npm 版本不可覆盖，修正须使用新版本。
+## 失败与恢复
+
+npm 发布前修复失败门禁，再按情况基于经过审查的提交重跑。npm 发布后版本不可覆盖：不能改写产物、将 tag 指向其他提交，或假设重跑会替换内容。Registry preflight 遇到既有版本会跳过发布，继续核验已安装产物与通道；坏产物必须升新版本。发布后的验证失败会留下“npm 已存在、GitHub Release 未完成”的状态，必须明确报告，查明原因后才能宣告发版完成。
+
+仅 tag/release 创建失败时，在同一 SHA 重跑失败 job；既有 tag 指向其他提交时直接失败。CLI 失败证据不要包含一次性链接或凭据。发布检查不自动把本地演示部署到公网。
