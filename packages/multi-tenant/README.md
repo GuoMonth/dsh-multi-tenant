@@ -16,7 +16,7 @@ npx -y dsh-multi-tenant@0.8.0 start
 
 This guide targets 0.8.0. Check availability with `npm view dsh-multi-tenant@0.8.0 version`; if unavailable, use the [source verification flow](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md). Older 0.7.1 has no CLI. After publication, `@latest` also selects the current stable release.
 
-Choose Alice or Bob in the browser to enter their own native DSH workbench. The deterministic demo model reads samples, creates files and delegates to subagents; real AI requires provider credentials in native Settings. Ctrl-C stops the workbench and retains data. Linux amd64/arm64 pass CI; macOS/Windows Docker Desktop remains experimental.
+Choose Alice or Bob in the browser to enter their own native DSH workbench. The deterministic demo model reads samples, creates files and delegates to subagents; real AI requires provider credentials in native Settings. Ctrl-C stops the workbench and retains data. Linux amd64/arm64 have recorded native verification; macOS/Windows Docker Desktop remains experimental.
 
 [Startup, management and troubleshooting](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md)
 

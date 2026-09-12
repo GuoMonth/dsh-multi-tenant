@@ -37,12 +37,8 @@ for (const marker of ['pnpm verify', 'pnpm peers:check', 'pnpm typecheck', 'pnpm
   if (!releaseCheck.includes(marker)) errors.push(`release:check missing ${marker}`)
 }
 
-const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8')
-for (const marker of ["'22.19.0'", "'24'", 'pnpm install --frozen-lockfile', 'pnpm release:check']) {
-  if (!ci.includes(marker)) errors.push(`CI missing ${marker}`)
-}
 const release = readFileSync(join(root, '.github/workflows/release.yml'), 'utf8')
-for (const marker of ['workflow_dispatch:', 'environment: npm-release', 'actions: read', 'id-token: write', 'Require successful CI for release commit', 'pnpm release:check', 'npm publish --access public --provenance --tag "$NPM_TAG"']) {
+for (const marker of ['workflow_dispatch:', 'environment: npm-release', 'id-token: write', 'npm publish --access public --provenance --tag "$NPM_TAG"']) {
   if (!release.includes(marker)) errors.push(`manual release workflow missing ${marker}`)
 }
 

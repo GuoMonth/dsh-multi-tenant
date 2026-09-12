@@ -20,13 +20,13 @@ This guide describes the 0.8.0 CLI. If that exact version is absent, use the sou
 | Try native DSH locally | Published CLI below | Native Web opens; Alice/Bob have distinct samples; generated file and history survive restart |
 | Integrate into a platform | Adjacent [README](README.md), [中文](README.zh-CN.md), `examples/native-domains/platform.mjs`, `dist/index.d.mts` | Trusted identity mapped to separate domains; HTTP/WS admission, revocation and cleanup verified |
 | Modify this repository | Root [AGENTS.md](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/AGENTS.md), then relevant source/tests | Targeted checks and required installed/native proof pass |
-| Prepare/publish a release | [Release runbook](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/release.md), [中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/release.zh-CN.md) | Exact main CI, public image digest, installed npm CLI and SDK, matching tag/release |
+| Prepare/publish a release | [Release runbook](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/release.md), [中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/release.zh-CN.md) | Local validation, public image digest, installed npm CLI and SDK, matching tag/release |
 
 GitHub links above track `main`; replace `main` with the matching `v<version>` tag for published source. Read only the task-relevant documents. Historical plans and evidence describe their recorded revision, not necessarily the current contract.
 
 ## Help a user try the published CLI
 
-Check `node --version`, `npm --version`, `docker info` and `docker context show`. Node must satisfy the package engine; Docker must be running locally with Linux containers. Remote Docker is unsupported. Linux amd64/arm64 are tested in CI; macOS/Windows Docker Desktop is experimental pending real-machine evidence.
+Check `node --version`, `npm --version`, `docker info` and `docker context show`. Node must satisfy the package engine; Docker must be running locally with Linux containers. Remote Docker is unsupported. Linux amd64/arm64 have recorded native CI evidence; ongoing quality checks run locally; macOS/Windows Docker Desktop is experimental pending real-machine evidence.
 
 ```sh
 npx -y dsh-multi-tenant@0.8.0 start

@@ -12,7 +12,9 @@ node scripts/registry-preflight.mjs 0.8.0
 
 以上命令不执行发布。完整检查覆盖元数据、固定依赖/Actions、公开类型、测试、构建、SQLite 恢复和独立安装的 SDK tarball。同步根目录及 npm 包的双语 README、AI.md、changelog 和发布说明。源码 `runtime-manifest.json` 保持 `image: null`，只有发布工作流向产物写入经过验证的 digest。
 
-PR 及其合入 main 后的精确提交必须通过 CI：Node 22.19/24、固定 DSH 源码身份、真实原生域隔离，以及 Linux amd64/arm64 原生 runner 上的安装后 CLI 验证。macOS/Windows Docker Desktop 在实机验收前保持实验支持，不以 Linux CI 代替。
+质量验证以本地执行为准，不再设置 push/PR CI，也不要求 GitHub 检查通过才发布。在发布 PR 记录提交、命令、结果、Node 版本和实际覆盖平台。已有 amd64/arm64 证据保留为历史事实，不代表未来每次变更都已在两种架构验证。macOS/Windows Docker Desktop 在实机验收前继续标为实验支持。
+
+运行时/CLI 变更还需在本地执行相应原生探针。用真实公开 digest 运行 `DSH_RUNTIME_IMAGE=ghcr.io/...@sha256:... node scripts/bind-runtime-image.mjs` 后，可用 `node scripts/experience-smoke.mjs` 验证不传镜像 override 的安装后 tarball；完成后将源码 manifest 恢复为 `image: null`。这是维护者本地检查，不再占用 Actions。
 
 ## 发布前提
 
@@ -22,11 +24,11 @@ PR 及其合入 main 后的精确提交必须通过 CI：Node 22.19/24、固定 
 
 ## 发布经过审查的 main 提交
 
-1. 合并发布 PR，记录 main SHA，等待这个精确提交的 **push CI** 成功；PR CI 或旧 main CI 不能替代。
+1. 完成本地相关验证，在发布 PR 记录证据，合并后记录 main SHA，无需等待 GitHub CI。
 2. 获得发布授权后，打开 **Actions → Publish package → Run workflow**，选择 `main`。CLI 等价命令是 `gh workflow run release.yml --ref main`。记录运行的 head SHA，核对它就是待发布源码。
-3. 工作流在两个原生架构上构建镜像并验证安装后的 CLI/浏览器，推送候选镜像、组装多平台 digest，并匿名拉取。随后执行包检查、registry 归属/版本检查、digest 绑定，再用独立安装的本地 tarball 验证**不传 `--image`** 的启动流程。
-4. npm Trusted Publishing 携带 provenance 发布；工作流下载精确 npm 版本，检查 SDK/类型、dist-tag，以及使用包内 digest 的真实 CLI/原生浏览器流程，最后创建相同源码提交的 tag 与 GitHub Release。
-5. 核对 npm `latest=0.8.0`、`v0.8.0` 指向运行 SHA、GitHub Release 存在。全新本地环境执行 `npx -y dsh-multi-tenant@0.8.0 start`，验证原生 Web、停止重启后的文件与历史。工作流的 Linux 消费者证据不替代 Desktop 验收。
+3. 工作流在 native amd64/arm64 runner 构建发布镜像、推送、组装多平台 digest，并匿名检查 manifest，不下载全部镜像层。不安装 Playwright 或执行质量测试；随后构建 npm 包、检查 registry 归属/版本，并绑定公开镜像 digest。
+4. npm Trusted Publishing 携带 provenance 发布；轻量分发检查下载精确 npm 版本，检查 exports、AI 指引、CLI help、固定镜像引用、匿名 manifest 访问及 dist-tag，不启动原生 Host、浏览器或 SDK 测试套件。最后创建同一源码提交的 tag 与 GitHub Release。
+5. 核对 npm `latest=0.8.0`、`v0.8.0` 指向运行 SHA、GitHub Release 存在。在本地执行 `node scripts/registry-smoke.mjs 0.8.0 latest` 和 `node scripts/experience-smoke.mjs dsh-multi-tenant@0.8.0`（需要 Docker/Chromium），或在全新环境验证 `npx -y dsh-multi-tenant@0.8.0 start`。确认原生 Web、停止重启后的文件与历史，并记录实际硬件覆盖。
 
 npm 包通过固定镜像引用管理 DSH。使用者不需要 GHCR 登录、DSH 源码或本机构建镜像。本项目尚未配置 DockerHub 分发。
 
