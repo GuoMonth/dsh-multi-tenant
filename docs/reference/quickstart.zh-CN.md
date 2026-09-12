@@ -1,19 +1,19 @@
 # 本机开发者体验
 
-这是 0.8.0 源码的使用说明。当前分支尚未发布；0.7.1 不包含 CLI。正式发布必须先通过运行镜像和 npm 消费者验收。
+本文对应 0.8.0。先用 `npm view dsh-multi-tenant@0.8.0 version` 核对是否可用；尚不可用时走下方源码验证流程。0.7.1 不包含 CLI，正式产物内置经过验证的镜像 digest。
 
-## 发布后的入口
+## npm 入口
 
-先准备 Node 22.19+/24+、正在运行的本机 Docker（Linux containers）。不需要 pnpm、DSH、仓库源码、模型密钥或 Docker registry 登录。
+先准备 Node 22.19 或更新的 22.x，或 Node 24+、正在运行的本机 Docker（Linux containers）。不需要 pnpm、DSH、仓库源码、模型密钥或 Docker registry 登录。
 
 ```sh
-npx -y dsh-multi-tenant@latest start
+npx -y dsh-multi-tenant@0.8.0 start
 ```
 
 或全局安装后运行：
 
 ```sh
-npm install -g dsh-multi-tenant
+npm install -g dsh-multi-tenant@0.8.0
 dsh-multi-tenant start
 ```
 
@@ -40,8 +40,7 @@ dsh-multi-tenant start --no-open --port 3080 --data-dir /absolute/private/path
 
 ## 平台支持
 
-- Linux + 本机 Docker Engine：本地原生链路验证。
-- linux/arm64：镜像发布工作流在 native runner 执行相同验收，成功后才发布。
+- Linux amd64/arm64 + 本机 Docker Engine：已通过原生 runner 上的安装后 CLI CI；镜像发布时重复验证。
 - macOS / Windows Docker Desktop：新的 provider 不再依赖宿主 bind path、UID 或 Unix Socket；实机认证与浏览器验证未完成前视为实验支持。
 - 远程 Docker、Windows containers：明确拒绝。仅安装 Docker Desktop 不代表 daemon 已启动。
 
@@ -53,9 +52,12 @@ dsh-multi-tenant start --no-open --port 3080 --data-dir /absolute/private/path
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm build
 docker build -f packages/multi-tenant/runtime/Dockerfile -t dsh-experience:dev packages/multi-tenant
 docker image inspect dsh-experience:dev --format '{{.Id}}'
 node packages/multi-tenant/dist/cli.mjs start --image sha256:<输出的ID> --data-dir /tmp/dsh-experience-dev
 ```
 
 `--image` 只接受固定 digest/本地 image ID。源码 manifest 的 image 为 null，避免发布前假装镜像已经存在。正式发布工作流先发布并匿名验证固定镜像，再将 digest 注入 npm 产物。
+
+通过 npx 启动且未全局安装时，管理命令也用 `npx -y dsh-multi-tenant@0.8.0 status`（或 `stop`/`doctor`）。需要 AI 协助时参阅 [AI 项目导航](../../packages/multi-tenant/AI.md)。

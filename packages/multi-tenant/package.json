@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant",
   "version": "0.8.0",
-  "description": "Principal-isolated native DeepSeek Harness Hosts: domain directory, runtime lifecycle and authenticated HTTP/WebSocket ingress.",
+  "description": "One-command local DeepSeek Harness workbench and SDK for Principal-isolated native DSH Hosts.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
   "repository": {
@@ -39,7 +39,8 @@
     "runtime",
     "src/native/tcp-relay.mjs",
     "experience",
-    "runtime-manifest.json"
+    "runtime-manifest.json",
+    "AI.md"
   ],
   "keywords": [
     "deepseek-harness",

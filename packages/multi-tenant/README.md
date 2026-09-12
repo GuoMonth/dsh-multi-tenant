@@ -1,13 +1,36 @@
 # dsh-multi-tenant
 
-> **0.8.0 source: one-command experience (not released yet).** After release: `npx -y dsh-multi-tenant@latest start`. Requires Node/npm and running local Docker; no API key or manual profile. 0.7.1 does not include the CLI. See the [quickstart](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md). The SDK integration guide follows.
-
-
 [简体中文](README.zh-CN.md) · [Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases) · [Changelog](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CHANGELOG.md)
 
 Give each signed-in user their own native DeepSeek Harness environment. Users keep DSH's chat, workspaces, files, presets and subagents, while the platform separates their data and execution from other users.
 
-This package is for **developers building a multi-user DSH service**. It provides the integration layer between your existing authentication system and independently running DSH Hosts.
+Use the CLI to try a complete local workbench, or the SDK to connect independent DSH Hosts to your existing authentication system. This project starts and manages DSH; it is not a multi-user plugin installed inside a shared DSH Host.
+
+## Try it with one command
+
+Requires Node 22.19 or newer 22.x, or Node 24+, and running local Docker with Linux containers. No manual DSH installation, image build or API key is needed.
+
+```sh
+npx -y dsh-multi-tenant@0.8.0 start
+```
+
+This guide targets 0.8.0. Check availability with `npm view dsh-multi-tenant@0.8.0 version`; if unavailable, use the [source verification flow](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md). Older 0.7.1 has no CLI. After publication, `@latest` also selects the current stable release.
+
+Choose Alice or Bob in the browser to enter their own native DSH workbench. The deterministic demo model reads samples, creates files and delegates to subagents; real AI requires provider credentials in native Settings. Ctrl-C stops the workbench and retains data. Linux amd64/arm64 pass CI; macOS/Windows Docker Desktop remains experimental.
+
+[Startup, management and troubleshooting](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md)
+
+## Use with an AI coding agent
+
+Give your coding agent this prompt:
+
+```text
+Read https://raw.githubusercontent.com/GuoMonth/dsh-multi-tenant/main/packages/multi-tenant/AI.md,
+check the current npm version and my local environment, then help me start and verify dsh-multi-tenant.
+Before changing repository code, read the root AGENTS.md and identify the relevant checks.
+```
+
+The [AI project guide](AI.md) covers evaluation, SDK integration, source navigation and troubleshooting. [AGENTS.md](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/AGENTS.md) provides repository development instructions. The npm package includes `AI.md`; prefer the bundled guide when working with an installed version.
 
 ## Where it fits
 
@@ -19,7 +42,7 @@ This package is for **developers building a multi-user DSH service**. It provide
 
 A typical visit is: **sign in → resolve the user's domain → start or reuse its DSH Host → open native DSH Web**. A browser reconnect returns to the same domain; it does not create a new Host for every request or session.
 
-## What 0.7.1 delivers
+## What the platform SDK provides
 
 - A domain directory keyed by `(tenantId, principalId)`, keeping identity and desired state across platform restarts.
 - Deduplicated Host startup, generation checks, suspension/revocation, bounded shutdown and verified recovery after a coordinator crash.
@@ -29,20 +52,22 @@ A typical visit is: **sign in → resolve the user's domain → start or reuse i
 
 ## Decide whether this version suits your deployment
 
-**This is a developer integration package.** Docker uses bridge networking by default, allowing external model APIs and remote MCP. Set `network: 'none'` when offline operation is needed. Starting with 0.7.1, bridge replaces the offline default in 0.7.0. Login/SSO, TLS, domain provisioning, quotas and operational monitoring are responsibilities of the embedding platform; an account-management UI or a ready-made hosted service is not included.
+**This is a developer integration package.** Docker uses bridge networking by default, allowing external model APIs and remote MCP. Set `network: 'none'` when offline operation is needed. Starting with 0.7.1, bridge replaces the offline default in 0.7.0. Login/SSO, TLS, domain provisioning, quotas and operational monitoring are responsibilities of the embedding platform; the CLI’s local demo identities do not provide account management or a hosted service.
 
 The security boundary is the **user within a tenant**, not each project or conversation. Two workspaces belonging to one Principal are not promised to be mutually confidential. Native permissions, tool filters, stop/archive/delete and preset selection retain native semantics. Team-shared domains, project ACLs, cross-user session sharing, automatic idle eviction and multi-machine scheduling are outside this version.
 
 Independent Hosts have a fixed memory and startup cost; an inactive browser can still have background work. Choose resource limits and when to stop domains from your workload. Platform administration, authentication secrets and the Docker socket must stay outside every native Host.
 
+**Upgrading from 0.7.1 to 0.8.0:** Existing SDK APIs are unchanged. The new CLI uses separate control state and image-pinned Docker volumes; it does not import platform data automatically.
+
 **Upgrading from 0.7.0:** Existing domain data and integration APIs retain their structure. The network default changes: explicitly set `network: 'none'` before upgrading if offline restrictions must remain. To adopt the included Dockerfile, rebuild the image, stop existing Hosts, update the image ID and restart.
 
 **Upgrading from 0.5.x or earlier:** 0.7.0 changes the integration architecture and public API. The shared-process Cordis plugin, per-Agent resource API and custom panel are removed. Start with a new platform directory, replace the integration code and preserve old data separately; there is no automatic legacy-data migration. The 0.6.0 source milestone was not published to npm.
 
-## First steps
+## SDK integration entry
 
 ```sh
-npm install dsh-multi-tenant@0.7.1
+npm install dsh-multi-tenant@0.8.0
 # Check the installed platform API without Docker or an external model:
 node node_modules/dsh-multi-tenant/examples/native-domains/smoke.mjs
 ```
@@ -63,15 +88,15 @@ For a complete keyless native Web demonstration from source, install the reposit
 - Platform administration, authentication secrets, the domain directory and Docker socket stay outside every native Host. Native settings and credentials belong only to that domain.
 - The platform is trusted code. Do not mount its API in the native Web server or derive domain identity, image, profile paths, runtime endpoints or origins from browser parameters.
 
-## Install and prerequisites
+## SDK installation and prerequisites
 
 ```sh
-npm install dsh-multi-tenant@0.7.1
+npm install dsh-multi-tenant@0.8.0
 ```
 
 To test an unreleased checkout, build and install its tarball with `pnpm --filter dsh-multi-tenant pack`.
 
-The coordinator requires Node 22.19 or Node 24+. The included providers target Linux. `DockerRuntimeProvider` requires a local Docker engine and a prebuilt immutable image containing **DSH 0.1.5-rc.2**, pinned source `fb2c4b9e698e30edb738bca4cf0618587db7d203`. Run the coordinator as a non-root user with Docker access; the reference runtime UID/GID must match that user so both sides can access the private control files. It does not download DSH into the platform process. TypeScript consumers should install `@types/node` and include `node` in compiler `types`.
+The coordinator requires Node 22.19 or Node 24+. The public SDK reference providers target Linux; the CLI uses a separate internal provider. `DockerRuntimeProvider` requires a local Docker engine and a prebuilt immutable image containing **DSH 0.1.5-rc.2**, pinned source `fb2c4b9e698e30edb738bca4cf0618587db7d203`. Run the coordinator as a non-root user with Docker access; the reference runtime UID/GID must match that user so both sides can access the private control files. It does not download DSH into the platform process. TypeScript consumers should install `@types/node` and include `node` in compiler `types`.
 
 Docker defaults to `--network bridge`; set `network: 'none'` for `--network none`. No ports are published and the native server listens on container loopback. Bridge allows access to reachable host/LAN services and other containers on the same bridge; it is not a network tenant boundary. Apply deployment firewall policy when network separation is required. External API credentials remain necessary. The local process provider is for trusted development, not hostile workloads.
 
@@ -117,7 +142,7 @@ docker build -f packages/multi-tenant/runtime/Dockerfile -t dsh-domain-runtime:l
 docker image inspect dsh-domain-runtime:local --format '{{.Id}}'
 ```
 
-Pass the resulting `sha256:...` as the provider `image`, then provision each domain profile below. The Dockerfile and dependency lock ship in the npm package, without fixture models, fixture MCP or credentials. The base image digest and npm dependencies are pinned; OS tools take current Debian repository security updates, so use the final image ID as deployment identity.
+Pass the resulting `sha256:...` as the provider `image`, then provision each domain profile below. The Dockerfile and dependency lock ship in the npm package, with explicitly labeled CLI demo model/MCP assets and no real credentials. SDK profiles do not enable these demo features automatically. The base image digest and npm dependencies are pinned; OS tools take current Debian repository security updates, so use the final image ID as deployment identity.
 
 Includes Bash, Git/SSH client, curl/wget, jq, ripgrep, text/archive utilities, Python 3/venv/pip, C/C++ build tools and the base image's Node/npm. Account-dependent AI CLIs, browsers and additional language SDKs belong in project-specific derived images. The runtime root is read-only: install Python packages into `/domain/.venv` and Node dependencies into projects under `/domain`. `/tmp` is noexec; set `TMPDIR` to a writable directory under `/domain` when build/install tools need executable temporary files. The provider overrides the image's default user with the configured non-root UID/GID.
 

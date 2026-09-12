@@ -116,6 +116,14 @@ jobs:
           DSH_RUNTIME_IMAGE: ${{ needs.runtime-images.outputs.image }}
         run: node scripts/bind-runtime-image.mjs
 
+      - name: Install native CLI verification dependencies
+        run: |
+          pnpm --dir scripts/native-host-probe install --frozen-lockfile
+          pnpm --dir scripts/native-host-probe exec playwright install --with-deps chromium
+
+      - name: Verify bound tarball CLI without an image override
+        run: node scripts/experience-smoke.mjs
+
       - name: Publish to npm via Trusted Publishing
         if: steps.registry.outputs.publish_needed == 'true'
         working-directory: packages/multi-tenant
@@ -123,6 +131,9 @@ jobs:
 
       - name: Verify registry artifact and dist-tag
         run: node scripts/registry-smoke.mjs "$RELEASE_VERSION" "$NPM_TAG"
+
+      - name: Verify published npm CLI with its bundled runtime
+        run: node scripts/experience-smoke.mjs "dsh-multi-tenant@$RELEASE_VERSION"
 
       - name: Create matching Git tag and GitHub release
         env:
