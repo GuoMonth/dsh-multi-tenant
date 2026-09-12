@@ -1,0 +1,26 @@
+[
+  {
+    "id": "experience-mcp",
+    "name": "@deepseek-ai/dsh-mcp-client",
+    "config": {
+      "transport": "stdio",
+      "serverName": "experience",
+      "command": "/usr/local/bin/node",
+      "args": [
+        "/opt/dsh/experience/mcp.mjs"
+      ],
+      "reconnect": {
+        "enabled": false
+      }
+    }
+  },
+  {
+    "id": "delegate",
+    "name": "@deepseek-ai/dsh-tool-subagent",
+    "config": {
+      "provider": "spawn",
+      "toolName": "demo_delegate",
+      "backgroundMode": "continuable"
+    }
+  }
+]

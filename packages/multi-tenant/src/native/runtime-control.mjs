@@ -29,7 +29,14 @@ export function apply(ctx, config) {
         type: 'runtime-ready', domainId, generation, version: manifest.version, endpoint,
         authentication: { cookie },
       }
-      if (control) {
+      if (control && config.transport === 'tcp') {
+        const { createAuthenticatedRelay } = await import('./tcp-relay.mjs')
+        const close = await createAuthenticatedRelay(endpoint, cookie)
+        ctx.effect(() => close, 'domain runtime: authenticated TCP transport')
+        const temporary = join(control, 'ready.tmp')
+        await writeFile(temporary, JSON.stringify(ready), { mode: 0o600 })
+        await rename(temporary, join(control, 'ready.json'))
+      } else if (control) {
         const sockets = new Set()
         const relay = createServer(socket => {
           sockets.add(socket)

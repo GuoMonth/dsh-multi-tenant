@@ -1,6 +1,6 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Principal-isolated native DeepSeek Harness Hosts: domain directory, runtime lifecycle and authenticated HTTP/WebSocket ingress.",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
@@ -36,7 +36,10 @@
     "LICENSE",
     "examples",
     "CHANGELOG.md",
-    "runtime"
+    "runtime",
+    "src/native/tcp-relay.mjs",
+    "experience",
+    "runtime-manifest.json"
   ],
   "keywords": [
     "deepseek-harness",
@@ -67,5 +70,8 @@
   "dshRuntime": {
     "version": "0.1.5-rc.2",
     "commit": "fb2c4b9e698e30edb738bca4cf0618587db7d203"
+  },
+  "bin": {
+    "dsh-multi-tenant": "dist/cli.mjs"
   }
 }

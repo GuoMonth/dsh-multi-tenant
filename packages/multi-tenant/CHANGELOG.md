@@ -1,5 +1,13 @@
 # Changelog / 更新记录
 
+## 0.8.0 (source, unreleased)
+
+- Add one-command local CLI, persistent Alice/Bob workspaces and explicit keyless demo.
+- Add daemon-owned volumes and authenticated loopback relay for local Docker contexts.
+- Publish verified native amd64/arm64 runtime images before binding the digest into npm.
+- Keep existing platform SDK; no implicit data migration or public demo authentication.
+
+
 Published artifacts and tags are listed in [GitHub Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases). Source milestones do not necessarily have an npm release.
 
 ## 0.7.1 — 2026-09-11

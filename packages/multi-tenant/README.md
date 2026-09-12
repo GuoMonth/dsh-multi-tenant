@@ -1,5 +1,8 @@
 # dsh-multi-tenant
 
+> **0.8.0 source: one-command experience (not released yet).** After release: `npx -y dsh-multi-tenant@latest start`. Requires Node/npm and running local Docker; no API key or manual profile. 0.7.1 does not include the CLI. See the [quickstart](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md). The SDK integration guide follows.
+
+
 [简体中文](README.zh-CN.md) · [Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases) · [Changelog](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CHANGELOG.md)
 
 Give each signed-in user their own native DeepSeek Harness environment. Users keep DSH's chat, workspaces, files, presets and subagents, while the platform separates their data and execution from other users.

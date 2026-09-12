@@ -5,3 +5,6 @@
 !src/
 !src/native/
 !src/native/runtime-control.mjs
+!src/native/tcp-relay.mjs
+!experience/
+!experience/**

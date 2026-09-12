@@ -1,0 +1,61 @@
+[
+  {
+    "id": "web-runtime",
+    "config": {
+      "printUrl": false,
+      "openBrowser": false
+    }
+  },
+  {
+    "id": "session-title-llm",
+    "disabled": true
+  },
+  {
+    "id": "session-telemetry-otel",
+    "disabled": true
+  },
+  {
+    "id": "agent-default-model",
+    "config": {
+      "provider": "experience",
+      "model": "demo"
+    }
+  },
+  {
+    "id": "session-query-sqlite",
+    "config": {
+      "path": "/domain/query.sqlite",
+      "openAt": "first-search"
+    }
+  },
+  {
+    "id": "agent-presets",
+    "config": {
+      "default": "demo",
+      "includeUserRoot": true,
+      "includeShippedRoot": true,
+      "roots": [
+        {
+          "path": "/opt/dsh/experience/presets",
+          "trust": "system"
+        }
+      ]
+    }
+  },
+  {
+    "insert": [
+      {
+        "id": "domain-runtime-control",
+        "name": "/opt/dsh/runtime-control.mjs",
+        "config": {
+          "runtimeManifest": "/opt/dsh/node_modules/@deepseek-ai/dsh/package.json",
+          "transport": "tcp"
+        }
+      },
+      {
+        "id": "experience-model",
+        "name": "/opt/dsh/experience/model.mjs"
+      }
+    ]
+  }
+]

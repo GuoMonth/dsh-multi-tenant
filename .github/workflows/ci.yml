@@ -29,6 +29,11 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_GC: '1'
       - run: pnpm probe:image
+      - name: Installed one-command CLI
+        run: |
+          set -euo pipefail
+          docker build -f packages/multi-tenant/runtime/Dockerfile -t dsh-experience:ci packages/multi-tenant
+          DSH_EXPERIENCE_IMAGE=$(docker image inspect dsh-experience:ci --format '{{.Id}}') node scripts/experience-smoke.mjs
       - run: pnpm probe:isolated
         env:
           # Keep native Unix socket paths within Linux's 107-byte limit.

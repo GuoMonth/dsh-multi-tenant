@@ -1,0 +1,11 @@
+{
+  "checks": [
+    "Installed CLI opens real native Web; two Principals run private MCP samples, file generation and native delegation",
+    "Raw published relay denies unauthenticated/native token-exchange access; worker has no host bind mounts",
+    "Stop/start keeps native history and generated files in the same domain"
+  ],
+  "measurements": {
+    "launchMs": 74.80340199999773
+  },
+  "passed": true
+}
