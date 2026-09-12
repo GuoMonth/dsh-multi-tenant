@@ -4,7 +4,7 @@
 
 - `pnpm release:check`: passed; 40 package tests, 4 script tests, typecheck/build, SQLite recovery probe, independently installed SDK consumer.
 - `scripts/experience-smoke.mjs`: passed against the local image built from runtime/Dockerfile, using an independently packed/installed npm package, npm bin resolution and its real CLI.
-- Browser: one-time bootstrap, Alice/Bob distinct localhost origins, real native DSH Web, private sample MCP, file creation, native child catalog, restart and retained file. Direct unauthenticated/native token-exchange access to the worker relay returns 401.
+- Browser: one-time bootstrap, Alice/Bob distinct localhost origins, real native DSH Web, private sample MCP, file creation, native child catalog, restart and retained file, explicit native turn-history query, CLI SIGKILL and exact orphan recovery. Direct unauthenticated/native token-exchange access to the worker relay returns 401.
 - The restart test removes the local seeding marker to cover interrupted publication; native session facts prevent duplicate creation.
 - `linux-report.json` is the runner result. Its launchMs measures the final CLI process readiness, not image download or first native Host startup; it is not a product performance claim. Screenshots show the native entry state.
 - `pnpm probe:image`: native readiness/tools plus bridge HTTPS egress and explicit none blocking passed.

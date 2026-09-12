@@ -88,10 +88,21 @@ try {
   await rm(join(directory,'seeded.json')) // simulate interruption after native seeding but before local publication
   const next = await launch()
   await openUser(a, next, 'alice')
+  const oldHistory = await a.evaluate(async () => {
+    const result = await fetch('/api/session/list', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'client-request',rpcId:'history',method:'session/list',payload:{args:{_request:{}}}})}).then(r=>r.json())
+    return JSON.stringify(result.result.value)
+  })
+  assert.ok(oldHistory.includes('Create a file'), 'native turn history must survive stop/start')
   await send(a, 'Read my sample', 'This private sample belongs to alice.')
   const output = execFileSync('docker',['ps','--filter',`label=dsh.instance=${config.instance}`,'--format','{{.Names}}'],{encoding:'utf8'}).trim()
   assert.match(execFileSync('docker',['exec',output,'cat','/domain/workspace/demo-output.md'],{encoding:'utf8'}), /Created for alice/)
   report.checks.push('Stop/start keeps native history and generated files in the same domain')
+  const oldContainerId = execFileSync('docker',['inspect',output,'--format','{{.Id}}'],{encoding:'utf8'}).trim()
+  const killed = once(child, 'exit'); child.kill('SIGKILL'); await killed
+  const recovered = await launch()
+  assert.throws(()=>execFileSync('docker',['inspect',oldContainerId],{stdio:'pipe'}), 'recovery must remove the exact orphan before new admission')
+  await openUser(a, recovered, 'alice')
+  report.checks.push('CLI SIGKILL recovery removes its exact orphan before reusing persistent storage')
   report.passed = true
 } catch (error) { failure = error; report.error = safeError(error) }
 finally {
