@@ -12,6 +12,7 @@ const installed = installArtifact()
 const root = await mkdtemp(join(tmpdir(), 'dsh-cli-'))
 const directory = join(root, 'state')
 const cli = join(installed.packageDirectory, 'dist/cli.mjs')
+assert.match(execFileSync('npm', ['exec', '--offline', '--', 'dsh-multi-tenant', '--help'], { cwd: installed.directory, encoding: 'utf8' }), /start\|status\|stop\|doctor/)
 let child, browser, failure
 const report = { checks: [], measurements: {}, passed: false }
 const run = (...args) => execFileSync(process.execPath, [cli, ...args, '--data-dir', directory], { encoding: 'utf8' })

@@ -6,8 +6,9 @@ const tools = [
   { name: 'create_file', description: 'Create a sample Markdown file in the current workspace', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
 ]
 for await (const line of createInterface({ input: process.stdin })) {
+  let req
   try {
-    const req = JSON.parse(line)
+    req = JSON.parse(line)
     if (req.id === undefined) continue
     let result
     if (req.method === 'initialize') result = { protocolVersion: req.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'dsh-experience', version: '1.0.0' } }
@@ -24,5 +25,7 @@ for await (const line of createInterface({ input: process.stdin })) {
       result = { content: [{ type: 'text', text }] }
     } else { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, error: { code: -32601, message: 'Method not found' } }) + '\n'); continue }
     process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, result }) + '\n')
-  } catch { /* Invalid input must not leak paths or corrupt the stdio protocol. */ }
+  } catch {
+    if (req?.id !== undefined) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, error: { code: -32603, message: 'The demo tool could not complete. Check the sample file in your workspace.' } }) + '\n')
+  }
 }

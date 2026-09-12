@@ -23,3 +23,17 @@ test('the Desktop relay gates every HTTP and upgrade path before native DSH', as
     assert.equal(calls, 1)
   } finally { await close(); native.closeAllConnections(); await new Promise(resolve => native.close(resolve)) }
 })
+
+test('demo MCP responds to an invalid tool instead of leaving a native call hanging', async () => {
+  const { spawn } = await import('node:child_process')
+  const child = spawn(process.execPath, ['packages/multi-tenant/experience/mcp.mjs'], { stdio: ['pipe','pipe','pipe'] })
+  try {
+    const response = once(child.stdout, 'data')
+    child.stdin.write(JSON.stringify({jsonrpc:'2.0',id:7,method:'tools/call',params:{name:'unknown'}})+'\n')
+    const [bytes] = await response
+    const message = JSON.parse(String(bytes))
+    assert.equal(message.id,7)
+    assert.equal(message.error.code,-32603)
+    assert.ok(!message.error.message.includes('node:'))
+  } finally { child.stdin.end(); await once(child,'exit') }
+})
