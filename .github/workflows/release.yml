@@ -9,13 +9,29 @@ permissions:
   actions: read
   contents: write
   id-token: write
+  packages: write
 
 concurrency:
   group: npm-dsh-multi-tenant-release
   cancel-in-progress: false
 
 jobs:
+  eligible:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate all publication on successful main CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          CONCLUSION=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" --event push --limit 1 --json conclusion --jq '.[0].conclusion // ""')
+          test "$CONCLUSION" = success
+  runtime-images:
+    needs: eligible
+    uses: ./.github/workflows/runtime-images.yml
   publish:
+    needs: runtime-images
     name: publish dsh-multi-tenant
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -94,6 +110,11 @@ jobs:
       - name: Check registry ownership and version state
         id: registry
         run: node scripts/registry-preflight.mjs "$RELEASE_VERSION"
+
+      - name: Bind the verified runtime image to the npm artifact
+        env:
+          DSH_RUNTIME_IMAGE: ${{ needs.runtime-images.outputs.image }}
+        run: node scripts/bind-runtime-image.mjs
 
       - name: Publish to npm via Trusted Publishing
         if: steps.registry.outputs.publish_needed == 'true'

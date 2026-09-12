@@ -29,6 +29,11 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_GC: '1'
       - run: pnpm probe:image
+      - name: Installed one-command CLI
+        run: |
+          set -euo pipefail
+          docker build -f packages/multi-tenant/runtime/Dockerfile -t dsh-experience:ci packages/multi-tenant
+          DSH_EXPERIENCE_IMAGE=$(docker image inspect dsh-experience:ci --format '{{.Id}}') node scripts/experience-smoke.mjs
       - run: pnpm probe:isolated
         env:
           # Keep native Unix socket paths within Linux's 107-byte limit.
@@ -95,3 +100,22 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Run complete release evidence
         run: pnpm release:check
+
+  experience-arm64:
+    name: Installed CLI (native arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          runtime: node@24
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir scripts/native-host-probe install --frozen-lockfile
+      - run: pnpm --dir scripts/native-host-probe exec playwright install --with-deps chromium
+      - name: Build and verify the CLI on ARM
+        run: |
+          set -euo pipefail
+          docker build -f packages/multi-tenant/runtime/Dockerfile -t dsh-experience:arm-ci packages/multi-tenant
+          DSH_EXPERIENCE_IMAGE=$(docker image inspect dsh-experience:arm-ci --format '{{.Id}}') node scripts/experience-smoke.mjs

@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "Installed CLI opens real native Web; two Principals run private MCP samples, file generation and native delegation",
+    "Raw published relay denies unauthenticated/native token-exchange access; worker has no host bind mounts",
+    "Stop/start keeps native history and generated files in the same domain",
+    "CLI SIGKILL recovery removes its exact orphan before reusing persistent storage"
+  ],
+  "measurements": {
+    "launchMs": 324.9052300000003
+  },
+  "passed": true
+}

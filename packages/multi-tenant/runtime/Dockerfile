@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /opt/dsh
 COPY runtime/package.json runtime/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
-COPY src/native/runtime-control.mjs ./runtime-control.mjs
+COPY src/native/*.mjs ./
+COPY experience ./experience
 ENV HOME=/domain DSH_HOME=/domain/dsh-home DSH_CONTROL_DIR=/control \
     PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /domain

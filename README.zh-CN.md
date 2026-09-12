@@ -1,5 +1,12 @@
 # dsh-multi-tenant
 
+> **0.8.0 源码：一行启动体验（尚未发布）**。新增 CLI，自动准备原生运行镜像并打开本机工作台。0.7.1 不包含此命令。
+>
+> 发布后：`npx -y dsh-multi-tenant@latest start`
+>
+> 只需 Node/npm 与可用 Docker；默认免 API key。参见[快速体验与源码验证](docs/reference/quickstart.zh-CN.md)。以下保留平台 SDK 的完整接入说明。
+
+
 [English](README.md) · [版本发布](https://github.com/GuoMonth/dsh-multi-tenant/releases) · [更新记录](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CHANGELOG.md)
 
 让每位登录用户拥有自己的原生 DeepSeek Harness 工作环境。用户继续使用 DSH 的聊天、workspace、文件、preset 和子代理，平台负责将不同用户的数据与执行环境隔离。

@@ -1,0 +1,68 @@
+name: Runtime images
+on:
+  workflow_call:
+    outputs:
+      image:
+        description: Verified multi-platform runtime digest
+        value: ${{ jobs.manifest.outputs.image }}
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          runtime: node@24
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir scripts/native-host-probe install --frozen-lockfile
+      - run: pnpm --dir scripts/native-host-probe exec playwright install --with-deps chromium
+      - name: Build and prove the real CLI on native architecture
+        env:
+          IMAGE_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}-runtime:candidate-${GITHUB_SHA}-${IMAGE_ARCH}"
+          docker build -f packages/multi-tenant/runtime/Dockerfile -t "$IMAGE" packages/multi-tenant
+          DSH_EXPERIENCE_IMAGE=$(docker image inspect "$IMAGE" --format '{{.Id}}') node scripts/experience-smoke.mjs
+          echo "RUNTIME_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+      - name: Push candidate
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$RUNTIME_IMAGE"
+  manifest:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.digest.outputs.image }}
+    steps:
+      - name: Assemble version identity
+        id: digest
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}-runtime"
+          docker buildx imagetools create -t "$IMAGE:commit-$GITHUB_SHA" "$IMAGE:candidate-$GITHUB_SHA-amd64" "$IMAGE:candidate-$GITHUB_SHA-arm64"
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE:commit-$GITHUB_SHA" --format '{{json .Manifest}}' | jq -r '.digest')
+          [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          docker logout ghcr.io
+          # Public visibility must be configured for this package before release.
+          # Anonymous failure stops npm publication rather than shipping a broken CLI.
+          DOCKER_CONFIG=$(mktemp -d) docker pull "$IMAGE@$DIGEST"
+          echo "image=$IMAGE@$DIGEST" >> "$GITHUB_OUTPUT"
