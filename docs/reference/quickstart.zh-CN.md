@@ -40,7 +40,7 @@ dsh-multi-tenant start --no-open --port 3080 --data-dir /absolute/private/path
 
 ## 平台支持
 
-- Linux amd64/arm64 + 本机 Docker Engine：已通过原生 runner 上的安装后 CLI CI；镜像发布时重复验证。
+- Linux amd64/arm64 + 本机 Docker Engine：已有原生 runner 上的安装后 CLI 验证记录；后续质量验证在本地执行，并记录实际覆盖平台。
 - macOS / Windows Docker Desktop：新的 provider 不再依赖宿主 bind path、UID 或 Unix Socket；实机认证与浏览器验证未完成前视为实验支持。
 - 远程 Docker、Windows containers：明确拒绝。仅安装 Docker Desktop 不代表 daemon 已启动。
 

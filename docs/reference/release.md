@@ -12,7 +12,9 @@ node scripts/registry-preflight.mjs 0.8.0
 
 These commands do not publish. The full check validates metadata, pinned dependencies/actions, public types, tests, build, SQLite recovery and an independently installed SDK tarball. Keep both READMEs, package copies, AI.md, changelogs and release notes consistent. Source `runtime-manifest.json` must keep `image: null`; a release workflow writes the verified digest into the artifact.
 
-CI must pass on the release PR and then on the exact merged main commit: Node 22.19/24, pinned DSH source, installed native domain isolation, and installed CLI on native Linux amd64/arm64. macOS/Windows Docker Desktop is experimental until real-machine acceptance is recorded; Linux CI is not Desktop evidence.
+Quality verification runs locally. There is no push/PR CI workflow and no required GitHub check before publication. Record the commit, commands, results, Node version and actual platform coverage in the release PR. Existing amd64/arm64 evidence remains historical proof, not a promise that every future change was tested on both architectures. macOS/Windows Docker Desktop remains experimental until real-machine evidence is recorded.
+
+For runtime/CLI changes, also run the relevant native probes locally. After binding a real public digest with `DSH_RUNTIME_IMAGE=ghcr.io/...@sha256:... node scripts/bind-runtime-image.mjs`, use `node scripts/experience-smoke.mjs` to verify the installed tarball without an image override. Restore the source manifest to `image: null` afterward. This is a local maintainer check, not an Actions job.
 
 ## Publication prerequisites
 
@@ -22,11 +24,11 @@ CI must pass on the release PR and then on the exact merged main commit: Node 22
 
 ## Publish the reviewed main commit
 
-1. Merge the release PR, record the resulting main SHA, and wait for its **push CI** to succeed. A PR run or an older main run does not satisfy the gate.
+1. Complete relevant local checks, record their evidence in the release PR, merge it and record the resulting main SHA. Do not wait for GitHub CI.
 2. When publication is authorized, open **Actions → Publish package → Run workflow**, select `main`. CLI equivalent: `gh workflow run release.yml --ref main`. Record the run's head SHA and verify it is the intended source.
-3. The workflow builds each runtime image on its native architecture, runs the installed CLI/browser proof, pushes candidates, assembles a multi-platform digest and tests anonymous pull. It then runs package checks, checks registry ownership/version state, binds that digest and tests an installed local tarball **without `--image`**.
-4. npm Trusted Publishing publishes with provenance. The workflow downloads the exact npm artifact, verifies SDK/types, dist-tag and the real CLI/native browser flow using its bundled digest, then creates the matching source tag and GitHub Release.
-5. Confirm npm `latest=0.8.0`, `v0.8.0` points to the run SHA, and the GitHub Release exists. In a fresh local environment, run `npx -y dsh-multi-tenant@0.8.0 start`; verify native Web and retained files/history after stop/start. The workflow's Linux consumer proof does not replace Desktop acceptance.
+3. The workflow builds release images on native amd64/arm64 runners, pushes them, assembles a multi-platform digest and checks anonymous manifest access without downloading all layers. It does not install Playwright or run quality tests. It builds the npm package, checks registry ownership/version state and binds the public image digest.
+4. npm Trusted Publishing publishes with provenance. A lightweight delivery check downloads the exact npm package, checks exports/AI guide/CLI help, immutable image reference, anonymous manifest access and dist-tag. It does not run the SDK test suite, native Hosts or a browser. The workflow then creates the matching source tag and GitHub Release.
+5. Confirm npm `latest=0.8.0`, `v0.8.0` points to the run SHA, and the GitHub Release exists. Locally run `node scripts/registry-smoke.mjs 0.8.0 latest` and `node scripts/experience-smoke.mjs dsh-multi-tenant@0.8.0` (Docker/Chromium required), or verify `npx -y dsh-multi-tenant@0.8.0 start` in a fresh environment. Check native Web and retained files/history after stop/start. Record actual hardware coverage.
 
 The npm package manages DSH using its bundled immutable runtime reference. Users do not need a GHCR login, DSH checkout or local image build. DockerHub distribution is not configured.
 

@@ -5,6 +5,8 @@
 - Add one-command local CLI, persistent Alice/Bob workspaces and explicit keyless demo.
 - Add daemon-owned volumes and authenticated loopback relay for local Docker contexts.
 - Publish verified native amd64/arm64 runtime images before binding the digest into npm.
+- Run quality checks locally; remove push/PR CI and repeated release-time browser/native tests, keeping manual publication and artifact verification.
+- 质量验证改为本地执行，移除自动 CI 和发版重复测试；保留手动发布及产物核验。
 - Add an npm-bundled AI guide and repository agent instructions; verify the published CLI with its bundled runtime digest.
 - 新增随 npm 分发的 AI 导航与仓库开发指引；发布后验证包内镜像启动链路。
 - Keep existing platform SDK; no implicit data migration or public demo authentication.

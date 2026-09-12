@@ -19,7 +19,7 @@ pnpm install --frozen-lockfile
 pnpm release:check
 ```
 
-`release:check` performs metadata/contract checks, typechecking, tests, build, SQLite proof and an independently installed tarball SDK smoke; it does not publish. For narrow edits, run relevant checks first. Before a release PR, run the complete release check. Keep Node 22.19 and Node 24 CI green.
+`release:check` performs metadata/contract checks, typechecking, tests, build, SQLite proof and an independently installed tarball SDK smoke; it does not publish. For narrow edits, run relevant checks first. Before a release PR, run the complete release check. Record local validation and the tested Node version in the PR; GitHub does not repeat quality tests.
 
 Runtime, CLI, ingress or public API changes also require the relevant installed/native proof, on a machine with local Docker and Chromium:
 
@@ -29,7 +29,7 @@ pnpm --dir scripts/native-host-probe exec playwright install chromium
 pnpm probe:isolated
 ```
 
-For CLI/image changes, build the runtime image as described in the AI guide, then run `DSH_EXPERIENCE_IMAGE=sha256:<actual-image-id> node scripts/experience-smoke.mjs`. `pnpm probe:image` verifies the installed runtime image and network behavior. CI covers the CLI on native amd64 and arm64. Use `PROBE_CHROMIUM` for an existing compatible browser. Read the probe requirements before running; do not claim Desktop hardware coverage from Linux CI.
+For CLI/image changes, build the runtime image as described in the AI guide, then run `DSH_EXPERIENCE_IMAGE=sha256:<actual-image-id> node scripts/experience-smoke.mjs`. `pnpm probe:image` verifies the installed runtime image and network behavior. Prior CI evidence covers native amd64 and arm64; future validation runs locally on available hardware, with untested architectures stated explicitly. Use `PROBE_CHROMIUM` for an existing compatible browser. Read the probe requirements before running; do not claim Desktop hardware coverage from Linux CI.
 
 ## Editing and delivery
 
@@ -38,4 +38,4 @@ For CLI/image changes, build the runtime image as described in the AI guide, the
 - Update both root READMEs and their npm package copies for user-facing changes; package links must resolve outside a checkout. Keep `AI.md` shipped and current when commands/architecture change.
 - Use meaningful behavioral tests for lifecycle or security changes; documentation edits need link/command/package-content checks rather than mirror tests.
 - Summarize what changed, actual verification and remaining limits in the PR. Never expose one-time URLs, control tokens or model credentials in logs/evidence.
-- Release preparation and publication are distinct. Follow [the release runbook](docs/reference/release.md); an authorized publication uses the manual workflow from a reviewed main commit with successful push CI. Never fabricate an image digest, publish from a feature branch, or tag a commit different from the published source.
+- Release preparation and publication are distinct. Follow [the release runbook](docs/reference/release.md); an authorized publication uses the manual workflow from a reviewed main commit validated locally. Never fabricate an image digest, publish from a feature branch, or tag a commit different from the published source.
