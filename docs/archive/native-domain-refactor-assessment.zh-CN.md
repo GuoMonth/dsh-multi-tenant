@@ -1,3 +1,5 @@
+> Archived snapshot; not current requirements. See the documentation index and active Issue for current scope.
+
 # #68 / #71 原生集成重构评估与对抗性审查
 
 > 契约更新（2026-09-11）：用户已明确采用 Principal 唯一授权边界，取消域内独立根 grant 要求。下文保留原始审查过程与证据，根授权相关阻塞不再属于当前产品验收；当前契约以 [实施方案](native-domain-refactor-plan.zh-CN.md) 为准。
@@ -41,7 +43,7 @@ master 与 rc.2 的定点 diff 显示：本次关注的 `scope/src`、`agent-pre
 
 ## #68：根因是两种不同的关系被塞入一个父链
 
-当前插件在根 Agent 的 `setupMcp` 中安装 Principal MCP，再在 `agent/created` 中把子级接到父 Agent。它仅在子级尚未有 scope parent 时成立。[本项目 runtime-driver](../../packages/multi-tenant/src/runtime-driver.ts)
+当前插件在根 Agent 的 `setupMcp` 中安装 Principal MCP，再在 `agent/created` 中把子级接到父 Agent。它仅在子级尚未有 scope parent 时成立。[本项目 runtime-driver](https://github.com/GuoMonth/dsh-multi-tenant/blob/6d6d5d6ad54de9008f2c74e326612f7e56e9625f/packages/multi-tenant/src/runtime-driver.ts)
 
 真实 preset 装配的关系是：
 

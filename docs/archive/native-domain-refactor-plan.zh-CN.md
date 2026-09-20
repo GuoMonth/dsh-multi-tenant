@@ -1,3 +1,5 @@
+> Archived snapshot; not current requirements. See the documentation index and active Issue for current scope.
+
 # #68 / #71 原生域重构：交付契约与验收
 
 2026-09-11：用户明确批准以下产品契约，替代此前“Principal 宿主内部继续保留独立根 grant”的要求：

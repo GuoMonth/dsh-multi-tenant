@@ -23,7 +23,7 @@ Node 24.18.0 与 Node 22.19.0 均完整通过 `pnpm release:check`：verify / pr
 
 ## 真实浏览器
 
-复现脚本：[browser-check.js](../../../packages/multi-tenant/examples/scoped-web/browser-check.js)。使用 agent-browser 在本机真实 DSH WebServer profile 上操作页面：
+复现脚本：[browser-check.js](https://github.com/GuoMonth/dsh-multi-tenant/blob/6d6d5d6ad54de9008f2c74e326612f7e56e9625f/packages/multi-tenant/examples/scoped-web/browser-check.js)。使用 agent-browser 在本机真实 DSH WebServer profile 上操作页面：
 
 - Acme Alice、Acme Bob、Globex Alice 分别新建资源、发送、运行中 Steer/Stop。
 - 通过原生 subagent 工具委派，进入真实 child 并验证冷续接、发送、Steer/Stop。

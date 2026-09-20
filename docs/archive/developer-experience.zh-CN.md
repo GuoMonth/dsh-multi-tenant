@@ -1,3 +1,5 @@
+> Archived snapshot; not current requirements. See the documentation index and active Issue for current scope.
+
 # 一行启动的开发者体验：评估与实施规划
 
 状态：提案，尚未实现、发布或验证。基于 main `cef1a3b` / 0.7.1，2026-09-12。

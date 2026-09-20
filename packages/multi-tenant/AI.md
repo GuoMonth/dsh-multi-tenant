@@ -1,6 +1,6 @@
 # dsh-multi-tenant: guide for coding agents
 
-> Start here to help a developer try, integrate, understand or modify this project. 中文使用者也可直接将本文交给 AI，要求用中文说明和操作。
+> Use this guide for the existing packaged SDK/CLI. For Cell integration development, use the repository S0 design; this guide is not a mandatory pre-read.
 
 ## Current development policy
 
@@ -91,4 +91,4 @@ Pass the returned immutable `sha256:…` ID (not the literal placeholder) to:
 node packages/multi-tenant/dist/cli.mjs start --image sha256:<returned-id> --data-dir /tmp/dsh-experience-dev
 ```
 
-Use a fresh private data directory for an unrelated test. `pnpm release:check` verifies the package without publishing. Root AGENTS.md maps changes to the appropriate native tests. Report the exact commit, checks actually run, and limitations; a process-ready message alone is not proof the native workbench works.
+Use a fresh private data directory for an unrelated test. `pnpm release:check` verifies the package without publishing. Root CONTRIBUTING.md maps changes to the appropriate native tests. Report the exact commit, checks actually run, and limitations; a process-ready message alone is not proof the native workbench works.
