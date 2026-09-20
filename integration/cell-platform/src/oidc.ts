@@ -3,6 +3,7 @@ import * as oidc from "openid-client";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { RuntimeAccessError } from "@dsh/cell-connector-internal";
 import { randomUUID } from "node:crypto";
+import type { createEnvironmentControl } from "./control.js";
 import type { Environment, PlatformAuthenticator } from "./ingress.js";
 import {
   Sessions,
@@ -24,7 +25,7 @@ interface Entry {
   nonceHash: string;
 }
 interface Transaction {
-  entry: Entry;
+  entry: Entry | undefined;
   verifier: string;
   state: string;
   nonce: string;
@@ -88,10 +89,11 @@ const escape = (value: string) =>
 export async function createOIDCAuthentication(
   options: OIDCOptions,
   secret: string | undefined,
-  input: readonly Environment[],
+  environments: ReadonlyMap<string, Environment>,
   origins: ReadonlyMap<string, string>,
   members: readonly Member[],
   shutdown: AbortSignal,
+  control: ReturnType<typeof createEnvironmentControl>,
 ) {
   const platform = new URL(options.platformOrigin),
     issuer = new URL(options.issuer);
@@ -117,18 +119,20 @@ export async function createOIDCAuthentication(
     issuer.hash
   )
     throw new Error("Invalid OIDC topology");
-  const environments = new Map(input.map((e) => [e.id, structuredClone(e)]));
-  const byHost = new Map<string, Environment>();
-  for (const environment of environments.values()) {
-    const origin = origins.get(environment.id);
-    if (
-      !origin ||
-      !validOrigin(origin) ||
-      origin === platform.origin ||
-      byHost.has(new URL(origin).host)
-    )
-      throw new Error("Invalid environment origin");
-    byHost.set(new URL(origin).host, environment);
+  function environmentForHost(host: string) {
+    const byHost = new Map<string, Environment>();
+    for (const environment of environments.values()) {
+      const origin = origins.get(environment.id);
+      if (
+        !origin ||
+        !validOrigin(origin) ||
+        origin === platform.origin ||
+        byHost.has(new URL(origin).host)
+      )
+        throw new Error("Invalid environment origin");
+      byHost.set(new URL(origin).host, environment);
+    }
+    return byHost.get(host);
   }
   const requestScope = new AsyncLocalStorage<AbortSignal>();
   const config = await oidc.discovery(
@@ -182,14 +186,14 @@ export async function createOIDCAuthentication(
   const authenticator: PlatformAuthenticator = {
     async authenticate(request, signal) {
       signal.throwIfAborted();
-      const environment = byHost.get(request.headers.host ?? "");
+      const environment = environmentForHost(request.headers.host ?? "");
       return environment
         ? sessions.child(cookie(request, childCookie), environment)
         : undefined;
     },
     async handle(request, response, signal) {
       const host = request.headers.host ?? "",
-        environment = byHost.get(host);
+        environment = environmentForHost(host);
       if (host !== platform.host && !environment) {
         response.writeHead(421);
         response.end();
@@ -232,6 +236,16 @@ export async function createOIDCAuthentication(
         signal.throwIfAborted();
         response.setHeader("cache-control", "no-store");
         response.setHeader("referrer-policy", "no-referrer");
+        if (!environment && url.pathname.startsWith("/api/")) {
+          const parent = sessions.parent(cookie(request, parentCookie));
+          if (!parent || (request.method !== "GET" && !csrf(request, origin)))
+            throw new Error("EnvironmentForbidden");
+          await control.handle(request, response, parent.member, {
+            signal: AbortSignal.any([signal, parent.abort.signal]),
+            correlationId,
+          });
+          return true;
+        }
         if (request.method === "POST" && url.pathname === "/auth/logout") {
           if (!csrf(request, origin)) throw new Error("InvalidLogoutOrigin");
           if (environment)
@@ -266,14 +280,24 @@ export async function createOIDCAuthentication(
           redirect(response, destination.href);
           return true;
         }
-        if (!environment && url.pathname === "/auth/authorize") {
-          const entry = entries.take(
-            url.searchParams.get("entry") ?? undefined,
-          );
-          if (!entry) throw new Error("LoginExpired");
+        if (
+          !environment &&
+          (url.pathname === "/auth/authorize" || url.pathname === "/auth/login")
+        ) {
+          if (request.headers["sec-fetch-site"] === "cross-site")
+            throw new Error("CrossSiteLogin");
+          const entry =
+            url.pathname === "/auth/authorize"
+              ? entries.take(url.searchParams.get("entry") ?? undefined)
+              : undefined;
+          if (url.pathname === "/auth/authorize" && !entry)
+            throw new Error("LoginExpired");
           const parent = sessions.parent(cookie(request, parentCookie));
           if (parent) {
-            redirect(response, exchange(entry, parent.key));
+            redirect(
+              response,
+              entry ? exchange(entry, parent.key) : platform.origin,
+            );
             return true;
           }
           const verifier = oidc.randomPKCECodeVerifier(),
@@ -322,7 +346,9 @@ export async function createOIDCAuthentication(
             claims.sub,
           );
           try {
-            const destination = exchange(tx.entry, parent.key);
+            const destination = tx.entry
+              ? exchange(tx.entry, parent.key)
+              : platform.origin;
             const previous = sessions.parent(cookie(request, parentCookie));
             if (previous) sessions.revoke(previous.key);
             setCookie(
@@ -364,15 +390,11 @@ export async function createOIDCAuthentication(
         if (url.pathname === "/" && !environment) {
           const parent = sessions.parent(cookie(request, parentCookie));
           const links = parent
-            ? [...environments.values()]
-                .filter(
-                  (e) =>
-                    e.owner.tenantId === parent.member.owner.tenantId &&
-                    e.owner.principalId === parent.member.owner.principalId,
-                )
+            ? control
+                .list(parent.member)
                 .map(
                   (e) =>
-                    `<li><a href="${escape(origins.get(e.id)! + "/auth/login")}">${escape(e.id)}</a></li>`,
+                    `<li>${escape(e.id)} (${escape(e.phase)}) <form method="post" action="/api/environments/${escape(e.id)}"><button>Create or inspect</button></form><a href="/api/environments/${escape(e.id)}">Inspect</a>${e.origin ? ` <a href="${escape(e.origin + "/auth/login")}">Open environment</a>` : ""}</li>`,
                 )
                 .join("")
             : "";
@@ -380,7 +402,7 @@ export async function createOIDCAuthentication(
             response,
             parent
               ? `<h1>Your environments</h1><ul>${links}</ul><form method="post" action="/auth/logout"><button>Log out</button></form>`
-              : "Open the environment address provided by your administrator to sign in.",
+              : '<a href="/auth/login">Sign in</a>',
           );
           return true;
         }
@@ -388,6 +410,13 @@ export async function createOIDCAuthentication(
         response.end();
         return true;
       } catch (error) {
+        if (error instanceof RuntimeAccessError) {
+          if (!response.headersSent && !response.destroyed) {
+            response.writeHead(503, { "content-type": "application/json" });
+            response.end(JSON.stringify(error));
+          } else if (!response.destroyed) response.destroy();
+          return true;
+        }
         const reasons = new Set([
           "EnvironmentForbidden",
           "InvalidLogoutOrigin",

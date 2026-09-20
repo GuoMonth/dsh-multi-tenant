@@ -7,8 +7,8 @@ not evidence that a real identity provider or Gateway has been validated.
 
 ## Fixed topology and configuration
 
-Keep the R2 `host`, `port`, `kubernetes`, `bindings` and `environments` fields.
-Add the following administrator-owned configuration (example identifiers only):
+Use [R5 allocation configuration](r5-allocation.md) for current runtime/environment
+fields. The OIDC and membership fields remain as follows (example identifiers only):
 
 ```json
 {
@@ -55,7 +55,9 @@ Network calls use HTTPS, reject redirects and have a 10-second timeout plus
 request/shutdown cancellation. Access/refresh/ID tokens are neither stored as
 sessions nor forwarded to DSH. There is no refresh or automatic login retry.
 
-The environment landing page starts login. A five-minute entry record binds the
+Login can start at the platform home page before allocation, or at an existing
+environment landing page. Platform login returns to the platform without an
+environment exchange. A five-minute entry record binds the
 environment to a random host-only browser cookie. The platform either reuses a
 live parent or performs OIDC with a separate five-minute browser-bound
 transaction. It returns a 30-second, one-use ticket to the exact configured
