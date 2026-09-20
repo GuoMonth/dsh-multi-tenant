@@ -1,0 +1,21 @@
+{
+  "name": "@dsh/cell-platform-internal",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/main.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@dsh/cell-connector-internal": "file:../../vendor/dsh-cell-connector-internal-0.0.0.tgz"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "@types/node": "22.20.1"
+  }
+}

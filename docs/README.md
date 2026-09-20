@@ -6,7 +6,8 @@ Read only the row relevant to the task. Current implementation and planned Cell 
 | --- | --- |
 | Product principles | [Constitution](../CONSTITUTION.md) |
 | Current work / acceptance | [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) |
-| Cell integration design (not implemented) | [S0](design/s0-runtime-architecture.zh-CN.md), [research](design/s0-references.zh-CN.md) |
+| R2 implementation assembly (regression pending) | [Private platform app](design/r2-platform-assembly.md) |
+| Cell integration design (partially implemented) | [S0](design/s0-runtime-architecture.zh-CN.md), [research](design/s0-references.zh-CN.md) |
 | Existing SDK / CLI | [Bundled AI guide](../packages/multi-tenant/AI.md), [quickstart](reference/quickstart.md) |
 | Checks | [Contributing](../CONTRIBUTING.md) |
 | Publishing | [Release runbook](reference/release.md) |
