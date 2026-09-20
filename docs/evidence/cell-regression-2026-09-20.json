@@ -1,0 +1,109 @@
+{
+  "date": "2026-09-20",
+  "runtimeSource": "3bcf68855bf16bcc5043058fa8133d2d2368efac",
+  "platformSource": "b11509eca33a8169ad07c08d4ed0756aef1fc09e",
+  "connectorSource": "1612dc43a948dd6c5049a7d4a725e61a7bee1476",
+  "images": {
+    "operator": "localhost:30482/dsh-operator@sha256:48a7068c5e0765db5e4aeafc7aa2eb15553ce73df7c4b71e1e15021966b88deb",
+    "cell": "localhost:30482/dsh-cell@sha256:a69ec44549e60d10718d6db0b12866059e78a67d0d4701f38042acf9d2dea321",
+    "platform": "localhost:30482/dsh-platform@sha256:ba0873daad9d13b9985b07505d867ad6dc0184f9ed3fc1597361cba870ca876e"
+  },
+  "evidence": {
+    "protocol": {
+      "sessionId": "session-843bbf09-5c98-4f30-b730-62e88a4f0bca",
+      "burst": 24,
+      "websocket": "snapshot",
+      "export": [
+        "HEAD",
+        "GET"
+      ],
+      "crossTenant": "denied",
+      "browserErrors": []
+    },
+    "live-model": {
+      "marker": "CELL_1611f87b120f",
+      "model": "deepseek-flash",
+      "title": "Create and verify cell file via tools",
+      "write": "ok",
+      "read": "ok",
+      "attachment": "read",
+      "result": "verified"
+    },
+    "revocation": {
+      "parentLogout": "active WS closed; new RPC 401",
+      "membershipRemoval": "active WS closed; new RPC 401",
+      "otherTenant": "unaffected",
+      "restoredMember": "fresh login works",
+      "durableSession": "snapshot after Pod recreation"
+    },
+    "persistence": {
+      "cellUID": "bc5a841b-c04c-40a3-aeea-fed64d4835c3",
+      "oldPodUID": "77efd791-f8ed-4768-9288-2a17be0510f7",
+      "newPodUID": "494a7a84-afc1-4e1f-b621-b226502cad3b",
+      "pvcUIDs": {
+        "cell-bc5a841b-c04c-40a3-aeea-fed64d4835c3-data": "d8c505c3-464d-4098-85e6-952522621a83",
+        "cell-bc5a841b-c04c-40a3-aeea-fed64d4835c3-private": "96ec44ec-4225-4d8d-aa10-585b10168f1d"
+      },
+      "fileMarker": "CELL_1611f87b120f",
+      "filePreserved": true
+    },
+    "expiry": {
+      "lifetimeMs": 60000,
+      "elapsedMs": 60996,
+      "activeWebsocket": "closed",
+      "newRPC": 401
+    },
+    "crd": [
+      {
+        "mutation": "change",
+        "rejected": true
+      },
+      {
+        "mutation": "remove",
+        "rejected": true
+      }
+    ],
+    "delete-policy": {
+      "identity": "980b622e-d085-46a7-81bf-61e6d068da15",
+      "dataPVC": "deleted",
+      "privatePVC": "deleted",
+      "foreignIntent": "rejected"
+    },
+    "platform-delete-closed": {
+      "route": 421,
+      "repeated": {
+        "code": "RecordMissing",
+        "target": {
+          "allocationKey": "0cb900ff-812b-49ec-875c-ebc91ba166a3"
+        },
+        "stage": "inspect",
+        "effect": "not-submitted",
+        "observedState": "missing",
+        "retry": "never",
+        "message": "RecordMissing",
+        "nextAction": "Query this original allocation only; missing or changed records must not be recreated or adopted",
+        "correlationId": "af17058b-e473-4dc6-97eb-e649823c515e"
+      },
+      "post": {
+        "status": 409,
+        "body": {
+          "environmentId": "bob-main",
+          "phase": "delete-requested",
+          "diagnostic": {
+            "code": "RecordMissing",
+            "target": {
+              "allocationKey": "0cb900ff-812b-49ec-875c-ebc91ba166a3"
+            },
+            "stage": "inspect",
+            "effect": "not-submitted",
+            "observedState": "missing",
+            "retry": "never",
+            "message": "RecordMissing",
+            "nextAction": "Query this original allocation only; missing or changed records must not be recreated or adopted",
+            "correlationId": "30385303-db24-488d-bb84-6923f9d348a3"
+          }
+        }
+      }
+    }
+  }
+}

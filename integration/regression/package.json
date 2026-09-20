@@ -1,0 +1,14 @@
+{
+  "name": "@dsh/cell-regression-private",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test:transport": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.58.2"
+  }
+}
