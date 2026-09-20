@@ -140,15 +140,11 @@ jobs:
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "GitHub release $TAG already exists; leaving it unchanged"
+            gh release edit "$TAG" --prerelease=false --latest
           else
-            RELEASE_FLAGS=()
-            if [[ "$RELEASE_VERSION" == *-* ]]; then
-              RELEASE_FLAGS+=(--prerelease)
-            fi
             gh release create "$TAG" \
               --verify-tag \
-              "${RELEASE_FLAGS[@]}" \
+              --latest \
               --title "dsh-multi-tenant ${RELEASE_VERSION}" \
               --notes-file "docs/releases/v${RELEASE_VERSION}.md"
           fi
