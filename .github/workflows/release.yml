@@ -102,11 +102,12 @@ jobs:
           node scripts/verify-cell-publication.mjs
           mkdir -p release-artifact
           pnpm --filter dsh-multi-tenant pack --pack-destination "$GITHUB_WORKSPACE/release-artifact"
-          node scripts/cell-artifact-smoke.mjs "release-artifact/dsh-multi-tenant-${RELEASE_VERSION}.tgz"
+          node scripts/cell-artifact-smoke.mjs "$GITHUB_WORKSPACE/release-artifact/dsh-multi-tenant-${RELEASE_VERSION}.tgz"
+          npm publish --dry-run --ignore-scripts --access public --tag "$NPM_TAG" "$GITHUB_WORKSPACE/release-artifact/dsh-multi-tenant-${RELEASE_VERSION}.tgz"
 
       - name: Publish to npm via Trusted Publishing
         if: steps.registry.outputs.publish_needed == 'true'
-        run: npm publish --access public --provenance --tag "$NPM_TAG" --ignore-scripts "release-artifact/dsh-multi-tenant-${RELEASE_VERSION}.tgz"
+        run: npm publish --access public --provenance --tag "$NPM_TAG" --ignore-scripts "$GITHUB_WORKSPACE/release-artifact/dsh-multi-tenant-${RELEASE_VERSION}.tgz"
 
       - name: Verify registry artifact and dist-tag
         run: node scripts/registry-smoke.mjs "$RELEASE_VERSION" "$NPM_TAG" --artifact-only
