@@ -22,6 +22,8 @@ test("invalid configuration fails with a stage and never echoes input credential
     const diagnostic = JSON.parse(result.stderr);
     assert.equal(diagnostic.stage, "configuration");
     assert.equal(diagnostic.effect, "not-submitted");
+    assert.equal(diagnostic.observedState, "not-listening");
+    assert.equal(diagnostic.retry, "never");
     assert.match(diagnostic.correlationId, /^[a-f0-9-]{36}$/);
     assert.ok(diagnostic.nextAction.length > 20);
   } finally {

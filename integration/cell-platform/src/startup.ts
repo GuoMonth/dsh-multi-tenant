@@ -17,9 +17,11 @@ export function startupDiagnostic(stage: StartupStage, correlationId: string) {
   return {
     code: "PlatformStartupRejected",
     stage,
-    state: "not-listening",
+    target: { component: "cell-platform" },
+    observedState: "not-listening",
+    message: "Platform startup rejected",
     effect: "not-submitted",
-    retry: "after-configuration-review",
+    retry: "never",
     correlationId,
     nextAction: actions[stage],
   };
