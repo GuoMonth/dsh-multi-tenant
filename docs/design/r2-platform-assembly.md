@@ -32,33 +32,15 @@ The app's npm lock pins the tarball integrity as well as its build tools. On a
 runtime change: commit its inputs, pack into this `vendor/`, update the source
 commit/SHA-256 and npm lock, then build both sides. Never hand-edit extracted JS.
 
-## R2 fixture configuration, not production authentication
+## Current authentication and deployment
 
-Run `node integration/cell-platform/dist/main.js /private/configuration.json` only
-in the controlled platform network described by runtime's R1 configuration.
-TLS terminates at the administrator's Gateway, routing environment origins to
-this app with their original Host. Do not bypass NetworkPolicy to run it from an
-arbitrary laptop or expose the unauthenticated launcher port.
-
-The JSON configuration contains:
-
-- `host`, `port`: the task-owned listener.
-- `kubernetes`: `server` (HTTPS), `caFile`, `tokenFile`; use namespace-scoped
-  read-only credentials outside all Cell storage.
-- `bindings`: runtime CellBinding records (`ref`, `namespace`, `name`, `origin`,
-  `template`, exact defaulted `expectedSpec` and `expectedPodSpec`). Capture them
-  from the administrator's pinned prebuilt fixture, not browser requests.
-- `environments`: `{id, owner: {tenantId, principalId}, instance: {allocationKey,
-  identity}}`. Bind every Environment to a configured runtime ref.
-- `fixtureSessions`: `{environmentId, tokenFile}`. Each file must be private
-  (0600), containing at least 43 URL-safe random token characters. Tokens are not
-  printed or embedded in this repository.
-
-Browser automation for R3 can set `__Host-dsh-platform-fixture` from that private
-file on the environment origin, with Secure/HttpOnly/Path=/. Fixture sessions
-expire after one hour or process shutdown. There is no login page, IdP, account
-management or persistence in this fixture. R4 replaces this explicit test
-entry with OIDC and parent/child sessions; it must not be advertised as login.
+The R2 fixture token entry has been removed by R4. Use [R4 configuration and
+sessions](r4-oidc.md) for OIDC and membership. The fixed runtime binding still
+contains `ref`, `namespace`, `name`, `origin`, `template`, exact defaulted
+`expectedSpec` and `expectedPodSpec`; capture these from the administrator's
+prebuilt Cell. `environments` contains `id`, `owner: {tenantId, principalId}` and
+`instance: {allocationKey, identity}`. Kubernetes configuration contains HTTPS
+`server`, `caFile` and `tokenFile` with namespace-scoped read-only credentials.
 
 ## Deferred regression
 

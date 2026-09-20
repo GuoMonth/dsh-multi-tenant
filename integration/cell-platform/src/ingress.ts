@@ -1,4 +1,8 @@
-import { createServer, type IncomingMessage } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import { randomUUID } from "node:crypto";
 import {
   RuntimeAccessError,
@@ -17,6 +21,11 @@ export interface AuthorizedSession {
   readonly signal: AbortSignal;
 }
 export interface PlatformAuthenticator {
+  handle?(
+    request: IncomingMessage,
+    response: ServerResponse,
+    signal: AbortSignal,
+  ): Promise<boolean>;
   authenticate(
     request: IncomingMessage,
     signal: AbortSignal,
@@ -129,38 +138,39 @@ export function createPlatformIngress(
       controller.abort();
       active.delete(controller);
     });
-    void admit(request, controller, correlationId)
-      .then((handle) => handle.forward(request, response))
-      .catch((error) => {
-        if (!response.destroyed) {
-          const diagnostic =
-            error instanceof RuntimeAccessError
-              ? error
-              : new RuntimeAccessError(
-                  "ReadUnavailable",
-                  correlationId,
-                  "Inspect platform logs with this correlation ID",
-                );
-          console.warn(
-            JSON.stringify({ code: diagnostic.code, correlationId }),
+    void (async () => {
+      if (await authenticator.handle?.(request, response, controller.signal))
+        return;
+      const handle = await admit(request, controller, correlationId);
+      await handle.forward(request, response);
+    })().catch((error) => {
+      if (!response.destroyed) {
+        const diagnostic =
+          error instanceof RuntimeAccessError
+            ? error
+            : new RuntimeAccessError(
+                "ReadUnavailable",
+                correlationId,
+                "Inspect platform logs with this correlation ID",
+              );
+        console.warn(JSON.stringify({ code: diagnostic.code, correlationId }));
+        if (response.headersSent) response.destroy();
+        else {
+          response.writeHead(
+            diagnostic.code === "Forbidden"
+              ? 401
+              : diagnostic.code === "AccessRejected"
+                ? 403
+                : 503,
+            {
+              "content-type": "application/json",
+              "cache-control": "no-store",
+            },
           );
-          if (response.headersSent) response.destroy();
-          else {
-            response.writeHead(
-              diagnostic.code === "Forbidden"
-                ? 401
-                : diagnostic.code === "AccessRejected"
-                  ? 403
-                  : 503,
-              {
-                "content-type": "application/json",
-                "cache-control": "no-store",
-              },
-            );
-            response.end(JSON.stringify(diagnostic));
-          }
+          response.end(JSON.stringify(diagnostic));
         }
-      });
+      }
+    });
   });
   server.on("upgrade", (request, socket, head) => {
     socket.on("error", () => socket.destroy());
