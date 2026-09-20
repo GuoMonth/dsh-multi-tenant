@@ -10,6 +10,18 @@
 - HTTPS 平台 origin 与 `cell-<UID>.<site-domain>` 使用同一受控 site domain，443 端口。Gateway 将它们交给平台 Service；只允许系统 namespace 内带平台标签的 Pod 访问 Cell。平台需要直达 API 和 Pod IP，因此推荐在 K8s 内运行。
 - OIDC Code+PKCE，固定 callback `https://<platform-host>/auth/callback`，issuer 必须 HTTPS 且 CA 受信任。管理员维护可信 `(issuer, subject) → owner` 映射；不从用户输入推导权限。
 
+管理员可直接使用新版运行时 npm，无需先检出源码：
+
+```bash
+npx dsh-isolated-runtime@0.3.0-alpha.1 release
+npx dsh-isolated-runtime@0.3.0-alpha.1 manifests > operator.yaml
+# 替换示例域名，核对 namespace/RBAC 和目标集群后部署。
+kubectl apply --server-side -f operator.yaml
+kubectl -n dsh-system rollout status deployment/cell-operator --timeout=120s
+```
+
+该 npm 只输出清单，不自动操作集群；旧 `start/up/stop/uninstall` 已移除。Cell 镜像必须使用 `release` 输出的固定 digest，并与平台清单一致。
+
 ## 2. 配置与状态
 
 配置结构见 [`integration/distribution/config.example.json`](../../integration/distribution/config.example.json)，所有占位符必须替换。它不含可用模型或登录凭据。
@@ -35,7 +47,7 @@ docker build -f integration/distribution/Dockerfile -t YOUR_PLATFORM_IMAGE dist/
 
 ```bash
 dsh-multi-tenant start --config /private/config.json
-# 本次制品发布后，对应的 npm 获取入口：
+# 已发布的 npm 入口：
 npx dsh-multi-tenant@latest start --config /private/config.json
 ```
 

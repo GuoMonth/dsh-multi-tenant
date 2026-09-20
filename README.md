@@ -17,6 +17,8 @@ Breaking updates are allowed: publish a new explicit combination, update configu
 
 An administrator first configures Kubernetes, the platform-mode Cell Operator, OIDC, DNS/TLS, storage and permissions. The platform needs direct Kubernetes API and Cell Pod-IP connectivity; run it in the cluster. Running npx on an ordinary host does not provide cluster networking.
 
+Runtime setup: `npx dsh-isolated-runtime@0.3.0-alpha.1 manifests` prints the pinned Operator/CRD/RBAC YAML for administrator review and deployment. Its `release` command prints the fixed Cell image and DSH version. This replaces the old standalone launcher; the runtime npm package does not run a second user-facing server.
+
 ```bash
 # Node.js 24+
 npx dsh-multi-tenant@latest start --config /private/config.json
