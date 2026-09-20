@@ -101,7 +101,7 @@ jobs:
         run: |
           node scripts/verify-cell-publication.mjs
           mkdir -p release-artifact
-          pnpm --filter dsh-multi-tenant pack --pack-destination ../../release-artifact
+          pnpm --filter dsh-multi-tenant pack --pack-destination "$GITHUB_WORKSPACE/release-artifact"
           node scripts/cell-artifact-smoke.mjs "release-artifact/dsh-multi-tenant-${RELEASE_VERSION}.tgz"
 
       - name: Publish to npm via Trusted Publishing
