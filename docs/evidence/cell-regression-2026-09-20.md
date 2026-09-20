@@ -48,3 +48,13 @@
 未知写的 runtime 结果来自真实 API 故障注入；平台未知提交屏障、并发互斥和重放规则另由 SQLite/运行时替身测试覆盖，不混称为完整崩溃矩阵。真实 WS 撤权与本地 HTTP 流 abort 分别记录，不将已缓冲完的 HTTP 响应当作正在执行的 writer。
 
 任务资源和原始失败现场保留在本地 TASK 台账指定的专属 lab；模型 key、OIDC client secret、浏览器状态、完整鉴权 URL 不进入本记录或 Issue。故障 relay 已停用。Retain 卷不自动清理，不复用到新实例。
+
+## 制品记录
+
+平台镜像由源码提交 `b11509eca33a8169ad07c08d4ed0756aef1fc09e` 构建；后续仅添加证据文档，不改变镜像代码输入。
+
+- operator：`localhost:30482/dsh-operator@sha256:48a7068c5e0765db5e4aeafc7aa2eb15553ce73df7c4b71e1e15021966b88deb`。
+- cell：`localhost:30482/dsh-cell@sha256:a69ec44549e60d10718d6db0b12866059e78a67d0d4701f38042acf9d2dea321`。
+- platform：`localhost:30482/dsh-platform@sha256:ba0873daad9d13b9985b07505d867ad6dc0184f9ed3fc1597361cba870ca876e`。
+
+平台最终镜像部署后重新完成登录/原 UID 查询、删除屏障及伪造身份/Origin 负例检查。完整端到端及模型测试先于仅改善启动诊断的补丁；运行时制品未变化。
