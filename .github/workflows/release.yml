@@ -105,6 +105,13 @@ jobs:
           node scripts/cell-artifact-smoke.mjs "$GITHUB_WORKSPACE/release-artifact/dsh-multi-tenant-${RELEASE_VERSION}.tgz"
           npm publish --dry-run --ignore-scripts --access public --tag "$NPM_TAG" "$GITHUB_WORKSPACE/release-artifact/dsh-multi-tenant-${RELEASE_VERSION}.tgz"
 
+      - name: Preserve the verified tarball for publication recovery
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-publication-artifact
+          path: release-artifact/*.tgz
+          retention-days: 30
+
       - name: Publish to npm via Trusted Publishing
         if: steps.registry.outputs.publish_needed == 'true'
         run: npm publish --access public --provenance --tag "$NPM_TAG" --ignore-scripts "$GITHUB_WORKSPACE/release-artifact/dsh-multi-tenant-${RELEASE_VERSION}.tgz"
