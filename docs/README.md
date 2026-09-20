@@ -20,3 +20,5 @@ This routing follows OpenAI's [GPT-6 Astra guidance](https://developers.openai.c
 - [R4 OIDC and environment sessions](design/r4-oidc.md): private app configuration, revocation and deferred regression.
 
 - [R5 创建、查询与分配状态](design/r5-allocation.md)：当前配置、状态屏障和集中回归清单。
+
+- [R6 管理删除与集中回归](design/r6-deletion.md)：私有管理员入口、删除屏障及回归启动点。

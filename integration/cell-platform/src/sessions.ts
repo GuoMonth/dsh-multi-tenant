@@ -156,6 +156,10 @@ export class Sessions {
     const child = this.children.get(digest(token!))!;
     this.revoke(child.parentKey);
   }
+  revokeEnvironment(environmentId: string) {
+    for (const child of this.children.values())
+      if (child.environmentId === environmentId) this.removeChild(child.key);
+  }
   revoke(key: string) {
     const parent = this.parents.get(key);
     if (!parent) return;

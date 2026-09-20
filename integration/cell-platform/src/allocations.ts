@@ -12,8 +12,9 @@ export interface EnvironmentDefinition {
 }
 export interface AllocationRecord extends EnvironmentDefinition {
   readonly allocationKey: string;
-  readonly phase: "reserved" | "submitted" | "bound";
+  readonly phase: "reserved" | "submitted" | "bound" | "delete-requested";
   readonly identity?: string;
+  readonly deleteEffect?: "unknown" | "accepted" | "not-submitted";
 }
 /** One process owns this private DB. Submitted is a durable uncertainty barrier, not Pod state. */
 export class AllocationStore {
@@ -44,9 +45,9 @@ export class AllocationStore {
           .get()!["n"];
         if (count !== 0) throw new Error("Unsupported state format");
         this.db.exec(
-          "CREATE TABLE allocations (id TEXT PRIMARY KEY, intent TEXT NOT NULL, phase TEXT NOT NULL CHECK(phase IN ('reserved','submitted','bound')), identity TEXT, CHECK((phase='bound')=(identity IS NOT NULL))); PRAGMA user_version=5;",
+          "CREATE TABLE allocations (id TEXT PRIMARY KEY, intent TEXT NOT NULL, phase TEXT NOT NULL CHECK(phase IN ('reserved','submitted','bound','delete-requested')), identity TEXT, delete_effect TEXT CHECK(delete_effect IN ('unknown','accepted','not-submitted')), CHECK((phase IN ('bound','delete-requested'))=(identity IS NOT NULL)), CHECK((phase='delete-requested')=(delete_effect IS NOT NULL))); PRAGMA user_version=6;",
         );
-      } else if (version !== 5) throw new Error("Unsupported state version");
+      } else if (version !== 6) throw new Error("Unsupported state version");
       const existing = this.db.prepare("SELECT id FROM allocations").all();
       if (existing.some((row) => !definitions.some((e) => e.id === row["id"])))
         throw new Error(
@@ -104,7 +105,9 @@ export class AllocationStore {
         { stage: "state", effect: "unknown" },
       );
     const row = this.db
-      .prepare("SELECT intent,phase,identity FROM allocations WHERE id=?")
+      .prepare(
+        "SELECT intent,phase,identity,delete_effect FROM allocations WHERE id=?",
+      )
       .get(id);
     if (!row) return undefined;
     const intent = JSON.parse(
@@ -113,6 +116,13 @@ export class AllocationStore {
     return {
       ...intent,
       phase: row["phase"] as AllocationRecord["phase"],
+      ...(row["delete_effect"]
+        ? {
+            deleteEffect: row["delete_effect"] as NonNullable<
+              AllocationRecord["deleteEffect"]
+            >,
+          }
+        : {}),
       ...(typeof row["identity"] === "string"
         ? { identity: row["identity"] }
         : {}),
@@ -123,6 +133,7 @@ export class AllocationStore {
     phase: AllocationRecord["phase"],
     identity: string | undefined,
     correlationId: string,
+    deleteEffect?: "unknown" | "accepted" | "not-submitted",
   ) {
     try {
       if (this.poisoned) throw new Error("Poisoned");
@@ -130,13 +141,22 @@ export class AllocationStore {
       if (
         !current ||
         (current.identity && current.identity !== identity) ||
-        (current.phase === "bound" && phase !== "bound") ||
+        (current.phase === "bound" &&
+          phase !== "bound" &&
+          phase !== "delete-requested") ||
+        (current.phase === "delete-requested" &&
+          phase !== "delete-requested") ||
+        (phase === "delete-requested" &&
+          current.phase !== "bound" &&
+          current.phase !== "delete-requested") ||
         (current.phase === "submitted" && phase === "reserved")
       )
         throw new Error("Invalid allocation transition");
       this.db
-        .prepare("UPDATE allocations SET phase=?,identity=? WHERE id=?")
-        .run(phase, identity ?? null, id);
+        .prepare(
+          "UPDATE allocations SET phase=?,identity=?,delete_effect=? WHERE id=?",
+        )
+        .run(phase, identity ?? null, deleteEffect ?? null, id);
     } catch {
       this.poisoned = true;
       throw new RuntimeAccessError(
