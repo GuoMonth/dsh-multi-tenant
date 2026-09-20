@@ -12,10 +12,11 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@dsh/cell-connector-internal": "file:../../vendor/dsh-cell-connector-internal-0.0.0.tgz"
+    "@dsh/cell-connector-internal": "file:../../vendor/dsh-cell-connector-internal-0.0.0.tgz",
+    "openid-client": "6.8.8"
   },
   "devDependencies": {
-    "typescript": "6.0.3",
-    "@types/node": "22.20.1"
+    "@types/node": "22.20.1",
+    "typescript": "6.0.3"
   }
 }

@@ -16,3 +16,5 @@ Read only the row relevant to the task. Current implementation and planned Cell 
 Old assessments and plans live in `archive/`; release records in `releases/`; captured verification in `evidence/`. They describe their recorded revisions, not current obligations. Search them only for a specific historical question. Keep product principles in the constitution, task status in Issues, commands in executable manifests/runbooks; avoid copies of each in agent instructions.
 
 This routing follows OpenAI's [GPT-6 Astra guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra) and [skill guidance](https://learn.chatgpt.com/docs/build-skills), reviewed 2026-09-20: narrow context, task-specific entry points, minimal procedural scaffolding. These sources inform documentation structure, not product requirements or a required model configuration.
+
+- [R4 OIDC and environment sessions](design/r4-oidc.md): private app configuration, revocation and deferred regression.
