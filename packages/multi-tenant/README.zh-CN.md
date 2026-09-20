@@ -4,13 +4,13 @@ OIDC 多租户平台：登录、成员授权、环境会话及原生 DSH 协议�
 
 [English](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/README.md)
 
-**当前为 Cell MVP alpha 候选，尚未发布本次制品。** 核心双用户与真实模型回归已通过。版本 `0.9.0-alpha.1` 计划发布到 npm `latest`；latest 是安装通道，不代表稳定版。允许破坏性变更，不承诺历史兼容、升级或无感恢复。
+**当前为 Cell MVP alpha。** 核心双用户与真实模型回归已通过。版本 `0.9.0-alpha.1` 使用 npm `latest` 通道；latest 是安装通道，不代表稳定版。允许破坏性变更，不承诺历史兼容、升级或无感恢复。
 
 ## 固定发行边界
 
 依赖的 DSH 明确为 **0.1.5-rc.2**，源码 **`fb2c4b9e698e30edb738bca4cf0618587db7d203`**。每次发行锁定可公开拉取的 Cell、Operator 镜像 `@sha256` digest，并在平台 `cell-release.json` / runtime `release.json` 中记录匹配的运行时源码与 DSH 身份；实际部署的平台镜像也固定 digest。npm `latest` 只用于安装时选择包，不让运行中的镜像标签或 DSH 版本范围漂移。
 
-允许破坏性更新：新迭代明确新的固定组合，按需修改配置/状态要求并验证受影响链路，不要求兼容层、历史升级或迁移承诺。已发布制品身份不改写。当前源码候选尚未绑定公开镜像，空 digest 会阻止发布，不自动选择旧镜像或虚构 digest。
+允许破坏性更新：新迭代明确新的固定组合，按需修改配置/状态要求并验证受影响链路，不要求兼容层、历史升级或迁移承诺。已发布制品身份不改写。已锁定公开运行时 [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1)，架构 Linux/amd64；精确 digest 见[发行清单](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/cell-release.json)。空 digest 仍会阻止发布。
 
 
 ## 启动
@@ -18,7 +18,7 @@ OIDC 多租户平台：登录、成员授权、环境会话及原生 DSH 协议�
 管理员先配置 K8s、平台模式 Cell Operator、OIDC、DNS/TLS、存储和权限。平台需要直接访问 Kubernetes API 与 Cell Pod IP，推荐在集群内运行；普通宿主机上的 npx 不会自动获得集群网络。
 
 ```bash
-# 本次版本发布后；Node.js 24+
+# Node.js 24+
 npx dsh-multi-tenant@latest start --config /private/config.json
 ```
 

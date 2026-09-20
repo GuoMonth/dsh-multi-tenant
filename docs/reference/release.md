@@ -1,6 +1,6 @@
 # Cell alpha release runbook
 
-Current target: `dsh-multi-tenant@0.9.0-alpha.1`, npm **latest**, GitHub **prerelease**. Channel and maturity are separate. This branch prepares delivery; it does not claim publication. Historical 0.8.0 workbench instructions are in [archive](../archive/v0.8/docs/reference/release.md).
+Current target: `dsh-multi-tenant@0.9.0-alpha.1`, npm **latest**, GitHub **prerelease**. Channel and maturity are separate. Runtime [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1) is public and the exact image pair is bound in the manifest. npm publication uses the manual workflow below. Historical 0.8.0 workbench instructions are in [archive](../archive/v0.8/docs/reference/release.md).
 
 ## Coordinated inputs
 

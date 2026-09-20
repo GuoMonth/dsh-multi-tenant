@@ -1,6 +1,6 @@
 # Changelog / 更新记录
 
-## 0.9.0-alpha.1 (unpublished)
+## 0.9.0-alpha.1
 
 - Replace the default Docker-demo CLI with `start --config`, private-socket inspect/delete and Node 24+ Cell platform bundles.
 - Keep OIDC/protocol ownership here and Cell/Operator images in dsh-isolated-runtime; bind their fixed public combination at authorized release time.
