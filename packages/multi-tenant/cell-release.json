@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "platformVersion": "0.9.0-alpha.1",
+  "channel": "latest",
+  "status": "source-candidate",
+  "runtime": {
+    "repository": "GuoMonth/dsh-isolated-runtime",
+    "commit": "3bcf68855bf16bcc5043058fa8133d2d2368efac",
+    "accessMode": "platform"
+  },
+  "connector": {
+    "repository": "GuoMonth/dsh-isolated-runtime",
+    "commit": "1612dc43a948dd6c5049a7d4a725e61a7bee1476",
+    "artifact": "dsh-cell-connector-internal-0.0.0.tgz",
+    "sha256": "89df381117d37164e5f2afcf0524747913753221f1673994dd9d8b128adafc8a"
+  },
+  "dsh": {
+    "version": "0.1.5-rc.2",
+    "commit": "fb2c4b9e698e30edb738bca4cf0618587db7d203"
+  },
+  "images": {
+    "cell": null,
+    "operator": null
+  },
+  "evidence": "https://github.com/GuoMonth/dsh-multi-tenant/blob/4ba252765bccb41314c0bdc6b11bcf60cc0b33ef/docs/evidence/cell-regression-2026-09-20.md"
+}

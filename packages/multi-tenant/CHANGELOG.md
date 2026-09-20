@@ -1,5 +1,11 @@
 # Changelog / 更新记录
 
+## 0.9.0-alpha.1 (unpublished)
+
+- Replace the default Docker-demo CLI with `start --config`, private-socket inspect/delete and Node 24+ Cell platform bundles.
+- Keep OIDC/protocol ownership here and Cell/Operator images in dsh-isolated-runtime; bind their fixed public combination at authorized release time.
+- Align latest channel, alpha scope, real screenshots and existing-cluster startup documentation. No compatibility or upgrade promise.
+
 ## 0.8.0
 
 - Add one-command local CLI, persistent Alice/Bob workspaces and explicit keyless demo.

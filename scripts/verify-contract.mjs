@@ -9,7 +9,7 @@ const native = JSON.parse(readFileSync(join(root, 'scripts/native-host-probe/pac
 const errors = []
 if (pkg.dshRuntime?.version !== DSH_TARGET.version || pkg.dshRuntime?.commit !== DSH_TARGET.commit) errors.push('runtime target must match exact DSH version and commit')
 if (pkg.dsh || pkg.peerDependencies) errors.push('platform package must not install as a shared-host Cordis plugin')
-if (!/^\d+\.\d+\.\d+$/.test(pkg.version)) errors.push('package version must be exact')
+if (!/^\d+\.\d+\.\d+(?:-alpha\.\d+)?$/.test(pkg.version)) errors.push('package version must be exact')
 if (!/^[a-f0-9]{40}$/.test(DSH_TARGET.commit)) errors.push('invalid source identity')
 for (const [name, version] of Object.entries(native.dependencies)) {
   if ((name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) && version !== DSH_TARGET.version) errors.push(`${name} runtime dependency must be exact ${DSH_TARGET.version}`)

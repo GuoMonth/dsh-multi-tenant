@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Post-publication verification for the exact artifact and npm dist-tag. */
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -60,28 +61,20 @@ if (normalizeRepository(repository) !== EXPECTED_REPOSITORY) {
 
 const integrity = npmJson(['view', `${PACKAGE_NAME}@${version}`, 'dist.integrity'])
 if (!integrity) throw new Error('registry artifact is missing dist.integrity')
+const packed = readFileSync(join(root, `release-artifact/dsh-multi-tenant-${version}.tgz`))
+const expectedIntegrity = 'sha512-' + createHash('sha512').update(packed).digest('base64')
+if (integrity !== expectedIntegrity) throw new Error('Registry artifact differs from the verified publication tarball')
 
-if (artifactOnly) {
-  // Delivery verification only: no Docker workloads, browser or test suite.
-  const installed = installArtifact(`${PACKAGE_NAME}@${version}`)
-  try {
-    const manifest = JSON.parse(readFileSync(join(installed.packageDirectory, 'runtime-manifest.json'), 'utf8'))
-    if (!/^ghcr\.io\/[^\s]+@sha256:[a-f0-9]{64}$/.test(manifest.image ?? '')) throw new Error('Published CLI is missing its runtime digest')
-    readFileSync(join(installed.packageDirectory, 'AI.md'), 'utf8')
-    execFileSync('npm', ['exec', '--offline', '--', 'dsh-multi-tenant', '--help'], { cwd: installed.directory, stdio: 'inherit' })
-    execFileSync('docker', ['buildx', 'imagetools', 'inspect', manifest.image], { stdio: 'inherit' })
-  } finally { installed.close() }
-} else {
-// Reuse the exact same installed-consumer contract that validates a local
-// tarball before publication, including the Principal-isolated domain contract.
-execFileSync('node', [
-  'scripts/artifact-consumer-smoke.mjs',
-  `${PACKAGE_NAME}@${version}`,
-], {
-  cwd: root,
-  stdio: ['ignore', 'inherit', 'inherit'],
-})
-
-}
+// Always inspect the installed Cell artifact. This is not a cluster regression.
+execFileSync(process.execPath, ['scripts/cell-artifact-smoke.mjs', `${PACKAGE_NAME}@${version}`], { cwd: root, stdio: 'inherit' })
+const installed = installArtifact(`${PACKAGE_NAME}@${version}`)
+try {
+  const manifest = JSON.parse(readFileSync(join(installed.packageDirectory, 'cell-release.json'), 'utf8'))
+  if (manifest.status !== 'release-bound') throw new Error('Published Cell combination is not release-bound')
+  for (const name of ['cell', 'operator']) {
+    const image = manifest.images[name]
+    if (!/^ghcr\.io\/guomonth\/dsh-isolated-runtime-(cell|operator)@sha256:[a-f0-9]{64}$/.test(image ?? '')) throw new Error('Missing runtime-owned immutable image')
+  }
+} finally { installed.close() }
 
 console.log(`registry smoke passed: ${PACKAGE_NAME}@${version}; ${distTag}=${version}; integrity=${integrity.slice(0, 20)}…`)

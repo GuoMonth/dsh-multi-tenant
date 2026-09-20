@@ -1,9 +1,8 @@
 # R4 OIDC and environment sessions
 
-The private `integration/cell-platform` app now requires OIDC. The R2 fixture
+The `integration/cell-platform` source, bundled into the Cell CLI, requires OIDC. The R2 fixture
 cookie and `fixtureSessions` configuration have been removed without migration.
-This is implementation pending the consolidated browser/cluster regression,
-not evidence that a real identity provider or Gateway has been validated.
+The fixed OIDC/Gateway combination passed regression; see the [current regression report](../evidence/cell-regression-2026-09-20.md) for tested cases and explicit evidence limits.
 
 ## Fixed topology and configuration
 
@@ -86,7 +85,7 @@ file and send SIGHUP again. An IdP-side logout or account change alone is not an
 instant revocation feed; local TTL or membership reload bounds access. No IdP
 back-channel logout, distributed state, compatibility or recovery promises.
 
-## Consolidated regression checklist
+## Regression coverage inventory
 
 - Two real subjects map to their own environments; absent/changed membership,
   cross-owner access and direct Cell bypass fail closed.
@@ -101,5 +100,4 @@ back-channel logout, distributed state, compatibility or recovery promises.
 - DSH cookie/bootstrap, raw native requests and platform/IdP credential filtering
   remain correct. Test login again after platform restart and concurrent tab attempts.
 
-Typecheck/build are the current checks. Real IdP, browser, CNI, TLS and session
-behavior are deliberately pending the main-code completion checkpoint in Issue #82.
+The inventory above is broader than this MVP acceptance. See the [current regression report](../evidence/cell-regression-2026-09-20.md) for actual real IdP/browser/CNI/TLS/session results; the complete OIDC attack matrix is not claimed.

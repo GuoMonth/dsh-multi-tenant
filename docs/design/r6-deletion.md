@@ -82,12 +82,4 @@ runtime 重新验证 Cell identity/归属/模板，使用 UID + resourceVersion 
 Runtime 的本地 TLS API 用例覆盖真实 DELETE 编码、UID/resourceVersion 条件、
 Pending 删除、冲突/替换/缺失/中断和重复请求边界。上述结果不能替代真实 API/GC。
 
-主要入口已连接，可开始集中回归，不能按代码行数声称 MVP 完成。接下来的顺序：
-
-1. 准备当前双仓库提交/镜像、有效的 defaulted profile、CRD/RBAC、Gateway/TLS/CNI、
-   两个真实 OIDC 身份及模型凭据；配置必须放在受控私有位置。
-2. R1–R5：真实创建、两主体登录/隔离、原生 HTTP/WS/stream/Fetch、撤权和故障状态。
-3. R6：真实精确删除、未知响应与旧 UID 负例、Retain/Delete/private/Secret 处置。
-4. 当前版本正常 Pod 重建持久化和真实模型调用；记录实际源码/镜像/基础设施组合。
-
-尚未核验上述真实环境配置，未运行集群/浏览器/真实模型回归；主 Issue #82 保持开放。
+当前固定版本已通过核心集群/浏览器/真实模型回归，详见 [回归报告](../evidence/cell-regression-2026-09-20.md)。真实 API 已覆盖精确删除、响应丢失、旧 UID、Retain/Delete/private PVC；外部 credentialsRef Secret 删除场景未额外集群实测。平台未知/并发屏障属于 SQLite + runtime 替身证据，不混称完整集群崩溃矩阵。主 Issue #82 保持开放，发行制品准备另见 [启动指南](../reference/quickstart.md)。

@@ -1,0 +1,55 @@
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "kubernetes": {
+    "server": "https://kubernetes.default.svc",
+    "caFile": "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+    "tokenFile": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  },
+  "allocation": {
+    "namespaces": {
+      "tenant-a": "tenant-a"
+    },
+    "domain": "REPLACE_SITE_DOMAIN",
+    "profiles": [
+      {
+        "template": "approved-v1",
+        "expectedSpec": {
+          "REPLACE": "API-defaulted approved Cell spec"
+        },
+        "expectedPodSpec": {
+          "REPLACE": "API-defaulted approved StatefulSet Pod spec"
+        }
+      }
+    ]
+  },
+  "stateFile": "/private/state.sqlite",
+  "adminSocket": "/private/admin.sock",
+  "environments": [
+    {
+      "id": "alice-main",
+      "owner": {
+        "tenantId": "tenant-a",
+        "principalId": "alice"
+      },
+      "template": "approved-v1"
+    }
+  ],
+  "members": [
+    {
+      "issuer": "https://REPLACE_ISSUER",
+      "subject": "REPLACE_VERIFIED_SUBJECT",
+      "owner": {
+        "tenantId": "tenant-a",
+        "principalId": "alice"
+      }
+    }
+  ],
+  "oidc": {
+    "issuer": "https://REPLACE_ISSUER",
+    "clientId": "REPLACE_CLIENT_ID",
+    "clientSecretFile": "/private/client-secret",
+    "platformOrigin": "https://REPLACE_PLATFORM_HOST",
+    "siteDomain": "REPLACE_SITE_DOMAIN"
+  }
+}

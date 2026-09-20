@@ -1,34 +1,59 @@
-# Local developer experience
+# Cell alpha：已有 Kubernetes 的启动入口
 
-This guide targets 0.8.0. Check availability with `npm view dsh-multi-tenant@0.8.0 version`; if absent, use the source flow below. 0.7.1 has no CLI. Published artifacts include a verified prebuilt image digest.
+本指南针对 `0.9.0-alpha.1` 源码候选。发布前 npm latest 仍可能指向旧 Docker 演示；不能用旧包验收本指南。当前集成回归已通过，公开镜像绑定和正式发布另行执行。
 
-With Node 22.19 or newer 22.x, or Node 24+ and a running local Docker Engine/Desktop using Linux containers:
+## 1. 管理员准备运行时
 
-```sh
-npx -y dsh-multi-tenant@0.8.0 start
-```
+- 单个已配置 K8s 集群，Gateway API、执行 NetworkPolicy 的 CNI、可用 StorageClass、租户 namespace。
+- 固定 runtime commit、DSH 基线和 Cell/Operator 镜像 digest，见包内 `cell-release.json`。源码候选的镜像字段为空，不能当作可部署发行版。
+- 使用 runtime 的 [`config/platform`](https://github.com/GuoMonth/dsh-isolated-runtime/tree/main/config/platform)，配置 `--access-mode=platform --base-domain=<site-domain> --system-namespace=dsh-system`。不要安装 standalone authorizer 或用户直达 Cell 的 route；现有模式冲突必须显式处理，不自动迁移。
+- HTTPS 平台 origin 与 `cell-<UID>.<site-domain>` 使用同一受控 site domain，443 端口。Gateway 将它们交给平台 Service；只允许系统 namespace 内带平台标签的 Pod 访问 Cell。平台需要直达 API 和 Pod IP，因此推荐在 K8s 内运行。
+- OIDC Code+PKCE，固定 callback `https://<platform-host>/auth/callback`，issuer 必须 HTTPS 且 CA 受信任。管理员维护可信 `(issuer, subject) → owner` 映射；不从用户输入推导权限。
 
-Or run `npm install -g dsh-multi-tenant@0.8.0`, then `dsh-multi-tenant start`. No source checkout, pnpm, DSH installation, image build, handwritten profile or API key is required. The CLI downloads the matching image, creates local state and opens a browser. Choose Alice or Bob to start a dedicated native DSH Host.
+## 2. 配置与状态
 
-The explicitly deterministic demo model supports “Read my sample”, “Create a file” and “Delegate to a subagent” through native tools. It is not an AI model. Configure your own provider credentials in native Settings and select a real model in the session to use real AI.
+配置结构见 [`integration/distribution/config.example.json`](../../integration/distribution/config.example.json)，所有占位符必须替换。它不含可用模型或登录凭据。
 
-Commands: `start`, `status`, `stop`, `doctor`. Options: `--data-dir PATH`, `--port 3080`, `--no-open`; development builds accept `--image DIGEST`. Port conflicts choose a free port. Ctrl-C stops owned containers and retains data. Default control state is `~/.dsh-experience`; workspace data lives in named Docker volumes, independently of npx caches. Use the same data directory for all management commands.
+`allocation.profiles` 必须取自该固定运行时在当前集群创建并 Ready 的校准 Cell：记录 API 默认化后的 `spec` 和 StatefulSet `spec.template.spec`，仅将 Cell UID、`cell-UID.domain` 替换为 `${INSTANCE_ID}`、`${ORIGIN_HOST}`。不要用空 profile 或放宽比较绕过模板拒绝。runtime 拥有模板验证；平台只配置已验收 profile。回归 fixture 的 [capture-profile.py](../../integration/regression/capture-profile.py) 展示采集方法，但其固定 Dex/测试用户不是部署配置生成器。
 
-Each user has a separate localhost hostname. The short-lived URL fragment establishes a host-only local session and disappears after exchange. Do not share it; rerun start for a fresh link. The launcher is loopback-only; demo identity selection is not public login/SSO. No hosts-file edits or manual certificates are required for the Chromium-verified local flow.
+每个 owner 首期只配置一个环境。`stateFile` 与 `adminSocket` 放在平台专用目录（0700），OIDC client secret 文件0600；SQLite/PVC 不进入用户 Cell。配置中的路径在平台进程内解析，使用绝对路径。模型凭据在各用户 DSH 私有设置里配置，不放在平台配置或 README 中。
 
-Linux Docker Engine is verified locally. Native Linux amd64/arm64 have recorded installed-CLI evidence; ongoing checks run locally, with platform coverage recorded by maintainers. Desktop transport no longer relies on host Unix sockets, bind paths or UIDs, but macOS/Windows real-machine acceptance remains experimental until recorded. Remote Docker and Windows containers are rejected. Bridge networking follows Docker policy and is not network tenant isolation.
+## 3. 构建/启动
 
-An instance pins its image, DSH and profile versions. Incompatible startup does not migrate data: use the original CLI or a new data directory. Stop does not delete volumes; there is no automatic destructive reset. Source manifests deliberately contain no pretend published image. Maintainers build runtime/Dockerfile, inspect its image ID and pass it with --image. See the [Chinese guide](quickstart.zh-CN.md) for complete source commands and boundaries.
-
-
-Source verification from the repository root (use the pnpm version in package.json):
-
-```sh
+```bash
+# 源码候选，本仓库根目录；使用 packageManager 固定的 pnpm
 pnpm install --frozen-lockfile
 pnpm build
-docker build -f packages/multi-tenant/runtime/Dockerfile -t dsh-experience:dev packages/multi-tenant
-docker image inspect dsh-experience:dev --format '{{.Id}}'
-node packages/multi-tenant/dist/cli.mjs start --image sha256:<returned-id> --data-dir /tmp/dsh-experience-dev
+mkdir -p dist/npm
+pnpm --filter dsh-multi-tenant pack --pack-destination ../../dist/npm
+# 用同一个 npm tarball 构建平台容器，无需复制源码/vendor
+# 在已有 API/Pod 网络的 Node 24 主机也可安装 tarball 后直接执行 CLI
+docker build -f integration/distribution/Dockerfile -t YOUR_PLATFORM_IMAGE dist/npm
 ```
 
-Replace the image placeholder with the inspect output. When using npx, run management commands as `npx -y dsh-multi-tenant@0.8.0 status` (or `stop`/`doctor`); the bare executable requires a global installation. See the [AI guide](../../packages/multi-tenant/AI.md) for assisted setup.
+推送平台镜像后固定 digest。[platform.yaml](../../integration/regression/platform.yaml)、[tenant-rbac.yaml](../../integration/regression/tenant-rbac.yaml)、[gateway.yaml](../../integration/regression/gateway.yaml) 是已验证的部署参考：替换平台镜像、域名、namespace、StorageClass、TLS 引用及 Secret，先渲染审阅再应用。单副本/Recreate，保留平台状态 PVC。引用清单目前仍是 fixture，不能不改就用于公共服务。容器默认运行：
+
+```bash
+dsh-multi-tenant start --config /private/config.json
+# 本次制品发布后，对应的 npm 获取入口：
+npx dsh-multi-tenant@latest start --config /private/config.json
+```
+
+无需两个 npm 命令同时启动；runtime Operator 由管理员部署，平台 npm 是用户协议服务入口。记录 `dsh-multi-tenant --version` 和实际镜像 digest。SIGTERM/SIGINT 保留 Cell/数据，SIGHUP 只重读成员配置；重启后用户重新登录。
+
+## 4. 查询与明确删除
+
+在平台容器内或同一私有 socket 所在主机执行：
+
+```bash
+dsh-multi-tenant inspect --socket /private/admin.sock --environment alice-main
+# 仅在管理员明确要删除时，使用查询返回的原分配 key 与精确 instance identity
+dsh-multi-tenant delete --socket /private/admin.sock --environment alice-main \
+  --allocation-key ORIGINAL_KEY --identity EXACT_UID
+```
+
+普通用户接口不提供 DELETE。超时/unknown 后检查原 key；不换 key 重试、不删除数据库强行创建。accepted、API 对象缺失、writer 已停止是不同事实。Cell data/private-state/外部 Secret 的清理边界见 [R6](../design/r6-deletion.md)。
+
+## 5. 内测最小检查
+
+首次部署核对：两个真实 OIDC 身份各自进入原生 Web；一次真实模型文件 write/read；跨 owner/绕过入口拒绝；登出关闭已有连接；平台退出不删除 Cell，重启后新登录绑定原 UID。依据变化选择验证，不重复扩大历史 HA/升级门禁。已有完整证据见 [回归报告](../evidence/cell-regression-2026-09-20.md)，本次打包增量见 [交付验证](../evidence/alpha-delivery-2026-09-20.md)。
