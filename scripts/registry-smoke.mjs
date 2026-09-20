@@ -24,6 +24,7 @@ function npmJson(args) {
   const out = execFileSync('npm', [...args, '--json'], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 20000,
   }).trim()
   return out ? JSON.parse(out) : undefined
 }
@@ -37,21 +38,22 @@ function normalizeRepository(value) {
     .toLowerCase()
 }
 
+// npm may accept an upload before publishing its public metadata. Only read here;
+// never interpret delayed visibility as permission to publish the same version again.
 let registryVersion
-for (let attempt = 1; attempt <= 10; attempt++) {
+let taggedVersion
+const deadline = Date.now() + 10 * 60 * 1000
+while (Date.now() < deadline) {
   try {
-    registryVersion = npmJson(['view', `${PACKAGE_NAME}@${version}`, 'version'])
-    if (registryVersion === version) break
-  } catch (error) {
-    if (attempt === 10) throw error
-  }
-  await new Promise(resolve => setTimeout(resolve, 3000))
+    registryVersion = npmJson(['view', `${PACKAGE_NAME}@${version}`, 'version', '--prefer-online'])
+    taggedVersion = npmJson(['view', `${PACKAGE_NAME}@${distTag}`, 'version', '--prefer-online'])
+    if (registryVersion === version && taggedVersion === version) break
+  } catch { /* bounded metadata propagation wait; no write or credential output */ }
+  console.log(`Waiting for public ${PACKAGE_NAME}@${version} and ${distTag}; upload is not replayed`)
+  await new Promise(resolve => setTimeout(resolve, 15000))
 }
-if (registryVersion !== version) throw new Error(`registry did not resolve ${PACKAGE_NAME}@${version}`)
-
-const taggedVersion = npmJson(['view', `${PACKAGE_NAME}@${distTag}`, 'version'])
-if (taggedVersion !== version) {
-  throw new Error(`npm ${distTag} dist-tag resolves to ${String(taggedVersion)}, expected ${version}`)
+if (registryVersion !== version || taggedVersion !== version) {
+  throw new Error('Public version/dist-tag did not converge within 10 minutes; inspect accepted publication before retrying')
 }
 
 const repository = npmJson(['view', `${PACKAGE_NAME}@${version}`, 'repository.url'])
