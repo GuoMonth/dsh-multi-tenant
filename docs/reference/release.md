@@ -8,6 +8,10 @@ The runtime repository owns Cell/Operator images and their source/DSH acceptance
 
 `packages/multi-tenant/cell-release.json` records the fixed runtime, Connector, DSH and platform version. Null images and `source-candidate` explicitly mean publication is pending. Never substitute old standalone images just because they are already public. `runtime-manifest.json` belongs to the retained historical SDK and is not the Cell CLI's release identity.
 
+## Fixed dependency boundary
+
+Current DSH: `0.1.5-rc.2` at `fb2c4b9e698e30edb738bca4cf0618587db7d203`. Release Cell/Operator images must be publicly pullable and fixed by digest; deploy the platform image by digest as well. A bound manifest may be checked again with the same inputs, but cannot silently accept another release tag or image pair. Changing the combination is an explicit new iteration, with affected-flow validation and no historical compatibility obligation. Candidate null digests mean unpublished; they never enable fallback to an old public image.
+
 ## Before authorized publication
 
 1. Review/merge the coordinated runtime documentation/channel PR and then this platform PR. No runtime API change is required by the CLI. Keep Issue #82 as the integration record.

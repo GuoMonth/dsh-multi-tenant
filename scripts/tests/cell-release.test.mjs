@@ -14,3 +14,12 @@ test('release binding rejects old runtime/DSH and mixed image pairs', () => {
     {}, null,
   ]) assert.throws(() => verifyCellRelease(expected, candidate, accepted.version, images), /combination mismatch/)
 })
+
+test('an already bound combination cannot silently change release or image digests', () => {
+  const bound = { ...expected, runtime: { ...expected.runtime, release: accepted.version }, images }
+  assert.doesNotThrow(() => verifyCellRelease(bound, accepted, accepted.version, images))
+  const changedImages = { ...images, cell: 'another-public-cell-digest' }
+  assert.throws(() => verifyCellRelease(bound, { ...accepted, images: changedImages }, accepted.version, changedImages), /combination mismatch/)
+  const nextTag = 'v0.3.0-alpha.1'
+  assert.throws(() => verifyCellRelease(bound, { ...accepted, version: nextTag }, nextTag, images), /combination mismatch/)
+})
