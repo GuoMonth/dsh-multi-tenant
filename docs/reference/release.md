@@ -1,6 +1,6 @@
 # Cell alpha release runbook
 
-Current target: `dsh-multi-tenant@0.9.0-alpha.1`, npm **latest**, GitHub **prerelease**. Channel and maturity are separate. Runtime [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1) is public and the exact image pair is bound in the manifest. npm publication uses the manual workflow below. Historical 0.8.0 workbench instructions are in [archive](../archive/v0.8/docs/reference/release.md).
+Current target: `dsh-multi-tenant@0.9.0-alpha.1`, npm **latest**, GitHub **Release / Latest**. The version name explicitly identifies Alpha maturity; do not enable GitHub Pre-release. Runtime [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1) is public and the exact image pair is bound in the manifest. npm publication uses the manual workflow below. Historical 0.8.0 workbench instructions are in [archive](../archive/v0.8/docs/reference/release.md).
 
 ## Coordinated inputs
 
@@ -18,7 +18,7 @@ Current DSH: `0.1.5-rc.2` at `fb2c4b9e698e30edb738bca4cf0618587db7d203`. Release
 2. Run `pnpm release:check`. This includes the packed npm consumer check and platform tests. Use the [regression report](../evidence/cell-regression-2026-09-20.md) for unchanged core behavior, plus [delivery verification](../evidence/alpha-delivery-2026-09-20.md) for this package. Do not substitute old standalone installation gates for integrated acceptance.
 3. Obtain the accepted **public** Cell and Operator digests for the manifest's runtime source/DSH combination. Publication is blocked until those artifacts exist and can be fetched anonymously. Review the runtime release manifest against the fixed source and images. A public repository alone does not make GHCR images public.
 4. Dispatch the manual `Publish package` workflow on the reviewed main commit with that runtime release tag and its exact public image digests. Binding rejects source/DSH/image disagreement and anonymous image lookup failures. The workflow no longer builds the old platform-owned DSH runtime image.
-5. The workflow packs/checks the Cell entry points, publishes via npm Trusted Publishing to `latest`, verifies exact registry version/tag and creates a matching GitHub prerelease. No npm publish or moving tag is performed by local checks or PR creation.
+5. The workflow packs/checks the Cell entry points, publishes via npm Trusted Publishing to `latest`, verifies exact registry version/tag and creates a matching GitHub Release marked Latest. No npm publish or moving tag is performed by local checks or PR creation.
 6. On a clean consumer, install the exact published package, build the platform container using `integration/distribution/Dockerfile`, record its digest and follow [startup](quickstart.md). Save the final versions, digests and narrow installation result to Issue #82 before inviting users. Source-level regression is not proof that a public artifact has been installed.
 
 No cluster installer, macOS matrix, upgrade compatibility, HA, migration or recovery guarantees are added. Both npm projects use latest for future authorized releases; runtime's npm launcher remains the separately scoped standalone experience and is not a second command required by this deployment.
