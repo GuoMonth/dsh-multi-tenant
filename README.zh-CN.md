@@ -1,5 +1,7 @@
 # dsh-multi-tenant
 
+> **当前开发边界：** Cell MVP + 中立内部契约；固定验证版本，允许破坏性变更，不承诺历史兼容、升级或无感恢复。先走通核心链路，失败提供 AI 可解读诊断。见[项目宪法](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONSTITUTION.md)。下文已存在的 CLI/SDK 行为描述其版本，不代表新版本兼容承诺。
+
 [English](README.md) · [版本发布](https://github.com/GuoMonth/dsh-multi-tenant/releases) · [更新记录](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CHANGELOG.md)
 
 让每位登录用户拥有自己的原生 DeepSeek Harness 工作环境。用户继续使用 DSH 的聊天、workspace、文件、preset 和子代理，平台负责将不同用户的数据与执行环境隔离。

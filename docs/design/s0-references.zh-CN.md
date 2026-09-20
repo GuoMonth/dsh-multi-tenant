@@ -52,14 +52,10 @@
 - [OIDC Core §5.7](https://openid.net/specs/openid-connect-core-1_0.html#ClaimStability)：稳定身份使用 issuer 与 subject 的组合；不是邮箱。此信息只在上层，runtime 不消费 OIDC claim。
 - [Kubernetes API Concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/)：复用对象版本、条件更新和读取/观察机制。resourceVersion 是适配器内的原生并发工具，不是公共全局 generation。
 
-## 6. 本项目额外提出的语义
+## 6. 本项目采用与撤回的设计
 
-以下是基于本项目约束的设计，不宣称直接来自上述项目：
+2026-09-20 按用户确认的 MVP 边界修订：保留权威划分、中立内部端口、精确目标和失败语义；只实现 Cell。
 
-- 四操作 core：create/get/retire/resolveAccess。
-- Environment 与 RuntimeInstance 的绑定、实例 key + incarnation 区分。
-- 保留终态记录阻止退役后迟到 create 复活。
-- 同进程 runtime-cell adapter + 非 bearer 的 AccessBinding/Connector。
-- 单实例 OIDC 会话、host-only 环境 origin 和跨 origin 一次性 handoff。
+先前提出的四操作公共 v1alpha1、永久退役记录、TTL AccessBinding 和固定 handoff 均不再作为当前要求。它们是已审查并收缩的候选方案，不能从历史引用重新引入。未来多后端兼容、暂停/快照等扩展需第二个真实需求和验证依据。
 
-采用成熟项目的边界思想，并不等于购买其全部功能面。S0 的符合性案例和 S1 实证用于验证这些本项目判断。
+采用社区设计的边界思想，不等于实现其全部产品或维护其协议兼容。

@@ -1,5 +1,7 @@
 # dsh-multi-tenant
 
+> **Current development scope:** Cell MVP with a neutral internal interface. Validate pinned versions; breaking changes are allowed with no historical compatibility, upgrade or seamless recovery promise. Prioritize the core flow and AI-readable failure diagnostics. See the [project constitution](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONSTITUTION.md). Existing CLI/SDK behavior below describes its version, not a future compatibility promise.
+
 [简体中文](README.zh-CN.md) · [Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases) · [Changelog](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CHANGELOG.md)
 
 Give each signed-in user their own native DeepSeek Harness environment. Users keep DSH's chat, workspaces, files, presets and subagents, while the platform separates their data and execution from other users.
