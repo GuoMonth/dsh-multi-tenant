@@ -1,3 +1,5 @@
+> Archived snapshot; not current requirements. See the documentation index and active Issue for current scope.
+
 # DSH 0.1.5-alpha.1 兼容性与规划审查
 
 审查及实施日期：2026-09-09。初始评估从仓库 `35a6b7c`、插件 `0.4.0` 开始；当前工作树已推进为 `0.5.0`。

@@ -1,3 +1,5 @@
+> Archived snapshot; not current requirements. See the documentation index and active Issue for current scope.
+
 # DSH 0.1.5-rc.2 对齐与架构评估
 
 评估日期：2026-09-11。项目起点：`cff95c6c77e8d7f8d7b38c2c8be0b11ff577905a` / `dsh-multi-tenant@0.5.0`。目标：DSH `0.1.5-rc.2` / `fb2c4b9e698e30edb738bca4cf0618587db7d203`。

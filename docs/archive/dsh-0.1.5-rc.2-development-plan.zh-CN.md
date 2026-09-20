@@ -1,3 +1,5 @@
+> Archived snapshot; not current requirements. See the documentation index and active Issue for current scope.
+
 # DSH rc.2 对齐与原生多租户能力开发方案
 
 日期：2026-09-11。状态：主线已实现；合入状态以关联 issue/PR 为准。F 按本计划的受限 adapter 备用方案交付，完整 stock Web 保留在 #71。目标 DSH：`0.1.5-rc.2`，commit `fb2c4b9e698e30edb738bca4cf0618587db7d203`。
