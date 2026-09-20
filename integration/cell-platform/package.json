@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "test": "npm run build && node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=24"

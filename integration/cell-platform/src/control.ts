@@ -13,6 +13,7 @@ export function createEnvironmentControl(
   definitions: readonly EnvironmentDefinition[],
 ) {
   const active = new Set<string>();
+  let revokeEnvironment: ((id: string) => void) | undefined;
   const environments = new Map<string, Environment>();
   const origins = new Map<string, string>();
   function authorized(id: string, member: Member) {
@@ -48,6 +49,14 @@ export function createEnvironmentControl(
           context,
         );
       }
+      if (record.phase === "delete-requested")
+        return {
+          id,
+          phase: record.phase,
+          deleteEffect: record.deleteEffect,
+          instance: view,
+          writerState: "unverified",
+        };
       store.save(id, "bound", view.ref.identity, context.correlationId);
       // Publish a route only after durable identity binding. Fresh runtime validation still gates access.
       environments.set(id, { id, owner: record.owner, instance: view.ref });
@@ -60,6 +69,103 @@ export function createEnvironmentControl(
   return {
     environments,
     origins,
+    setRevoker(revoke: (id: string) => void) {
+      if (revokeEnvironment) throw new Error("Revoker already set");
+      revokeEnvironment = revoke;
+    },
+    async administer(
+      id: string,
+      operation: "inspect" | "delete",
+      expected: { allocationKey: string; identity: string } | undefined,
+      context: AccessContext,
+    ) {
+      const record = store.get(id);
+      if (!record)
+        throw new RuntimeAccessError(
+          "RecordMissing",
+          context.correlationId,
+          "Use a configured environment",
+        );
+      if (operation === "inspect") {
+        if (record.phase === "reserved")
+          return {
+            id,
+            phase: record.phase,
+            allocationKey: record.allocationKey,
+          };
+        return refresh(id, false, context);
+      }
+      if (
+        !expected ||
+        record.allocationKey !== expected.allocationKey ||
+        record.identity !== expected.identity
+      )
+        throw new RuntimeAccessError(
+          "StaleInstance",
+          context.correlationId,
+          "Inspect and supply the exact persisted allocation and identity",
+        );
+      if (
+        active.has(id) ||
+        !record.identity ||
+        (record.phase !== "bound" && record.phase !== "delete-requested")
+      )
+        throw new RuntimeAccessError(
+          "AllocationUnresolved",
+          context.correlationId,
+          "Resolve the original create before deleting this environment",
+        );
+      if (record.phase === "delete-requested")
+        return refresh(id, false, context);
+      if (!revokeEnvironment) throw new Error("Revocation unavailable");
+      active.add(id);
+      try {
+        context.signal.throwIfAborted();
+        // A failed commit is uncertain: revoke locally even when persistence fails.
+        try {
+          store.save(
+            id,
+            "delete-requested",
+            record.identity,
+            context.correlationId,
+            "unknown",
+          );
+        } finally {
+          environments.delete(id);
+          origins.delete(id);
+          revokeEnvironment(id);
+        }
+        const result = await runtime.requestDelete(
+          record,
+          record.identity,
+          context,
+        );
+        store.save(
+          id,
+          "delete-requested",
+          record.identity,
+          context.correlationId,
+          result.effect,
+        );
+        return { id, phase: "delete-requested", ...result };
+      } catch (error) {
+        // The barrier remains after every outcome, including explicit rejection.
+        if (
+          error instanceof RuntimeAccessError &&
+          error.code !== "StateUnavailable"
+        )
+          store.save(
+            id,
+            "delete-requested",
+            record.identity,
+            context.correlationId,
+            error.effect,
+          );
+        throw error;
+      } finally {
+        active.delete(id);
+      }
+    },
     async handle(
       request: IncomingMessage,
       response: ServerResponse,

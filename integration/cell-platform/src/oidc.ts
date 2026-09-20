@@ -161,6 +161,7 @@ export async function createOIDCAuthentication(
   );
   oidc.enableNonRepudiationChecks(config);
   const sessions = new Sessions(members, options.sessionLifetimeMs);
+  control.setRevoker((id) => sessions.revokeEnvironment(id));
   const entries = new Once<Entry>(),
     transactions = new Once<Transaction>(),
     tickets = new Once<Ticket>();

@@ -8,11 +8,13 @@ import { createPlatformIngress } from "./ingress.js";
 import { createOIDCAuthentication, type OIDCOptions } from "./oidc.js";
 import { AllocationStore, type EnvironmentDefinition } from "./allocations.js";
 import { createEnvironmentControl } from "./control.js";
+import { listenAdmin } from "./admin.js";
 import type { Member } from "./sessions.js";
 interface Configuration {
   kubernetes: KubernetesOptions;
   allocation: CellAllocationOptions;
   stateFile: string;
+  adminSocket: string;
   environments: EnvironmentDefinition[];
   oidc: OIDCOptions & { clientSecretFile?: string };
   members: Member[];
@@ -73,9 +75,13 @@ async function main() {
     | Awaited<ReturnType<typeof createOIDCAuthentication>>
     | undefined;
   let app: ReturnType<typeof createPlatformIngress> | undefined;
+  let admin: Awaited<ReturnType<typeof listenAdmin>> | undefined;
   const stop = () => {
     lifecycle.abort();
     authentication?.close();
+    void admin?.close().catch(() => {
+      process.exitCode = 1;
+    });
     void app?.close().catch(() => {
       process.exitCode = 1;
     });
@@ -98,6 +104,7 @@ async function main() {
       authentication.authenticator,
       control.environments,
     );
+    admin = await listenAdmin(config.adminSocket, control, lifecycle.signal);
     // Reload only membership. Other configuration changes require a restart.
     let reloading = false;
     process.on("SIGHUP", () => {
