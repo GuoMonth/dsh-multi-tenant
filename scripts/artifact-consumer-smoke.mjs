@@ -6,7 +6,7 @@ import { installArtifact } from './installed-package.mjs'
 const installed = installArtifact(process.argv[2] ?? '--local')
 try {
   const guide = readFileSync(join(installed.packageDirectory, 'AI.md'), 'utf8')
-  if (!guide.includes('runtime-manifest.json')) throw new Error('Installed package is missing its AI operating guide')
+  if (!guide.includes('cell-release.json')) throw new Error('Installed package is missing its AI operating guide')
   execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--save-dev', 'typescript@6.0.3', '@types/node@22.20.0'], { cwd: installed.directory, stdio: 'pipe' })
   writeFileSync(join(installed.directory, 'contract.ts'), `
     import { DomainRuntimeCoordinator, SQLiteDomainRepository, createDomainIngress,

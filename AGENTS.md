@@ -5,7 +5,7 @@
 ## Task routing
 
 - Cell integration or ownership: [S0 architecture](docs/design/s0-runtime-architecture.zh-CN.md).
-- Existing SDK/CLI usage or source map: [package AI guide](packages/multi-tenant/AI.md).
+- Cell CLI usage or source map: [package AI guide](packages/multi-tenant/AI.md).
 - Checks and contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
 - Publication: [release runbook](docs/reference/release.md). Publishing, deployment and data deletion require applicable user authorization; routine local edits/checks within the task can proceed.
 - Other docs: [index](docs/README.md). Archived plans are evidence, not current requirements.
@@ -16,4 +16,4 @@
 - Platform identity/control storage/secrets remain outside user domains. DSH owns native Web, sessions, tools and persistence; do not copy its controllers or introduce shared-host per-root ACLs.
 - Preserve fail-closed admission/revocation and exact instance ownership. Unknown cleanup must not admit another writer to the same data.
 - User-facing changes update both root READMEs and their npm package copies; shipped links must work outside a checkout. Keep the bundled AI guide aligned with actual CLI behavior.
-- Follow nearby TypeScript ESM patterns. Current public exports and tests define implemented behavior; the Cell design is not yet implementation evidence.
+- Follow nearby TypeScript ESM patterns. Current public exports and tests define implemented behavior; use the regression and delivery reports for evidence, not design prose.

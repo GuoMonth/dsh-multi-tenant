@@ -9,7 +9,8 @@ const pkg = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/package.js
 const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const errors = []
 const version = pkg.version
-const releaseTag = `v${version}`
+const combination = JSON.parse(readFileSync(join(root, 'packages/multi-tenant/cell-release.json'), 'utf8'))
+if (combination.platformVersion !== version || combination.channel !== 'latest' || combination.runtime.accessMode !== 'platform' || combination.dsh.commit !== DSH_TARGET.commit) errors.push('Cell release combination mismatch')
 
 function filesBelow(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
@@ -18,13 +19,13 @@ function filesBelow(directory) {
   })
 }
 
-if (pkg.name !== 'dsh-multi-tenant' || !/^\d+\.\d+\.\d+$/.test(version)) errors.push('release identity mismatch')
+if (pkg.name !== 'dsh-multi-tenant' || !/^\d+\.\d+\.\d+(?:-alpha\.\d+)?$/.test(version)) errors.push('release identity mismatch')
 if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.tag !== 'latest' || pkg.publishConfig?.provenance !== true) {
   errors.push('publishConfig must be public latest with provenance')
 }
 if (pkg.license !== 'MIT') errors.push('license must be MIT')
 if (pkg.dsh) errors.push('obsolete Cordis bundle metadata')
-for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'AI.md', 'runtime', 'LICENSE', 'src/native/runtime-control.mjs', 'examples']) {
+for (const file of ['dist', 'README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'AI.md', 'cell-release.json', 'THIRD_PARTY_NOTICES', 'runtime', 'LICENSE', 'src/native/runtime-control.mjs', 'examples']) {
   if (!(pkg.files ?? []).includes(file)) errors.push(`package files missing ${file}`)
 }
 
@@ -33,7 +34,7 @@ for (const path of ['README.md', 'README.zh-CN.md', 'packages/multi-tenant/READM
 }
 
 const releaseCheck = String(rootPkg.scripts?.['release:check'] ?? '')
-for (const marker of ['pnpm verify', 'pnpm peers:check', 'pnpm typecheck', 'pnpm test', 'pnpm build', 'pnpm probe:sqlite', 'pnpm smoke']) {
+for (const marker of ['pnpm verify', 'pnpm peers:check', 'pnpm typecheck', 'pnpm test', 'pnpm build', 'pnpm probe:sqlite', 'pnpm smoke', 'pnpm smoke:cell']) {
   if (!releaseCheck.includes(marker)) errors.push(`release:check missing ${marker}`)
 }
 

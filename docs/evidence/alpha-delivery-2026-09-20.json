@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-20",
+  "version": "0.9.0-alpha.1",
+  "status": "local-package-verified-not-published",
+  "testedImage": "localhost:30482/dsh-platform@sha256:5e6679ee01bf4094cf37ca87d052c68767278f17edd9a678aa6e3e7d8d541504",
+  "testedTarballSHA256": "faf1b2fbeb0ea69b15dca61e24352f4966fecf8b79d72e63299c4589c0db1941",
+  "finalTarballSHA256": "ba91b5fa6ff8bfb3ba5e4968af428b65f738bee3a25c2c154548a1976b870d03",
+  "unchangedExecutableSHA256": {
+    "dist/cli.mjs": "01892f8d3d928b230e0e23b1bdf1d6674bd8201698cff9e7da2a2df1a15089f3",
+    "dist/cell-platform.mjs": "86178caf8659851be55c534ff2c736fb219aa50e36baebba36b8d28e89a51f0c",
+    "dist/cell-admin.mjs": "626133fb1d8e400bac11bcb671e2a605d5f906aa88188daa370664b4c35640c9",
+    "cell-release.json": "17634e2e16ecaf6a2b7af34510dd9fe47f097ed0373dd3392074a0bf9b62eb54"
+  }
+}

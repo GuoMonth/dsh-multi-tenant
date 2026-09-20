@@ -83,7 +83,7 @@ RBAC 在读取权限之外增加 Cell `create`，不增加 Pod/PVC 写入、patc
 Gateway/TLS 必须把 `cell-<UID>.<allocation.domain>` 送到平台，并保留 Host；
 该 domain 应在 `oidc.siteDomain` 内。CNI 必须继续阻止绕过平台直接访问新 Cell。
 
-## 集中回归新增要点
+## 回归覆盖范围（非全部通过声明）
 
 - SQLite 分配持久化、独占锁、错误格式/损坏/只读文件/磁盘满；写屏障前后退出。
 - 并发同环境创建、同 key 同意图、冲突归属/模板/实际 profile；CRD 不可变字段拒绝变更。
@@ -94,5 +94,4 @@ Gateway/TLS 必须把 `cell-<UID>.<allocation.domain>` 送到平台，并保留 
   取消已提交创建，也不删除 Cell。
 - 新 UID 的 HTTPS origin 路由、DSH cookie 与平台凭据过滤，以及 CNI 绕过负例。
 
-R5 原始交付只执行编译/类型、生成物及静态检查；R6 已开始本地状态回归，
-实际集群/浏览器行为仍待主 Issue #82 的集中验收。
+当前固定版本已完成核心集群/浏览器回归，实际通过项与测试层级见 [回归报告](../evidence/cell-regression-2026-09-20.md)。上方是风险清单，不把磁盘满、完整崩溃矩阵等未执行项冒充已验收。
