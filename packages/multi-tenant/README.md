@@ -4,13 +4,13 @@ OIDC, membership authorization, environment sessions and native DSH access, back
 
 [中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/README.zh-CN.md)
 
-**Cell MVP alpha candidate; this artifact has not been published yet.** Two-user and real-model regression passed. `0.9.0-alpha.1` targets npm `latest`, a default installation channel, not a stability promise. Breaking changes are allowed; historical compatibility, upgrades and seamless recovery are not promised.
+**Cell MVP alpha.** Two-user and real-model regression passed. `0.9.0-alpha.1` uses npm `latest`, a default installation channel, not a stability promise. Breaking changes are allowed; historical compatibility, upgrades and seamless recovery are not promised.
 
 ## Fixed release boundary
 
 DSH is exactly **0.1.5-rc.2**, source **`fb2c4b9e698e30edb738bca4cf0618587db7d203`**. Each release locks the publicly pullable Cell and Operator images by `@sha256` digest, with matching runtime source and DSH identity in `cell-release.json` (platform) / `release.json` (runtime). Pin the deployed platform image by digest too. npm `latest` selects a package at installation; it does not authorize moving image tags or a DSH version range at runtime.
 
-Breaking updates are allowed: publish a new explicit combination, update configuration/state expectations as needed and validate the affected flow. No compatibility shim, historical upgrade or migration promise is required. Published artifact identities stay immutable. The current source candidate has no public image binding yet; null digests block publication rather than selecting an old image or inventing one.
+Breaking updates are allowed: publish a new explicit combination, update configuration/state expectations as needed and validate the affected flow. No compatibility shim, historical upgrade or migration promise is required. Published artifact identities stay immutable. The public runtime pair is locked to [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1), Linux/amd64. Exact digests are in the [release manifest](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/cell-release.json). Null digests block publication.
 
 
 ## Start
@@ -18,7 +18,7 @@ Breaking updates are allowed: publish a new explicit combination, update configu
 An administrator first configures Kubernetes, the platform-mode Cell Operator, OIDC, DNS/TLS, storage and permissions. The platform needs direct Kubernetes API and Cell Pod-IP connectivity; run it in the cluster. Running npx on an ordinary host does not provide cluster networking.
 
 ```bash
-# After this version is published; Node.js 24+
+# Node.js 24+
 npx dsh-multi-tenant@latest start --config /private/config.json
 ```
 

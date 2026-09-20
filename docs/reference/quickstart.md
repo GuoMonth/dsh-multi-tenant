@@ -1,11 +1,11 @@
 # Cell alpha：已有 Kubernetes 的启动入口
 
-本指南针对 `0.9.0-alpha.1` 源码候选。发布前 npm latest 仍可能指向旧 Docker 演示；不能用旧包验收本指南。当前集成回归已通过，公开镜像绑定和正式发布另行执行。
+本指南针对 `0.9.0-alpha.1` Cell alpha。运行时公开镜像锁定 v0.3.0-alpha.1，Linux/amd64。安装后检查版本，不能用旧 0.8.0 Docker 演示包验收本指南。
 
 ## 1. 管理员准备运行时
 
 - 单个已配置 K8s 集群，Gateway API、执行 NetworkPolicy 的 CNI、可用 StorageClass、租户 namespace。
-- 固定 runtime commit、DSH 基线和 Cell/Operator 镜像 digest，见包内 `cell-release.json`。源码候选的镜像字段为空，不能当作可部署发行版。
+- 固定 runtime commit、DSH 基线和 Cell/Operator 镜像 digest，见包内 `cell-release.json`。当前清单已绑定公开 Cell/Operator digest；不允许用 main/latest 镜像标签替换。
 - 使用 runtime 的 [`config/platform`](https://github.com/GuoMonth/dsh-isolated-runtime/tree/main/config/platform)，配置 `--access-mode=platform --base-domain=<site-domain> --system-namespace=dsh-system`。不要安装 standalone authorizer 或用户直达 Cell 的 route；现有模式冲突必须显式处理，不自动迁移。
 - HTTPS 平台 origin 与 `cell-<UID>.<site-domain>` 使用同一受控 site domain，443 端口。Gateway 将它们交给平台 Service；只允许系统 namespace 内带平台标签的 Pod 访问 Cell。平台需要直达 API 和 Pod IP，因此推荐在 K8s 内运行。
 - OIDC Code+PKCE，固定 callback `https://<platform-host>/auth/callback`，issuer 必须 HTTPS 且 CA 受信任。管理员维护可信 `(issuer, subject) → owner` 映射；不从用户输入推导权限。
