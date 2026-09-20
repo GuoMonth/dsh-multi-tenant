@@ -4,7 +4,7 @@
 
 ## 环境与输入
 
-需要 Docker、kind、kubectl、Node 24、Python 3、openssl、受信任的 Chromium，以及同级固定提交的 `dsh-isolated-runtime` checkout。平台源码、vendor/source.json、DSH pin 和实际镜像 digest 均需记录。
+需要 Docker、kind、kubectl、Node 24、Python 3、openssl、受信任的 Chromium，以及同级固定提交的 `dsh-isolated-runtime` checkout。平台源码、vendor/cell-connector.json、DSH pin 和实际镜像 digest 均需记录。
 
 ```bash
 export DSH_REGRESSION_HOME=/absolute/task-owned/lab
