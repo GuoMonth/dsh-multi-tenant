@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { startupDiagnostic, type StartupStage } from "./startup.js";
 import { readFile, stat } from "node:fs/promises";
 import {
   createCellAllocationRuntime,
@@ -21,6 +23,7 @@ interface Configuration {
   host: string;
   port: number;
 }
+let startupStage: StartupStage = "configuration";
 async function main() {
   const filename = process.argv[2];
   if (!filename) throw new Error("Configuration required");
@@ -51,6 +54,7 @@ async function main() {
     return members;
   };
   validateMembers(config.members);
+  startupStage = "secret";
   let secret: string | undefined;
   if (config.oidc.clientSecretFile) {
     const info = await stat(config.oidc.clientSecretFile);
@@ -59,6 +63,7 @@ async function main() {
     secret = (await readFile(config.oidc.clientSecretFile, "utf8")).trim();
     if (!secret) throw new Error("Empty client secret");
   }
+  startupStage = "runtime";
   if (
     config.allocation.domain !== config.oidc.siteDomain &&
     !config.allocation.domain.endsWith("." + config.oidc.siteDomain)
@@ -68,6 +73,7 @@ async function main() {
     config.kubernetes,
     config.allocation,
   );
+  startupStage = "state";
   const store = new AllocationStore(config.stateFile, config.environments);
   const control = createEnvironmentControl(runtime, store, config.environments);
   const lifecycle = new AbortController();
@@ -89,6 +95,7 @@ async function main() {
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);
   try {
+    startupStage = "oidc";
     authentication = await createOIDCAuthentication(
       config.oidc,
       secret,
@@ -104,6 +111,7 @@ async function main() {
       authentication.authenticator,
       control.environments,
     );
+    startupStage = "admin";
     admin = await listenAdmin(config.adminSocket, control, lifecycle.signal);
     // Reload only membership. Other configuration changes require a restart.
     let reloading = false;
@@ -131,6 +139,7 @@ async function main() {
           reloading = false;
         });
     });
+    startupStage = "listen";
     await new Promise<void>((resolve, reject) => {
       app!.server.once("error", reject);
       app!.server.listen(config.port, config.host, resolve);
@@ -142,12 +151,6 @@ async function main() {
   }
 }
 main().catch(() => {
-  console.error(
-    JSON.stringify({
-      code: "PlatformStartupRejected",
-      nextAction:
-        "Check fixed configuration, HTTPS OIDC discovery, secret permissions and pinned connector",
-    }),
-  );
+  console.error(JSON.stringify(startupDiagnostic(startupStage, randomUUID())));
   process.exitCode = 1;
 });

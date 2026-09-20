@@ -1,0 +1,10 @@
+*
+!vendor/
+!vendor/**
+!integration/
+!integration/cell-platform/
+!integration/cell-platform/package.json
+!integration/cell-platform/package-lock.json
+!integration/cell-platform/tsconfig.json
+!integration/cell-platform/src/
+!integration/cell-platform/src/**

@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: platform
+  namespace: dsh-system
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: platform-state
+  namespace: dsh-system
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform
+  namespace: dsh-system
+spec:
+  selector:
+    app: platform
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform
+  namespace: dsh-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: platform
+  template:
+    metadata:
+      labels:
+        app: platform
+        dsh.isolated.io/access: platform
+    spec:
+      serviceAccountName: platform
+      enableServiceLinks: false
+      initContainers:
+        - name: private-files
+          image: PLATFORM_IMAGE
+          command: [sh, -ec]
+          args:
+            - "cp /config/* /private/; chmod 700 /private; chmod 600 /private/config.json /private/client-secret /private/ca.crt; chown -R 1000:1000 /private"
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - { name: config, mountPath: /config, readOnly: true }
+            - { name: state, mountPath: /private }
+      containers:
+        - name: platform
+          image: PLATFORM_IMAGE
+          env:
+            - name: NODE_EXTRA_CA_CERTS
+              value: /private/ca.crt
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 2
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - { name: state, mountPath: /private }
+      volumes:
+        - name: config
+          secret:
+            secretName: platform-config
+        - name: state
+          persistentVolumeClaim:
+            claimName: platform-state
