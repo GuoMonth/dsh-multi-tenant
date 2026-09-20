@@ -51,27 +51,8 @@ async function until<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 export function createPlatformIngress(
   runtime: RuntimeAccess,
   authenticator: PlatformAuthenticator,
-  input: readonly Environment[],
+  environments: ReadonlyMap<string, Environment>,
 ) {
-  const environments = new Map<string, Environment>();
-  const instances = new Set<string>();
-  const owners = new Set<string>();
-  for (const raw of input) {
-    if (
-      !raw.id ||
-      !raw.owner.tenantId ||
-      !raw.owner.principalId ||
-      environments.has(raw.id) ||
-      !raw.instance.allocationKey ||
-      !raw.instance.identity ||
-      instances.has(raw.instance.identity) ||
-      owners.has(JSON.stringify([raw.owner.tenantId, raw.owner.principalId]))
-    )
-      throw new Error("Invalid or duplicate Environment");
-    environments.set(raw.id, structuredClone(raw));
-    instances.add(raw.instance.identity);
-    owners.add(JSON.stringify([raw.owner.tenantId, raw.owner.principalId]));
-  }
   const active = new Set<AbortController>();
   let closing = false;
   async function admit(

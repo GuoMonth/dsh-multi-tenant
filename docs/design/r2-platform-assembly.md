@@ -34,13 +34,10 @@ commit/SHA-256 and npm lock, then build both sides. Never hand-edit extracted JS
 
 ## Current authentication and deployment
 
-The R2 fixture token entry has been removed by R4. Use [R4 configuration and
-sessions](r4-oidc.md) for OIDC and membership. The fixed runtime binding still
-contains `ref`, `namespace`, `name`, `origin`, `template`, exact defaulted
-`expectedSpec` and `expectedPodSpec`; capture these from the administrator's
-prebuilt Cell. `environments` contains `id`, `owner: {tenantId, principalId}` and
-`instance: {allocationKey, identity}`. Kubernetes configuration contains HTTPS
-`server`, `caFile` and `tokenFile` with namespace-scoped read-only credentials.
+The R2 fixture token and fixed prebuilt configuration have been replaced by
+[R4 OIDC](r4-oidc.md) and [R5 allocation](r5-allocation.md). Use those current
+configuration instructions. Runtime still owns all Kubernetes binding details;
+the platform stores opaque identities and authorization intent.
 
 ## Deferred regression
 

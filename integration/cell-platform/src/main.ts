@@ -1,16 +1,19 @@
 import { readFile, stat } from "node:fs/promises";
 import {
-  createCellRuntime,
-  type CellBinding,
+  createCellAllocationRuntime,
+  type CellAllocationOptions,
   type KubernetesOptions,
 } from "@dsh/cell-connector-internal";
-import { createPlatformIngress, type Environment } from "./ingress.js";
+import { createPlatformIngress } from "./ingress.js";
 import { createOIDCAuthentication, type OIDCOptions } from "./oidc.js";
+import { AllocationStore, type EnvironmentDefinition } from "./allocations.js";
+import { createEnvironmentControl } from "./control.js";
 import type { Member } from "./sessions.js";
 interface Configuration {
   kubernetes: KubernetesOptions;
-  bindings: CellBinding[];
-  environments: Environment[];
+  allocation: CellAllocationOptions;
+  stateFile: string;
+  environments: EnvironmentDefinition[];
   oidc: OIDCOptions & { clientSecretFile?: string };
   members: Member[];
   host: string;
@@ -22,22 +25,13 @@ async function main() {
   const config = JSON.parse(await readFile(filename, "utf8")) as Configuration;
   if (
     "fixtureSessions" in config ||
+    "bindings" in config ||
     !config.host ||
     !Number.isSafeInteger(config.port) ||
     config.port < 1 ||
     config.port > 65535
   )
     throw new Error("Invalid configuration");
-  const origins = new Map<string, string>();
-  for (const environment of config.environments) {
-    const binding = config.bindings.find(
-      (b) =>
-        b.ref.allocationKey === environment.instance.allocationKey &&
-        b.ref.identity === environment.instance.identity,
-    );
-    if (!binding) throw new Error("Missing runtime binding");
-    origins.set(environment.id, binding.origin);
-  }
   const validateMembers = (members: Member[]) => {
     if (
       !Array.isArray(members) ||
@@ -63,7 +57,17 @@ async function main() {
     secret = (await readFile(config.oidc.clientSecretFile, "utf8")).trim();
     if (!secret) throw new Error("Empty client secret");
   }
-  const runtime = createCellRuntime(config.kubernetes, config.bindings);
+  if (
+    config.allocation.domain !== config.oidc.siteDomain &&
+    !config.allocation.domain.endsWith("." + config.oidc.siteDomain)
+  )
+    throw new Error("Cell domain must use the configured OIDC site");
+  const runtime = createCellAllocationRuntime(
+    config.kubernetes,
+    config.allocation,
+  );
+  const store = new AllocationStore(config.stateFile, config.environments);
+  const control = createEnvironmentControl(runtime, store, config.environments);
   const lifecycle = new AbortController();
   let authentication:
     | Awaited<ReturnType<typeof createOIDCAuthentication>>
@@ -82,16 +86,17 @@ async function main() {
     authentication = await createOIDCAuthentication(
       config.oidc,
       secret,
-      config.environments,
-      origins,
+      control.environments,
+      control.origins,
       config.members,
       lifecycle.signal,
+      control,
     );
     lifecycle.signal.throwIfAborted();
     app = createPlatformIngress(
       runtime,
       authentication.authenticator,
-      config.environments,
+      control.environments,
     );
     // Reload only membership. Other configuration changes require a restart.
     let reloading = false;
