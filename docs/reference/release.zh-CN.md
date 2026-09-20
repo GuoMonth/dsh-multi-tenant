@@ -4,7 +4,7 @@
 
 ## 双仓库边界
 
-运行时发布固定 Cell/Operator 公开镜像和 `release.json`；平台发布 npm 包，负责 OIDC、用户协议和接入，并绑定运行时清单。当前运行时为 `v0.3.0-alpha.1`，DSH 精确版本为 `0.1.5-rc.2`。镜像使用公开 digest，源码身份见 `packages/multi-tenant/cell-release.json`。运行时旧 standalone npm 不属于这套 Cell 安装入口。
+运行时发布固定 Cell/Operator 公开镜像和 `release.json`；平台发布 npm 包，负责 OIDC、用户协议和接入，并绑定运行时清单。当前运行时为 `v0.3.0-alpha.1`，DSH 精确版本为 `0.1.5-rc.2`。镜像使用公开 digest，源码身份见 `packages/multi-tenant/cell-release.json`。运行时 npm `0.3.0-alpha.1` 提供 `release` / `manifests`，供管理员取得并部署固定 Cell 清单；旧 standalone 启动器不再是当前入口。
 
 ## 发布流程
 

@@ -17,6 +17,8 @@ OIDC 多租户平台：登录、成员授权、环境会话及原生 DSH 协议�
 
 管理员先配置 K8s、平台模式 Cell Operator、OIDC、DNS/TLS、存储和权限。平台需要直接访问 Kubernetes API 与 Cell Pod IP，推荐在集群内运行；普通宿主机上的 npx 不会自动获得集群网络。
 
+运行时准备：`npx dsh-isolated-runtime@0.3.0-alpha.1 manifests` 输出固定镜像的 Operator/CRD/RBAC 清单，由管理员审阅部署；`release` 输出固定 Cell 镜像及 DSH 版本。新版替代旧 standalone 启动器，不启动第二个用户服务。
+
 ```bash
 # Node.js 24+
 npx dsh-multi-tenant@latest start --config /private/config.json
