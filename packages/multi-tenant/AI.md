@@ -2,6 +2,10 @@
 
 > Start here to help a developer try, integrate, understand or modify this project. 中文使用者也可直接将本文交给 AI，要求用中文说明和操作。
 
+## Current development policy
+
+Read the [project constitution](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONSTITUTION.md) for source work. The current direction is Cell MVP + a neutral internal interface; fixed validation versions, breaking changes allowed, no historical compatibility, upgrade or seamless recovery promise. Fail fast with structured, redacted diagnostics and bounded waits. Historical CLI instructions below apply only to their recorded version.
+
 ## Establish the version first
 
 Read the adjacent `package.json`: it owns the package version, Node engine, exports and CLI bin. `runtime-manifest.json` owns the CLI image/DSH/profile identity. Source checkouts deliberately have `image: null`; only the publication workflow binds a verified image digest. Never invent an image URL or assume a source version is on npm.

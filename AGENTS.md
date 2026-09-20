@@ -1,8 +1,10 @@
 # Repository instructions for coding agents
 
-Read [the AI project guide](packages/multi-tenant/AI.md) for task routing and architecture, then [CONTRIBUTING.md](CONTRIBUTING.md) for the integration contract. Explicit user instructions take precedence. These instructions cover repository work; they do not authorize publishing or deployment by themselves.
+Read [the project constitution](CONSTITUTION.md) first, then [the AI project guide](packages/multi-tenant/AI.md) for task routing and architecture, then [CONTRIBUTING.md](CONTRIBUTING.md) for the integration contract. Explicit user instructions take precedence. These instructions cover repository work; they do not authorize publishing or deployment by themselves.
 
 ## Orientation
+
+- Current development is a Cell MVP behind a backend-neutral internal interface. Breaking APIs, configuration and state formats are allowed; do not add historical compatibility, upgrade or recovery machinery. Follow the constitution for bounded failure diagnostics and data ownership.
 
 - Inspect `git status`, branch and remote before editing; compare with the requested upstream revision. Preserve unrelated local changes.
 - The publishable package is `packages/multi-tenant`; the repository root is a private pnpm workspace.

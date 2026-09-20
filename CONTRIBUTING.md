@@ -2,7 +2,9 @@
 
 # Contributing
 
-This project integrates Principal-isolated native DSH Hosts into multi-user platforms. Keep the platform small: authentication, domain ownership, runtime lifecycle and ingress belong here; sessions, workspaces, presets, tools, persistence and Web behavior belong to native DSH.
+Read the [project constitution](CONSTITUTION.md). Build the Cell MVP behind a neutral internal interface. Validate a fixed current version; breaking API/configuration/state changes are allowed without historical compatibility, upgrade or seamless recovery promises. Fail fast with structured diagnostics; do not add compatibility layers for old versions.
+
+This project integrates Principal-isolated native DSH Hosts into multi-user platforms. Keep the platform small: authentication, domain ownership, runtime intent and ingress belong here; the Cell runtime owns resource lifecycle; sessions, workspaces, presets, tools, persistence and Web behavior belong to native DSH.
 
 The authority path is:
 
@@ -23,7 +25,7 @@ Before merging a material change:
 - include executable lifecycle, concurrency, hostile-input and failure evidence;
 - run release checks locally and record the Node version and any untested supported platforms;
 - use the installed tarball and native integration proof for public-surface/runtime changes;
-- update bilingual user-facing capabilities, boundaries and upgrade guidance;
+- update bilingual capabilities, boundaries and explicit breaking-change/reset guidance;
 - remove replaced implementation without removing required behavioral evidence.
 
 `pnpm release:check` does not publish. `pnpm probe:isolated` runs the installed package with real native Hosts; see its documented Linux/Docker/browser requirements. DSH version/source identity is pinned in `scripts/dsh-target.mjs`, while the package manifest owns the package version. Floating upstream changes require a reviewed rebaseline.
