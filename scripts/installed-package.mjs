@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertExportFiles } from './artifact-contract.mjs'
 
@@ -10,7 +10,8 @@ export const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 export function installArtifact(requested = '--local') {
   const directory = mkdtempSync(join(tmpdir(), 'dsh-installed-'))
   try {
-    let spec = requested
+    // Resolve local tarballs before npm runs in the isolated consumer directory.
+    let spec = requested !== '--local' && existsSync(requested) ? resolve(requested) : requested
     if (spec === '--local') {
       execFileSync('pnpm', ['--filter', 'dsh-multi-tenant', 'build'], { cwd: repositoryRoot, stdio: 'pipe' })
       execFileSync('pnpm', ['--filter', 'dsh-multi-tenant', 'pack', '--pack-destination', directory], { cwd: repositoryRoot, stdio: 'pipe' })

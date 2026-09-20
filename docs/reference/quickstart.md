@@ -25,7 +25,7 @@
 pnpm install --frozen-lockfile
 pnpm build
 mkdir -p dist/npm
-pnpm --filter dsh-multi-tenant pack --pack-destination ../../dist/npm
+pnpm --filter dsh-multi-tenant pack --pack-destination "$PWD/dist/npm"
 # 用同一个 npm tarball 构建平台容器，无需复制源码/vendor
 # 在已有 API/Pod 网络的 Node 24 主机也可安装 tarball 后直接执行 CLI
 docker build -f integration/distribution/Dockerfile -t YOUR_PLATFORM_IMAGE dist/npm
