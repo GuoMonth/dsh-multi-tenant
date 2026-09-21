@@ -8,6 +8,7 @@ Read only the row relevant to the task. Current entry is the Cell alpha; histori
 | Product principles | [Constitution](../CONSTITUTION.md) |
 | Current work / acceptance | [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) |
 | Platform source assembly | [Private platform app](design/r2-platform-assembly.md) |
+| Proxy scope / alternatives | [POC proxy assessment](design/proxy-choice.zh-CN.md) |
 | Cell contract | [S0](design/s0-runtime-architecture.zh-CN.md), [research](design/s0-references.zh-CN.md) |
 | Cell CLI / alpha startup | [Bundled AI guide](../packages/multi-tenant/AI.md), [quickstart](reference/quickstart.md) |
 | Checks | [Contributing](../CONTRIBUTING.md) |
