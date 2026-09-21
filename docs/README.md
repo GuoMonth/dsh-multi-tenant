@@ -4,6 +4,7 @@ Read only the row relevant to the task. Current entry is the Cell alpha; histori
 
 | Task | Source |
 | --- | --- |
+| POC scope / next three slices | [POC focus](design/poc-focus.zh-CN.md) |
 | Product principles | [Constitution](../CONSTITUTION.md) |
 | Current work / acceptance | [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) |
 | Platform source assembly | [Private platform app](design/r2-platform-assembly.md) |

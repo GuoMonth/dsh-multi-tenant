@@ -1,6 +1,6 @@
 # S0：Cell MVP 与中立内部契约
 
-2026-09-20 修订。原则已由用户确认，见 [项目宪法](../../CONSTITUTION.md)；本文件是待实现的技术设计，不代表 OIDC/Cell 已联调通过。主记录：[Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82)。
+2026-09-20 修订。原则已由用户确认，见 [项目宪法](../../CONSTITUTION.md)；本文件记录技术契约；固定版本已完成联调，实际证据见主 Issue。下一阶段收缩以 [POC 边界](poc-focus.zh-CN.md) 为准，不把历史备选方案扩成当前范围。主记录：[Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82)。
 
 本稿替代 2026-09-19 的通用 runtime v1alpha1 草案：不再承诺跨后端兼容、永久退役记录或历史恢复。社区调研仍见 [参考与取舍](s0-references.zh-CN.md)。
 
