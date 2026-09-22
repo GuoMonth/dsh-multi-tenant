@@ -1,10 +1,10 @@
 # Repository instructions
 
-[CONSTITUTION.md](CONSTITUTION.md) owns product principles. Current work is the Cell MVP in [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82); implementation status and acceptance belong to the Issue, not this file.
+[CONSTITUTION.md](CONSTITUTION.md) owns product principles. The Kubernetes-only Agent Workspace contract is tracked in [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104); implementation status and acceptance belong to the Issue, not this file.
 
 ## Task routing
 
-- Cell integration or ownership: [S0 architecture](docs/design/s0-runtime-architecture.zh-CN.md); current tested evidence: [regression report](docs/evidence/cell-regression-2026-09-20.md).
+- Workspace design or breaking changes: [Agent Workspace contract](docs/design/agent-workspace.zh-CN.md). Current Cell implementation/ownership: [S0 architecture](docs/design/s0-runtime-architecture.zh-CN.md); current tested evidence: [regression report](docs/evidence/cell-regression-2026-09-20.md).
 - Current installation and pinned versions: [quickstart](docs/reference/quickstart.md) and [package AI guide](packages/multi-tenant/AI.md). Roadmap and task ownership: [POC roadmap](docs/roadmap.md).
 - Checks and contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
 - Publication: [release runbook](docs/reference/release.md). Publishing, deployment and data deletion require applicable user authorization; routine local edits/checks within the task can proceed.
