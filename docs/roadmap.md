@@ -10,7 +10,7 @@
 | P2 简化部署 | runtime维护固定模板，平台消费；不再要求校准Cell和手写完整Pod spec | 跨仓库 [Issue #99](https://github.com/GuoMonth/dsh-multi-tenant/issues/99) |
 | P3 独立验收 | 从干净安装环境按短指南完成双用户、真实DSH任务和基本隔离检查，修复实际阻碍 | 平台统筹、runtime协作：[Issue #100](https://github.com/GuoMonth/dsh-multi-tenant/issues/100) |
 
-P1 的代码候选、已发布 npm 和联合安装验收是不同事实，以各 PR / Issue / Release 的实际状态为准。2026-09-20 已发布组合仍为平台 `0.9.0-alpha.1` + runtime `0.3.0-alpha.1` + DSH `0.1.5-rc.2`；人工profile校准仍是这个版本的现实前提。P2完成前不能用未来配置替代当前安装指南。
+P1 的代码候选、已发布 npm 和联合安装验收是不同事实，以各 PR / Issue / Release 的实际状态为准。2026-09-20 已发布组合仍为平台 `0.9.0-alpha.1` + runtime `0.3.0-alpha.1` + DSH `0.1.5-rc.2`；人工profile校准仍是这个版本的现实前提。新固定模板候选使用独立的[候选指南](reference/cell-mvp-v1-candidate.zh-CN.md)与[内测证据](evidence/cell-mvp-2026-09-22.md)，不能用它改写旧发行安装要求。
 
 ## P2 如何并行
 

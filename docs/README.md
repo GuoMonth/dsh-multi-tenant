@@ -14,6 +14,6 @@ Current product: OIDC access to native DSH in Kubernetes Cells. Start with the r
 | Evidence for the existing fixed combination | [Core regression](evidence/cell-regression-2026-09-20.md), [prepublication package checks](evidence/alpha-delivery-2026-09-20.md), [repeatable fixtures](../integration/regression/README.md) |
 | Upstream version | [Pinned DSH source](../scripts/dsh-target.mjs) |
 
-`design/` explains current decisions and implementation; Issues own mutable task state. `releases/` and `evidence/` describe the artifacts and checks at their recorded dates, not every future commit. Published versions remain immutable. P2/P3 planned behavior is not available merely because the roadmap describes it.
+`design/` explains current decisions and implementation; Issues own mutable task state. `releases/` and `evidence/` describe the artifacts and checks at their recorded dates, not every future commit. Published versions remain immutable. The fixed-template candidate has a separate [2026-09-22 acceptance record](evidence/cell-mvp-2026-09-22.md); it does not change the previously published artifacts.
 
 Older standalone/Docker and SDK documents live in `archive/` (including the [SDK compatibility history](archive/legacy-sdk/compatibility.md)). Use them only for historical versions or source investigations. They do not add macOS, snapshot, migration, HA or old transport/capability tasks to the current POC. Dependency/security defects are tracked separately from product scope.

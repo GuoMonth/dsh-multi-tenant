@@ -171,7 +171,7 @@ async function aliceLogin(context) {
         membershipRemoval: "active WS closed; new RPC 401",
         otherTenant: "unaffected",
         restoredMember: "fresh login works",
-        durableSession: "snapshot after Pod recreation",
+        durableSession: "snapshot after restored membership and fresh login",
       },
       null,
       2,

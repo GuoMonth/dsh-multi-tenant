@@ -32,6 +32,8 @@ See the [alpha startup guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/
 
 This branch targets `dsh-multi-tenant@0.10.0-alpha.1`; it is not published. Published `0.9.0-alpha.1` and npm `@latest` retain the calibrated-profile configuration above and do not accept the candidate schema. The Connector is bound to runtime source `ed914317e98a93752e8af4f7831c384fc1e92f13`; Cell and Operator image digests remain null because these local candidate images are not a public release. See the [candidate setup guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/cell-mvp-v1-candidate.md). DSH remains pinned to `0.1.5-rc.2`.
 
+The local candidate passed [MVP internal acceptance on 2026-09-22](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/evidence/cell-mvp-2026-09-22.md), including native Bash subprocesses and deployment without calibration; this does not publish the candidate.
+
 ## Ownership
 
 The current request path is Envoy TLS/routing → platform `openid-client` OIDC and admission → Node Connector → Go launcher → DSH. Envoy does not perform platform login or tenant authorization.
