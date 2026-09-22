@@ -68,9 +68,10 @@ test("platform rejects manually calibrated profiles and unbound image identities
     ),
   );
   assert.equal(candidate.allocation.template, "cell-mvp-v1");
-  assert.deepEqual(candidate.environments.map((item) => item.template), [
-    "cell-mvp-v1",
-  ]);
+  assert.deepEqual(
+    candidate.environments.map((item) => item.template),
+    ["cell-mvp-v1", "cell-mvp-v1"],
+  );
   assert.throws(
     () => validateCellMvpBinding(candidate.allocation, candidate.environments),
     /Runtime image digest is required/,

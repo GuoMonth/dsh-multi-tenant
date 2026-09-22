@@ -18,7 +18,8 @@
       "limits": { "cpu": "2", "memory": "2Gi" }
     },
     "namespaces": {
-      "tenant-a": "tenant-a"
+      "tenant-a": "tenant-a",
+      "tenant-b": "tenant-b"
     },
     "domain": "cells.example.com"
   },
@@ -32,6 +33,14 @@
         "principalId": "alice"
       },
       "template": "cell-mvp-v1"
+    },
+    {
+      "id": "bob-main",
+      "owner": {
+        "tenantId": "tenant-b",
+        "principalId": "bob"
+      },
+      "template": "cell-mvp-v1"
     }
   ],
   "members": [
@@ -41,6 +50,14 @@
       "owner": {
         "tenantId": "tenant-a",
         "principalId": "alice"
+      }
+    },
+    {
+      "issuer": "https://REPLACE_ISSUER",
+      "subject": "REPLACE_VERIFIED_SUBJECT",
+      "owner": {
+        "tenantId": "tenant-b",
+        "principalId": "bob"
       }
     }
   ],
