@@ -12,7 +12,8 @@
 2. 先发布已验收运行时镜像，核对匿名拉取及运行时 Release 清单。
 3. 在已授权的 main 提交上触发 **Actions → Publish package**，输入运行时 release tag、Cell 和 Operator 的精确公开 digest。平台流水线不重新构建运行时镜像。
 4. 流水线验证绑定关系，打包并检查安装产物，通过 npm Trusted Publishing 发布到 `latest`，核对公开版本、标签和完整性，然后创建同 tag 的 GitHub Release 并设为 Latest。版本名含 alpha 也遵循此规则。
-5. 核对 GitHub Latest 和 npm latest；在已配置 K8s、OIDC、DNS/TLS、存储的环境安装实际公开包，记录组合及结果到 Issue #82。入口为 `npx dsh-multi-tenant@latest start --config /private/config.json`，需要 Node 24+ 以及 K8s API/Pod 网络可达。
+5. 保存并上传原始流水线 tarball、`cell-release.json`、`npm-publication.json`（精确包版本、源码提交、观测到的 registry integrity）及校验和到同版本 GitHub Release。当前平台流水线只保留 tarball Actions artifact，不自动生成这些 Release 附件；已存在附件只比较，不替换不同字节。核对匿名下载与包完整性；0.9.0-alpha.1 的附件是发行后单独补录的。
+6. 核对 GitHub Latest 和 npm latest；在已配置 K8s、OIDC、DNS/TLS、存储的环境安装实际公开包，记录组合及结果到 Issue #82。入口为 `npx dsh-multi-tenant@latest start --config /private/config.json`，需要 Node 24+ 以及 K8s API/Pod 网络可达。
 
 ## 发布失败
 

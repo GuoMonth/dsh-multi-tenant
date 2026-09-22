@@ -6,6 +6,8 @@
 
 管理员需准备一个 Kubernetes 集群、platform 模式 Cell Operator、Gateway/TLS、实际执行 NetworkPolicy 的 CNI、存储、namespace 映射、RBAC 和 OIDC Provider。平台 origin 与 `cell-<UID>.<site-domain>` 都应经平台路由。平台需可访问 Kubernetes API 和 Cell Pod IP；可在集群内运行，或自行提供这两类网络可达性。使用 [`cell-release.json`](../../packages/multi-tenant/cell-release.json) 中固定的 runtime/DSH/镜像组合；平台镜像也按 digest 固定。
 
+已发布 Operator 配置要求平台 Pod 位于 `dsh-system`（Operator 的 `--system-namespace`），并带有 `dsh.isolated.io/access: platform` 标签；生成的 Cell ingress 策略同时要求这两个条件。该 namespace/标签不可由租户控制。集群外进程仅能路由 Pod IP 还不够，管理员还须提供同等受限并实测的访问策略。[平台 Deployment fixture](../../integration/regression/platform.yaml)可参考 namespace 与标签；其中测试镜像、域名和私有配置必须替换，不能原样应用。
+
 ## 部署 runtime 资源
 
 公开 runtime npm 包只输出固定资源。审阅清单及目标集群后再部署：

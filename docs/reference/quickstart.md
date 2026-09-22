@@ -6,6 +6,8 @@ This guide describes the published `dsh-multi-tenant@0.9.0-alpha.1` platform pac
 
 An administrator must provide one Kubernetes cluster, platform-mode Cell Operator, Gateway/TLS, a CNI that enforces NetworkPolicy, storage, namespace mapping, RBAC, and an OIDC provider. Route the platform origin and `cell-<UID>.<site-domain>` through the platform. The platform needs Kubernetes API and Cell Pod-IP connectivity; run it in-cluster or provide both routes. Use the fixed runtime/DSH/image combination in [`cell-release.json`](../../packages/multi-tenant/cell-release.json). Pin the platform image by digest as well.
 
+With the published operator configuration, run the platform Pod in `dsh-system` (the operator's `--system-namespace`) with the label `dsh.isolated.io/access: platform`. Both selectors are required by the generated Cell ingress policy. Keep that namespace/label outside tenant control. Pod-IP routing alone is insufficient for an out-of-cluster process; an administrator must provide an equally restricted and verified access policy. See the [platform Deployment fixture](../../integration/regression/platform.yaml) for the namespace and label; replace its test images, domains and private configuration rather than applying it unchanged.
+
 ## Install runtime resources
 
 The published runtime npm package prints the pinned resources. Review the output and target cluster before applying it:
