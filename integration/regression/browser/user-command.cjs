@@ -14,10 +14,42 @@ const root = path.resolve(
 async function submit(page, prompt, previousBashCount) {
   await page.locator("[data-composer-input]").first().fill(prompt);
   await page.getByRole("button", { name: "Send message" }).click();
-  await page
+  const result = page
     .locator('[data-tool="bash"][data-state="ok"]')
-    .nth(previousBashCount)
-    .waitFor({ timeout: 120000 });
+    .nth(previousBashCount);
+  await result.waitFor({ timeout: 120000 });
+  return result;
+}
+
+async function assertBashResult(resultCard, { markers, commandFragments }) {
+  const renderedToolResult = await resultCard.innerText();
+  for (const fragment of commandFragments) {
+    assert.ok(
+      renderedToolResult.includes(fragment),
+      `bash tool result card must identify the executed command fragment ${fragment}`,
+    );
+  }
+  for (const marker of markers) {
+    assert.ok(
+      new RegExp(`(?:^|\\n)${marker}(?:\\r?\\n|$)`).test(renderedToolResult),
+      `bash tool result card stdout must contain marker on its own line: ${marker}`,
+    );
+  }
+  // dsh-tool-bash renders non-zero exits, signals, and timeouts into the tool
+  // result text; absence of these markers plus the stdout marker establishes
+  // the expected successful foreground result (the assistant reply is outside
+  // this tool-result card and is never used as evidence).
+  assert.doesNotMatch(
+    renderedToolResult,
+    /(?:\[exit code: (?!0\])[^\]]+\]|\bexit code\s*:?\s*[1-9]\d*\b|\[killed by signal: [^\]]+\]|\[timed out after \d+ms\])/i,
+    "bash tool result must not report a non-zero exit, signal, or timeout",
+  );
+  return {
+    commandFragments,
+    stdoutMarkers: markers,
+    exitCode: 0,
+    exitCodeEvidence: "no DSH non-zero/signal/timeout marker; shell success marker was emitted only after node exit status 0",
+  };
 }
 
 (async () => {
@@ -34,6 +66,7 @@ async function submit(page, prompt, previousBashCount) {
   await page.locator("[data-composer-input]").first().waitFor({ timeout: 15000 });
 
   const marker = "CELL_COMMAND_" + crypto.randomBytes(8).toString("hex");
+  const successMarker = "CELL_BASH_OK_" + crypto.randomBytes(8).toString("hex");
   const file = "p3-command-" + marker + ".txt";
   const childCode =
     'require("node:fs").writeFileSync(' +
@@ -49,36 +82,43 @@ async function submit(page, prompt, previousBashCount) {
     "if (child.error || child.status !== 0) throw child.error || Error(child.stderr); " +
     "process.stdout.write(require(\"node:fs\").readFileSync(" +
     JSON.stringify(file) +
-    ', "utf8"))\'';
+    ', "utf8") + "\\n")\'; status=$?; ' +
+    'if [ "$status" -ne 0 ]; then exit "$status"; fi; printf \'%s\\n\' ' +
+    JSON.stringify(successMarker);
 
   const evidence = {
     marker,
+    successMarker,
     file,
     tool: "bash",
     operation: "Node child_process.spawnSync wrote a workspace file",
   };
   let bashCount = await page.locator('[data-tool="bash"][data-state="ok"]').count();
-  await submit(
+  const writeResult = await submit(
     page,
     "Use the native bash command tool only; do not use file tools. Call it with description `Run child Node process and persist marker`, workdir `/var/lib/dsh/data/workspace`, and timeoutMs 30000. Run exactly this command and report its stdout: " +
       command,
     bashCount,
   );
-  await page.getByText(marker, { exact: true }).last().waitFor({ timeout: 15000 });
-  evidence.write = "bash tool succeeded; child process created the file and printed its contents";
+  evidence.write = await assertBashResult(writeResult, {
+    markers: [marker, successMarker],
+    commandFragments: ["node:child_process", "spawnSync"],
+  });
 
   await page.reload();
   await page.locator("[data-composer-input]").first().waitFor({ timeout: 30000 });
   bashCount = await page.locator('[data-tool="bash"][data-state="ok"]').count();
-  await submit(
+  const readResult = await submit(
     page,
     "Use the native bash command tool only; do not use file tools. Call it with description `Read marker from workspace file`, workdir `/var/lib/dsh/data/workspace`, and timeoutMs 30000. Run `cat " +
       file +
       "` and report its stdout exactly.",
     bashCount,
   );
-  await page.getByText(marker, { exact: true }).last().waitFor({ timeout: 15000 });
-  evidence.afterReload = "bash tool read the same workspace file after page reload";
+  evidence.afterReload = await assertBashResult(readResult, {
+    markers: [marker],
+    commandFragments: ["cat " + file],
+  });
 
   fs.writeFileSync(
     path.join(root, "evidence/user-command.json"),
