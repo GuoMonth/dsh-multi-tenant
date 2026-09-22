@@ -1,6 +1,6 @@
 # R2 platform assembly
 
-`integration/cell-platform` is the Node 24 platform source. The Cell alpha CLI bundles this app; its internal package remains private. Its
+`integration/cell-platform` is the Node 24 platform source, bundled by the published `dsh-multi-tenant@0.9.0-alpha.1` CLI. The current user entry is `start --config`; the package is not a standalone Docker workbench. Its
 Environment records identity/owner/opaque InstanceRef, not Pod lifecycle. The
 platform authenticator grants an Environment and supplies a revocation signal;
 the runtime module owns instance verification and native forwarding. The app
@@ -39,9 +39,9 @@ The R2 fixture token and fixed prebuilt configuration have been replaced by
 configuration instructions. Runtime still owns all Kubernetes binding details;
 the platform stores opaque identities and authorization intent.
 
-## Regression evidence
+## Current status and regression evidence
 
-Actual results are in the [current regression report](../evidence/cell-regression-2026-09-20.md). The following inventory includes cases beyond the finite MVP run; consult the report before making a pass claim: auth before resource reads, cross-owner/duplicate mappings,
+The fixed-version core Cell path passed the finite 2026-09-20 regression. It is not a claim that every inventory item below has run, or that later runtime source changes are published. Runtime PR #93 is still unmerged and is not part of the runtime version bound by the current npm package. Actual results are in the [current regression report](../evidence/cell-regression-2026-09-20.md). The following inventory includes cases beyond the finite MVP run; consult the report before making a pass claim: auth before resource reads, cross-owner/duplicate mappings,
 revocation during API reads and after HTTP/WS upgrade, shutdown while awaiting
 admission, wrong origin/Host/UID, native DSH cookie bootstrap, platform cookie/header
 removal, stream and raw-query fidelity, unavailable Kubernetes, exact fixture
