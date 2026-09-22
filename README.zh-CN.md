@@ -30,7 +30,7 @@ npx dsh-multi-tenant@latest start --config /private/config.json
 
 ## 尚未发布的 `cell-mvp-v1` 源码候选
 
-本分支的平台包目标版本为 `dsh-multi-tenant@0.10.0-alpha.1`，尚未发布。已发布 `0.9.0-alpha.1` 与 npm `@latest` 仍使用人工校准 profile 配置，不接受候选格式。匹配的 runtime Connector 和镜像身份尚未绑定，当前候选还不能运行或发布。见[候选配置指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/cell-mvp-v1-candidate.zh-CN.md)。DSH 仍固定为 `0.1.5-rc.2`。
+本分支的平台包目标版本为 `dsh-multi-tenant@0.10.0-alpha.1`，尚未发布。已发布 `0.9.0-alpha.1` 与 npm `@latest` 仍使用人工校准 profile 配置，不接受候选格式。Connector 已绑定 runtime 源码 `ed914317e98a93752e8af4f7831c384fc1e92f13`；Cell/Operator 镜像 digest 仍为空，因为本地候选镜像不是公开发行物。见[候选配置指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/cell-mvp-v1-candidate.zh-CN.md)。DSH 仍固定为 `0.1.5-rc.2`。
 
 ## 两仓库分工
 
