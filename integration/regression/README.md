@@ -1,10 +1,12 @@
-# Cell 集中回归
+# Cell P3 集中验收
 
-这是固定版本、单集群、双 OIDC 用户的集成 fixture，不是安装发行器。只操作任务专属集群；保留失败现场，测试命令不自动删除集群或卷。2026-09-20 的实际结果见 [回归记录](../../docs/evidence/cell-regression-2026-09-20.md)。
+本目录提供 Issue #100 的浏览器回归 fixture。P3 使用一组精确的平台/runtime候选或已发布制品，在管理员已准备的 Kubernetes、OIDC、DNS/TLS、StorageClass 和执行 NetworkPolicy 的 CNI 上验收。它不创建 kind、构建或发布镜像，也不自动删除集群或数据。真实结果写入主 Issue；旧证据见 [`cell-regression-2026-09-20.md`](../../docs/evidence/cell-regression-2026-09-20.md)，不代替这轮新组合结果。
 
-## 环境与输入
+## 输入与本地准备
 
-需要 Docker、kind、kubectl、Node 24、Python 3、openssl、受信任的 Chromium，以及同级固定提交的 `dsh-isolated-runtime` checkout。平台源码、vendor/cell-connector.json、DSH pin 和实际镜像 digest 均需记录。
+验收前先确认 P1 runtime 与 P2 固定模板实现已进入同一候选组合。记录平台/runtime commit、DSH 版本、Operator/Cell/平台镜像 digest、npm tarball integrity、Connector 来源，并分别标明已发布或候选。未形成组合时不跑旧组合冒充 P3。
+
+从干净 consumer 安装记录的精确 tarballs，并执行 runtime CLI 的 `release`、`manifests` 命令；对照 manifest digest 和平台版本后由管理员审阅、应用清单。CLI 只输出 metadata/YAML，不持有集群凭据，也不负责安装或配置集群。
 
 ```bash
 export DSH_REGRESSION_HOME=/absolute/task-owned/lab
@@ -16,47 +18,66 @@ npm test --prefix integration/cell-platform
 npm run test:transport --prefix integration/regression
 ```
 
-本地 transport 测试占用 `127.0.0.2:8080`，先检查冲突。它验证固定 vendor 制品的凭据清洗、迟到校验取消和正在传输的 HTTP abort，不冒充真实 DSH/集群证据。
+`private/` 保存 kubeconfig、CA、OIDC client secret、平台 `config.json`、模型配置和浏览器 storageState，权限设为 0600；不得提交或打印。OIDC subject 必须从这次使用的 IdP 明确核对。模型 key 只通过 DSH 原生私有设置提交，不放在命令行、URL、截图或证据 JSON。
 
-私有目录保存 kubeconfig、CA、OIDC client-secret、config.json、模型凭据和浏览器 storageState；不得提交。测试账号来自 runtime 的 `test/e2e/phase2/dex.yaml`，仅用于本 fixture。模型配置为 `private/model.json`，字段 `apiKey`、`baseURL`、`model`，权限 0600；不要将 key 作为命令行参数。
+## 无校准部署
 
-## 部署顺序
+1. 管理员提供可复用的集群，安装启用 NetworkPolicy 执行的 Calico（或声明并验证等价 CNI）、Gateway API controller、StorageClass、OIDC issuer 和有效 DNS/TLS。创建独立系统 namespace、两个租户 namespace、浏览器/证书测试配置。该 P3 路径不创建 `calibration` namespace 或 profile Cell。
+2. 用本次精确 runtime npm 制品打印并审阅 manifests；应用 Operator/CRD、平台访问模式需要的 Gateway 资源、管理员 egress 策略示例（见下文）。记录安装后的镜像 digest 与实际 manifest SHA。Cell 镜像 digest 必须和该 runtime manifest 以及平台 pin 一致。
+3. 从平台 P2 候选配置样例 [`integration/distribution/config.candidate.example.json`](../distribution/config.candidate.example.json) 生成私有平台配置。使用 `cell-mvp-v1`：allocation 直接提供固定 template、精确 Cell image digest、Storage 与 Resources 参数，environment 只引用 `cell-mvp-v1`；保留两个 namespace 映射、OIDC issuer/subject、平台 origin 和域名。只有把 `image: null` 替换为同一 runtime 候选的精确 Cell digest 后配置才可启动。不要生成/填写 `expectedSpec`、`expectedPodSpec`，不要运行 `capture-profile.py`，不通过先创建一个 Cell 反向捕获配置。
+4. 以候选/已发布平台制品 `start --config <private config path>` 启动平台，应用 Gateway/TLS 路由。清单中平台 SQLite/PVC 与管理 socket 保持系统 namespace 私有。浏览器使用专属 profile 和 CA 信任，不设置 `ignoreHTTPSErrors`。
+5. 保持同一精确制品组合完成下面的两用户浏览器步骤。失败时保留专属证据和数据，不自动清理 PVC/namespace；记录实际操作步骤、用时和所有绕路。
 
-1. 创建专属 kind 集群和本地 registry。复用 runtime 的 `test/e2e/phase2/kind-template.yaml`、`hack/lib/kubernetes-test.sh`、`reference-versions.sh` 和 `browser-stack.sh` 的基础设施函数。使用 `DSH_LOCAL_RUNTIME=1`，只导入本机架构；不要运行会在退出时销毁集群的完整历史 gate。
-2. 安装 Calico、固定 Envoy Gateway 与当前 Cell CRD。由当前源码构建 operator/Cell 镜像；推入 registry 后以 digest 部署。operator 从 `config/default` 部署，参数为 `--access-mode=platform --base-domain=cells.test --system-namespace=dsh-system`。不要装 standalone authorizer 或 Cell 直达路由。
-3. 创建 `dsh-system`、`tenant-a`、`tenant-b`、`calibration`。Dex 保留两个测试账号，将 client `dsh-browser` 回调改为 `https://platform.cells.test/auth/callback`；client secret 写私有文件与 Secret，CA 为测试根。issuer 为 `https://dex.dsh-system.svc:15556/dex`。
-4. 在 calibration 创建名为 `profile` 的 Cell，使用实际 Cell digest、1Gi standard、Retain。等待 Ready 后执行 `python3 integration/regression/capture-profile.py`。它捕获 API 默认化后的 Cell spec、StatefulSet Pod template，并且只将实例 UID/authority 替换为契约占位符。检查 profile 后再部署平台，不能放松模板校验来使测试通过。MVP 每个 owner 只配置一个环境。
-5. `docker build -f integration/regression/Dockerfile -t <task-platform-image> .`；推入 registry，记录 digest。将 `platform.yaml` 的 `PLATFORM_IMAGE` 替换为该 digest。建立 `platform-config` Secret（config.json、client-secret、ca.crt），分别在 tenant-a/b 应用 `tenant-rbac.yaml`，再应用平台清单和 `gateway.yaml`。SQLite/PVC 和管理 socket 不进入用户 namespace。
-6. 暴露 Gateway 至回环地址 443、Dex 至 15556。平台固定 origin 没有自定义端口。普通进程不能绑定 443 时，使用任务专属 TCP relay；本轮使用 node namespace → Gateway Service 的 TCP 转发，避免 kubectl port-forward 在无关 TLS reset 时退出。
-7. 浏览器使用专属 profile/CA 信任库、CDP `127.0.0.1:30444`、`--host-resolver-rules=MAP *.cells.test 127.0.0.1,MAP dex.dsh-system.svc 127.0.0.1`。Node 平台通过 `NODE_EXTRA_CA_CERTS` 信任 Dex。**不使用 ignoreHTTPSErrors**。用 agent-browser 的 `open`、`snapshot -i`、`screenshot` 核验实际页面。
+固定 Cell 启动环境必须把 `DSH_PERMISSION_MODE` 设为 `danger-full-access`。固定 DSH composition 将该值用于 bash sandbox policy、approval policy 和 permission presets 的新会话默认值；因此原生 DSH `bash` 不再依赖容器内的第二层文件 sandbox runner。该默认仅在创建会话时写入权限事件，不会升级已有会话；本 gate 使用本轮新建的 Cell 和会话，不要求迁移历史权限状态。上游默认 `workspace-write` 则尝试 Linux bwrap，并可回退到 Landlock；本验收没有假定或探测这两种 runner 在 Cell 镜像中的可用性。此设置不授予 Pod 新权限，也不替代 Kubernetes/CNI 网络边界；平台仍须按租户撤权，并由 NetworkPolicy 管理出站。不要通过修改模式或 sandbox policy 绕过工具失败。
 
-## 按状态推进验证
+## 浏览器验收顺序
 
-这些脚本共享一次测试的数据；顺序有意义，删除后的环境不能通过重跑 core 自动恢复。CDP 浏览器应由独立进程保持运行。脚本不打印 Playwright 的完整 Call log（其中可能带 Cookie）；其他工具日志和完整失败响应仍须检查后再分享。
+先保持专属 CDP Chromium 进程运行（默认 `127.0.0.1:30444`），用 `core.cjs` 登录两个真实 OIDC subject，各自显式创建/查询 Cell 并进入原生 DSH。接着按顺序运行：
 
 ```bash
 node integration/regression/browser/core.cjs
 node integration/regression/browser/protocol.cjs
-# 原生 UI 添加 regression-deepseek 自定义 provider，配置 deepseek-flash，保留 Models 设置面板。
+# 原生 DSH 设置中配置真实模型；模型凭据只输入私有设置。
 node integration/regression/browser/live-model.cjs
-# 正常重建 Alice Pod：保留旧/新 Pod UID、Cell/PVC UID、文件内容和会话证据。
+node integration/regression/browser/user-command.cjs
 node integration/regression/browser/lifecycle.cjs
 node integration/regression/browser/negative.cjs
 node integration/regression/browser/delete.cjs
-# 停止平台，确认 Cell 不变；只读检查 SQLite 后，用相同固定配置重启。
 node integration/regression/browser/restart.cjs
 ```
 
-- `core`：OIDC 登录、分配原 key、Pending → Ready、两原生页面、跨 owner 拒绝、host-only cookie 元数据。
-- `protocol`：原生 RPC、24 路并发、WS snapshot、HEAD/GET export、会话隔离。
-- `lifecycle`：父会话登出和 SIGHUP 成员移除关闭已有 WS、拒绝后续 RPC，Bob 不受影响；最后恢复成员映射。
-- `negative`：伪造身份头、跨 origin、缺少 Origin 的写请求均拒绝。
-- `delete`：普通用户 DELETE 拒绝；错误 UID 不关闭活跃连接；精确管理员删除先撤权，重复 DELETE/POST 只查旧实例。关闭后的未知 origin 返回 421，不能硬编码只有 401 才表示拒绝。
-- `restart`：重新登录后 Alice 仍绑定原 UID、会话仍在；Bob 的 delete-requested 屏障仍在。
-- `expiry`：将 fixture 的 sessionLifetimeMs 临时设为 60000 并重启后运行 `browser/expiry.cjs`，验证真实计时关闭 WS；完成后恢复正常配置。这不是缩短产品默认 TTL。
+- `core`：两个 OIDC subject、每人自己的 Cell、跨 owner 拒绝、原生入口和 host-only cookie 属性。
+- `protocol`：原生 HTTP RPC、并发请求、WebSocket snapshot、HEAD/GET export 和会话隔离。
+- `live-model`：真实模型处理用户文件与上传文本；本轮还需刷新页面后确认同一用户文件仍可读取。
+- `user-command`：通过原生 DSH `bash` 工具启动 Node 子进程，让子进程在 DSH 当前用户 workspace 写文件并输出唯一标记；刷新页面后再经 `bash` 读取相同文件。脚本只检查对应 `[data-tool="bash"][data-state="ok"]` 工具结果卡中的命令片段、stdout 独立 nonce 行和 DSH 非零退出/信号/超时标记。写入命令在 Node 子进程 `status === 0` 后才输出 success nonce，shell 也只在 Node 父进程退出 0 后输出它；结合固定 DSH renderer 未显示失败标记，证据记录 `exitCode: 0`。该值依据真实工具结果行为推得，UI 没有单独暴露结构化 exitCode 字段。file tool、assistant 回复或 `kubectl exec` 均不算此项。
+- `lifecycle`：父会话登出关闭既有 WebSocket 并拒绝后续请求，另一用户不受影响。
+- `negative`：伪造身份头、跨 Origin、缺少 Origin 的写请求拒绝。
+- `delete` / `restart`：使用当前 P3 对应的撤权和持久化边界；只在组合契约要求时执行旧删除回归。普通 Pod 重建应保留本轮文件与会话。
 
-额外集群验证：CRD 拒绝改写/移除 allocation；未授权 Pod 与错误 namespace 的同名标签都不能直连；foreign HTTPRoute 触发 AccessModeConflict 且原对象不被清理；删除后确认 Pod/私有 PVC 消失、Retain 数据 PVC 仍在。Kubernetes 接受 DELETE 的返回值不是 writer 已停止证明。
+现有脚本的起始 origin、environment id、fixture 浏览器数据路径需要按 P2 配置更新。`core.cjs` 完成时创建 `private/alice-browser.json`、`private/bob-browser.json`；后续页面脚本使用专属 Chromium 上下文。不要分享完整 Playwright Call log、Cookie、ID Token 或认证 URL。
 
-`fixtures/api-fault.cjs` 是可选的任务内 HTTPS API relay，只用于故障注入：挂载专用 TLS 证书/脚本，转发原调用身份，`/tmp/mode` 为 create/delete 时，等真实 API 完成相应写入再丢弃响应。仅通过原 key 查询；记录一条 POST/DELETE，不重发。relay 日志只包含方法、状态或错误码，完成后停止它。不能将 relay 部署在共享/生产入口。
+## CNI egress 验收
 
-每次报告区分真实集群、浏览器、本地 socket 与 mock。HA、分区 fencing、强制删除、历史升级/恢复、多后端与发行安装矩阵不属于此 gate。
+runtime 自动创建的 Cell NetworkPolicy 只约束 ingress；它不阻止 Cell 出站。因此由集群管理员在每个租户 namespace 额外应用 [`network/egress-policy.example.yaml`](network/egress-policy.example.yaml) 的 egress-only 策略。它按 runtime Cell labels 选择 Cell Pod，默认拒绝其他出站，只开放 kube-system CoreDNS 的 TCP/UDP 53 和管理员填入的公网上模型 API IP 的 TCP 443。此示例不是 runtime 安装的一部分，也不是通用生产策略。
+
+将 `REPLACE_WITH_MODEL_PUBLIC_IPV4/32` 替换为验收时解析出的全球可路由地址；为所有实际使用的地址分别添加 peer，需要 IPv6 时也添加全球单播 IPv6 peer。不要把 ClusterIP/Service CIDR、节点网段、RFC1918、loopback、link-local 或私网目标放入模型 allowlist。若使用 NodeLocal DNS，应将 peer 换成该集群规定的 DNS 目的地，仍只开 DNS 端口。记录精确策略、DNS 和目标地址；动态 API 地址变化后策略必须按管理员流程更新。
+
+从每个 Cell 运行短超时探测；此检查只记录网络路径，不作为用户命令项证据。先从可信的系统 namespace 验证拒绝目标确实可达，否则失败可能只是目标不存在。下面从该 Cell 容器把本地探测脚本通过 stdin 传给 Node，不写入镜像或 PVC：
+
+```bash
+kubectl exec -i -n tenant-a "$CELL_POD" -- node - \
+  "$MODEL_HTTPS_URL" \
+  "$KNOWN_REACHABLE_PLATFORM_SERVICE_URL" \
+  "https://kubernetes.default.svc:443/" \
+  "http://169.254.169.254/" \
+  "http://$KNOWN_REACHABLE_PRIVATE_CONTROL_IP/" \
+  < integration/regression/network/egress-probe.mjs
+```
+
+`egress-probe.mjs` 只发无凭据 HEAD；允许目标必须完成 DNS、TLS 和 HTTP 首部（401/404 等响应也证明网络连通），拒绝目标必须 DNS 可解析且在 5 秒内以路由/策略丢包错误退出。至少一个 cluster/service、一个 private/control-plane 和一个 link-local 目标需从可信 namespace 证明可达后再作为拒绝项。脚本不会据不可达目标推断 CNI 拦截。
+
+## 有限本地 transport 回归
+
+`npm run test:transport --prefix integration/regression` 使用固定 vendor Connector 与真实本机 TCP socket 检查凭据头清洗、迟到地址校验撤权、长 HTTP 流客户端取消及两端关闭。它不连接 Kubernetes 或真实 DSH，不代表集群证据。Connector 的 connect/response-header/late-Upgrade deadline 由 runtime 独立模块测试和实现验收；这里保留平台集成 transport 行为，不复制 socket timeout 实现测试。正常长 WebSocket/HTTP stream 不设全程总时长。
+
+每次报告区分候选源码检查、真实 consumer 制品、真实集群/CNI、浏览器/DSH 工具和本地 socket 结果。把产品缺陷、管理员环境前提、不支持能力分开记载。HA、故障转移、长时压测、恢复/迁移、兼容和其他后端不属于本 gate。

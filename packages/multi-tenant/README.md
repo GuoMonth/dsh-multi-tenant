@@ -28,6 +28,10 @@ The command runs in the foreground. SIGINT/SIGTERM stop the platform and retain 
 
 See the [alpha startup guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md) for existing-cluster deployment, configuration and administrative commands.
 
+## Unpublished `cell-mvp-v1` source candidate
+
+This branch targets `dsh-multi-tenant@0.10.0-alpha.1`; it is not published. Published `0.9.0-alpha.1` and npm `@latest` retain the calibrated-profile configuration above and do not accept the candidate schema. The Connector is bound to runtime source `ed914317e98a93752e8af4f7831c384fc1e92f13`; Cell and Operator image digests remain null because these local candidate images are not a public release. See the [candidate setup guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/cell-mvp-v1-candidate.md). DSH remains pinned to `0.1.5-rc.2`.
+
 ## Ownership
 
 The current request path is Envoy TLS/routing → platform `openid-client` OIDC and admission → Node Connector → Go launcher → DSH. Envoy does not perform platform login or tenant authorization.

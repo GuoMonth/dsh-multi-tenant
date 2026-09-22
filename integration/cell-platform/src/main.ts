@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { startupDiagnostic, type StartupStage } from "./startup.js";
+import {
+  startupDiagnostic,
+  validateCellMvpBinding,
+  type StartupStage,
+} from "./startup.js";
 import { readFile, stat } from "node:fs/promises";
 import {
   createCellAllocationRuntime,
@@ -27,7 +31,10 @@ let startupStage: StartupStage = "configuration";
 async function main() {
   const filename = process.argv[2];
   if (!filename) throw new Error("Configuration required");
-  const config = JSON.parse(await readFile(filename, "utf8")) as Configuration;
+  const parsed: unknown = JSON.parse(await readFile(filename, "utf8"));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new Error("Invalid configuration");
+  const config = parsed as Configuration;
   if (
     "fixtureSessions" in config ||
     "bindings" in config ||
@@ -37,6 +44,7 @@ async function main() {
     config.port > 65535
   )
     throw new Error("Invalid configuration");
+  validateCellMvpBinding(config.allocation, config.environments);
   const validateMembers = (members: Member[]) => {
     if (
       !Array.isArray(members) ||

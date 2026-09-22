@@ -26,7 +26,9 @@ kubectl -n dsh-system rollout status deployment/cell-operator --timeout=120s
 
 从 [`config.example.json`](../../integration/distribution/config.example.json) 开始，按固定集群替换所有 `REPLACE_*` 和 profile 占位内容。特别是 `allocation.profiles[].expectedSpec` 与 `expectedPodSpec` 必须匹配 API 默认化后的、已批准的 Cell 和 Pod 模板。人工校准仍是已知部署负担；Issue #99 提出的简化尚未发布。不能把示例占位对象直接当成生产 profile，也不能放宽比较。状态数据库和 admin socket 放在 Cell 存储以外的私有目录；OIDC client secret 放在权限为 0600 的文件中。
 
-当前版本的校准方法：先用管理员认可的固定Cell spec创建并等待Ready，再采集API默认化后的Cell spec及StatefulSet `spec.template.spec`，仅将实例UID和origin替换为 `${INSTANCE_ID}` / `${ORIGIN_HOST}`。参考 [capture-profile.py](../../integration/regression/capture-profile.py) 的采集逻辑；其测试身份、域名和资源不是通用配置，不能直接套用。P2完成前保留这条实际可用路径。
+已发布版本的校准方法：先用管理员认可的固定Cell spec创建并等待Ready，再采集API默认化后的Cell spec及StatefulSet `spec.template.spec`，仅将实例UID和origin替换为 `${INSTANCE_ID}` / `${ORIGIN_HOST}`。参考 [capture-profile.py](../../integration/regression/capture-profile.py) 的采集逻辑；其测试身份、域名和资源不是通用配置，不能直接套用。这仍是已发布 `0.9.0-alpha.1` 的实际路径。
+
+固定模板配置属于独立的未发布源码候选，本版本及 npm `@latest` 不支持；见[候选配置指南](cell-mvp-v1-candidate.zh-CN.md)。
 
 使用 Node.js 24+ 前台运行已发布平台包：
 
