@@ -24,7 +24,7 @@ npm run test:transport --prefix integration/regression
 
 1. 管理员提供可复用的集群，安装启用 NetworkPolicy 执行的 Calico（或声明并验证等价 CNI）、Gateway API controller、StorageClass、OIDC issuer 和有效 DNS/TLS。创建独立系统 namespace、两个租户 namespace、浏览器/证书测试配置。该 P3 路径不创建 `calibration` namespace 或 profile Cell。
 2. 用本次精确 runtime npm 制品打印并审阅 manifests；应用 Operator/CRD、平台访问模式需要的 Gateway 资源、管理员 egress 策略示例（见下文）。记录安装后的镜像 digest 与实际 manifest SHA。Cell 镜像 digest 必须和该 runtime manifest 以及平台 pin 一致。
-3. 从唯一配置样例 [`integration/distribution/config.example.json`](../distribution/config.example.json) 生成私有平台配置。使用 P2 固定配置契约 `cell-mvp-v1`：allocation 直接提供固定 template、Cell image、Storage 与 Resources 参数，environment 只引用 `cell-mvp-v1`；包括两个 namespace 映射、OIDC issuer/subject、平台 origin 和域名。具体字段保持与这份共享样例及本轮 P2 合并结果一致。不要生成/填写 `expectedSpec`、`expectedPodSpec`，不要运行 `capture-profile.py`，不通过先创建一个 Cell 反向捕获配置。
+3. 从平台 P2 候选配置样例 [`integration/distribution/config.candidate.example.json`](../distribution/config.candidate.example.json) 生成私有平台配置。使用 `cell-mvp-v1`：allocation 直接提供固定 template、精确 Cell image digest、Storage 与 Resources 参数，environment 只引用 `cell-mvp-v1`；保留两个 namespace 映射、OIDC issuer/subject、平台 origin 和域名。只有把 `image: null` 替换为同一 runtime 候选的精确 Cell digest 后配置才可启动。不要生成/填写 `expectedSpec`、`expectedPodSpec`，不要运行 `capture-profile.py`，不通过先创建一个 Cell 反向捕获配置。
 4. 以候选/已发布平台制品 `start --config <private config path>` 启动平台，应用 Gateway/TLS 路由。清单中平台 SQLite/PVC 与管理 socket 保持系统 namespace 私有。浏览器使用专属 profile 和 CA 信任，不设置 `ignoreHTTPSErrors`。
 5. 保持同一精确制品组合完成下面的两用户浏览器步骤。失败时保留专属证据和数据，不自动清理 PVC/namespace；记录实际操作步骤、用时和所有绕路。
 
