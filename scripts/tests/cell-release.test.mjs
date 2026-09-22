@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { verifyCellRelease } from '../cell-release-contract.mjs'
 const root = new URL('../../', import.meta.url)
@@ -32,11 +33,13 @@ test('unpublished platform candidate never claims the old public runtime images'
   assert.equal(packageJson.version, '0.10.0-alpha.1')
   assert.equal(candidate.platformVersion, packageJson.version)
   assert.equal(candidate.status, 'source-candidate')
-  assert.equal(candidate.runtime.commit, 'source-candidate')
+  assert.equal(candidate.runtime.commit, 'ed914317e98a93752e8af4f7831c384fc1e92f13')
   assert.equal(candidate.runtime.release, null)
-  assert.equal(candidate.connector.commit, 'source-candidate')
-  assert.equal(candidate.connector.artifact, null)
-  assert.equal(candidate.connector.sha256, null)
+  assert.equal(candidate.connector.commit, 'ed914317e98a93752e8af4f7831c384fc1e92f13')
+  assert.equal(candidate.connector.artifact, 'dsh-cell-connector-internal-0.0.0.tgz')
+  assert.equal(candidate.connector.sha256, 'e9aaa0a364cd6277ea7038025e5ffb8a8613c4eebdbe0c424c56721d162ace10')
+  const vendor = readFileSync(new URL('vendor/dsh-cell-connector-internal-0.0.0.tgz', root))
+  assert.equal(createHash('sha256').update(vendor).digest('hex'), candidate.connector.sha256)
   assert.deepEqual(candidate.images, { cell: null, operator: null })
   assert.equal(candidate.dsh.version, '0.1.5-rc.2')
   assert.equal(candidate.dsh.commit, 'fb2c4b9e698e30edb738bca4cf0618587db7d203')

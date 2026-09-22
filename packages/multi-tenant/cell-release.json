@@ -5,15 +5,15 @@
   "status": "source-candidate",
   "runtime": {
     "repository": "GuoMonth/dsh-isolated-runtime",
-    "commit": "source-candidate",
+    "commit": "ed914317e98a93752e8af4f7831c384fc1e92f13",
     "accessMode": "platform",
     "release": null
   },
   "connector": {
     "repository": "GuoMonth/dsh-isolated-runtime",
-    "commit": "source-candidate",
-    "artifact": null,
-    "sha256": null
+    "commit": "ed914317e98a93752e8af4f7831c384fc1e92f13",
+    "artifact": "dsh-cell-connector-internal-0.0.0.tgz",
+    "sha256": "e9aaa0a364cd6277ea7038025e5ffb8a8613c4eebdbe0c424c56721d162ace10"
   },
   "dsh": {
     "version": "0.1.5-rc.2",

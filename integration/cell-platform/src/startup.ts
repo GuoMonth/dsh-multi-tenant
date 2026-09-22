@@ -15,23 +15,6 @@ const actions = {
 } as const;
 export type StartupStage = keyof typeof actions;
 
-export interface CellMvpAllocationConfiguration {
-  readonly template: "cell-mvp-v1";
-  readonly image: string;
-  readonly storage: {
-    readonly size: string;
-    readonly storageClassName?: string;
-    readonly retentionPolicy?: "Retain" | "Delete";
-  };
-  readonly resources: {
-    readonly requests: { readonly cpu: string; readonly memory: string };
-    readonly limits: { readonly cpu: string; readonly memory: string };
-  };
-  readonly credentialsSecret?: string;
-  readonly namespaces: Readonly<Record<string, string>>;
-  readonly domain: string;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -40,9 +23,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function validateCellMvpBinding(
   allocation: unknown,
   environments: unknown,
-): asserts allocation is Record<string, unknown> & {
-  readonly template: "cell-mvp-v1";
-} {
+): void {
   if (!isRecord(allocation)) throw new Error("Invalid allocation configuration");
   if (
     "profiles" in allocation ||

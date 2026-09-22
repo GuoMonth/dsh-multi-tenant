@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import {
   startupDiagnostic,
   validateCellMvpBinding,
-  type CellMvpAllocationConfiguration,
   type StartupStage,
 } from "./startup.js";
 import { readFile, stat } from "node:fs/promises";
@@ -19,7 +18,7 @@ import { listenAdmin } from "./admin.js";
 import type { Member } from "./sessions.js";
 interface Configuration {
   kubernetes: KubernetesOptions;
-  allocation: CellMvpAllocationConfiguration;
+  allocation: CellAllocationOptions;
   stateFile: string;
   adminSocket: string;
   environments: EnvironmentDefinition[];
@@ -80,9 +79,7 @@ async function main() {
     throw new Error("Cell domain must use the configured OIDC site");
   const runtime = createCellAllocationRuntime(
     config.kubernetes,
-    // The paired runtime vendor will publish this contract; keep the factory
-    // boundary stable while the two repositories implement it in parallel.
-    config.allocation as unknown as CellAllocationOptions,
+    config.allocation,
   );
   startupStage = "state";
   const store = new AllocationStore(config.stateFile, config.environments);
