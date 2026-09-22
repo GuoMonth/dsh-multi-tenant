@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dsh-cell-egress-example
+  namespace: tenant-a # Apply a copy in each tenant namespace.
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dsh-cell
+      app.kubernetes.io/managed-by: dsh-isolated-runtime
+  policyTypes:
+    - Egress
+  egress:
+    # CoreDNS only. If the cluster uses NodeLocal DNS, replace this peer with
+    # the cluster's documented DNS destination and keep port 53 as the only
+    # DNS allowance.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Replace with the currently resolved, globally routable model API IP
+    # ranges. Add one peer per address/range; never add cluster, RFC1918,
+    # loopback, link-local, or other private ranges here.
+    - to:
+        - ipBlock:
+            cidr: REPLACE_WITH_MODEL_PUBLIC_IPV4/32
+      ports:
+        - protocol: TCP
+          port: 443
