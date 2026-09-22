@@ -5,7 +5,7 @@
 ## Task routing
 
 - Cell integration or ownership: [S0 architecture](docs/design/s0-runtime-architecture.zh-CN.md); current tested evidence: [regression report](docs/evidence/cell-regression-2026-09-20.md).
-- Current installation: platform `dsh-multi-tenant@0.9.0-alpha.1` runs `start --config`; runtime `dsh-isolated-runtime@0.3.0-alpha.1` prints `release` / `manifests`. See the [quickstart](docs/reference/quickstart.md) and [package AI guide](packages/multi-tenant/AI.md).
+- Current installation and pinned versions: [quickstart](docs/reference/quickstart.md) and [package AI guide](packages/multi-tenant/AI.md). Roadmap and task ownership: [POC roadmap](docs/roadmap.md).
 - Checks and contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
 - Publication: [release runbook](docs/reference/release.md). Publishing, deployment and data deletion require applicable user authorization; routine local edits/checks within the task can proceed.
 - Other docs: [index](docs/README.md). Archived plans and standalone/Docker SDK guides are historical evidence, not current installation instructions or requirements. The active path is Envoy TLS/routing → platform `openid-client` OIDC/admission → Node Connector → Go launcher; historical Envoy OIDC/authorizer and standalone flows are not active.

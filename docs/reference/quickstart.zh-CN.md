@@ -13,6 +13,7 @@
 ```sh
 npx dsh-isolated-runtime@0.3.0-alpha.1 release
 npx dsh-isolated-runtime@0.3.0-alpha.1 manifests > operator.yaml
+# 替换示例 base-domain，核对 namespace/RBAC、kubeconfig context 和固定镜像后再应用。
 kubectl apply --server-side -f operator.yaml
 kubectl -n dsh-system rollout status deployment/cell-operator --timeout=120s
 ```
@@ -22,6 +23,8 @@ kubectl -n dsh-system rollout status deployment/cell-operator --timeout=120s
 ## 配置并启动平台
 
 从 [`config.example.json`](../../integration/distribution/config.example.json) 开始，按固定集群替换所有 `REPLACE_*` 和 profile 占位内容。特别是 `allocation.profiles[].expectedSpec` 与 `expectedPodSpec` 必须匹配 API 默认化后的、已批准的 Cell 和 Pod 模板。人工校准仍是已知部署负担；Issue #99 提出的简化尚未发布。不能把示例占位对象直接当成生产 profile，也不能放宽比较。状态数据库和 admin socket 放在 Cell 存储以外的私有目录；OIDC client secret 放在权限为 0600 的文件中。
+
+当前版本的校准方法：先用管理员认可的固定Cell spec创建并等待Ready，再采集API默认化后的Cell spec及StatefulSet `spec.template.spec`，仅将实例UID和origin替换为 `${INSTANCE_ID}` / `${ORIGIN_HOST}`。参考 [capture-profile.py](../../integration/regression/capture-profile.py) 的采集逻辑；其测试身份、域名和资源不是通用配置，不能直接套用。P2完成前保留这条实际可用路径。
 
 使用 Node.js 24+ 前台运行已发布平台包：
 
@@ -36,8 +39,8 @@ npx dsh-multi-tenant@0.9.0-alpha.1 start --config /private/config.json
 在可访问私有 Unix socket 的平台主机执行管理员命令。删除前先查询，并使用该环境返回的精确 allocation key 和 identity：
 
 ```sh
-dsh-multi-tenant inspect --socket /private/admin.sock --environment alice-main
-dsh-multi-tenant delete --socket /private/admin.sock --environment alice-main \
+npx dsh-multi-tenant@0.9.0-alpha.1 inspect --socket /private/admin.sock --environment alice-main
+npx dsh-multi-tenant@0.9.0-alpha.1 delete --socket /private/admin.sock --environment alice-main \
   --allocation-key ORIGINAL_KEY --identity EXACT_UID
 ```
 
@@ -45,4 +48,4 @@ dsh-multi-tenant delete --socket /private/admin.sock --environment alice-main \
 
 ## 证据与限制
 
-[2026-09-20 回归报告](../evidence/cell-regression-2026-09-20.md)记录了真实集群、浏览器、模型验证及其边界。公开 npm 包另在既有测试集群安装验证，见[alpha 交付证据](../evidence/alpha-delivery-2026-09-20.md)。这些是有限 MVP 检查，不是完整 OIDC 攻击矩阵、压力、HA、升级、迁移或恢复认证。runtime P1 sandbox 源码改动位于仍未合并的 [PR #93](https://github.com/GuoMonth/dsh-isolated-runtime/pull/93)，尚未进入当前公开 npm 绑定的清单。
+[2026-09-20 回归报告](../evidence/cell-regression-2026-09-20.md)记录了真实集群、浏览器、模型验证及其边界。[alpha 制品检查](../evidence/alpha-delivery-2026-09-20.md)是发布前历史快照；公开包安装与发行结果见 [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) 和 [npm 发布记录](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.9.0-alpha.1/npm-publication.json)。这些是有限 MVP 检查，不是完整 OIDC 攻击矩阵、压力、HA、升级、迁移或恢复认证。后续源码/任务状态见 [roadmap](../roadmap.md)，不据此改写本版本制品能力。

@@ -13,6 +13,7 @@ The published runtime npm package prints the pinned resources. Review the output
 ```sh
 npx dsh-isolated-runtime@0.3.0-alpha.1 release
 npx dsh-isolated-runtime@0.3.0-alpha.1 manifests > operator.yaml
+# Replace the example base-domain; review namespace/RBAC, kubeconfig context and image pins first.
 kubectl apply --server-side -f operator.yaml
 kubectl -n dsh-system rollout status deployment/cell-operator --timeout=120s
 ```
@@ -22,6 +23,8 @@ kubectl -n dsh-system rollout status deployment/cell-operator --timeout=120s
 ## Configure and start the platform
 
 Start from [`config.example.json`](../../integration/distribution/config.example.json). Replace every `REPLACE_*` and profile placeholder with values for the fixed cluster. In particular, `allocation.profiles[].expectedSpec` and `expectedPodSpec` must match the API-defaulted approved Cell and Pod templates. This manual calibration remains a known deployment burden; the proposed simplification in Issue #99 has not shipped. Do not use the placeholder object as a production profile or weaken the comparison. Keep the state database and admin socket in a private directory outside Cell storage, and keep OIDC client secret in a mode-0600 file.
+
+For this published version, create an administrator-approved Cell with the pinned spec, wait for Ready, and capture the API-defaulted Cell spec and StatefulSet `spec.template.spec`; replace only instance UID and origin with `${INSTANCE_ID}` / `${ORIGIN_HOST}`. See [capture-profile.py](../../integration/regression/capture-profile.py) for the capture logic. Its test identities, domain and resources are fixtures, not reusable deployment configuration. This is the current working path until P2 is implemented.
 
 Use Node.js 24+ and run the published package in the foreground:
 
@@ -36,8 +39,8 @@ After recording and reviewing the resolved version, deployments may use the `lat
 Run administrative commands from the platform host with access to the private Unix socket. Inspect before any deletion and use the exact allocation key and identity returned for that environment:
 
 ```sh
-dsh-multi-tenant inspect --socket /private/admin.sock --environment alice-main
-dsh-multi-tenant delete --socket /private/admin.sock --environment alice-main \
+npx dsh-multi-tenant@0.9.0-alpha.1 inspect --socket /private/admin.sock --environment alice-main
+npx dsh-multi-tenant@0.9.0-alpha.1 delete --socket /private/admin.sock --environment alice-main \
   --allocation-key ORIGINAL_KEY --identity EXACT_UID
 ```
 
@@ -45,4 +48,4 @@ Deletion is explicit and can affect Cell-owned resources according to their rete
 
 ## Evidence and limits
 
-The [2026-09-20 regression report](../evidence/cell-regression-2026-09-20.md) records the real cluster/browser/model checks and their limits. The published npm package was separately installed and exercised in the existing test cluster; see [alpha delivery evidence](../evidence/alpha-delivery-2026-09-20.md). These are finite MVP checks, not a full OIDC attack matrix, stress, HA, upgrade, migration, or recovery certification. Runtime P1 sandbox-source changes in [PR #93](https://github.com/GuoMonth/dsh-isolated-runtime/pull/93) are still unmerged and are not present in the published npm-bound manifest.
+The [2026-09-20 regression report](../evidence/cell-regression-2026-09-20.md) records the real cluster/browser/model checks and their limits. The [alpha artifact checks](../evidence/alpha-delivery-2026-09-20.md) are a prepublication snapshot; public-package installation and delivery results are recorded in [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) and the [npm publication record](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.9.0-alpha.1/npm-publication.json). These are finite MVP checks, not a full OIDC attack matrix, stress, HA, upgrade, migration, or recovery certification. Later source/task status belongs in the [roadmap](../roadmap.md), not this version’s artifact claims.

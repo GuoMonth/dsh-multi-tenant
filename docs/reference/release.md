@@ -1,6 +1,6 @@
 # Cell alpha release runbook
 
-Current target: `dsh-multi-tenant@0.9.0-alpha.1`, npm **latest**, GitHub **Release / Latest**. The version name explicitly identifies Alpha maturity; do not enable GitHub Pre-release. Runtime [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1) is public and the exact image pair is bound in the manifest. npm publication uses the manual workflow below. Historical 0.8.0 workbench instructions are in [archive](../archive/v0.8/docs/reference/release.md).
+Published baseline: `dsh-multi-tenant@0.9.0-alpha.1`, npm **latest**, GitHub **Release / Latest**. The version name explicitly identifies Alpha maturity; do not enable GitHub Pre-release. Runtime [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1) is public and the exact image pair is bound in the manifest. npm publication uses the manual workflow below. Historical 0.8.0 workbench instructions are in [archive](../archive/v0.8/docs/reference/release.md).
 
 ## Coordinated inputs
 
@@ -14,7 +14,7 @@ Current DSH: `0.1.5-rc.2` at `fb2c4b9e698e30edb738bca4cf0618587db7d203`. Release
 
 ## Before authorized publication
 
-1. Review/merge the coordinated runtime documentation/channel PR and then this platform PR. No runtime API change is required by the CLI. Keep Issue #82 as the integration record.
+1. Select a new explicit candidate version/combination and review its changes. Merge runtime provider changes before platform consumers, record Connector source and image identities, and keep Issue #82 as the integration record. Existing published versions are never overwritten; a documentation merge alone does not publish a new package.
 2. Run `pnpm release:check`. This includes the packed npm consumer check and platform tests. Use the [regression report](../evidence/cell-regression-2026-09-20.md) for unchanged core behavior, plus [delivery verification](../evidence/alpha-delivery-2026-09-20.md) for this package. Do not substitute old standalone installation gates for integrated acceptance.
 3. Obtain the accepted **public** Cell and Operator digests for the manifest's runtime source/DSH combination. Publication is blocked until those artifacts exist and can be fetched anonymously. Review the runtime release manifest against the fixed source and images. A public repository alone does not make GHCR images public.
 4. Dispatch the manual `Publish package` workflow on the reviewed main commit with that runtime release tag and its exact public image digests. Binding rejects source/DSH/image disagreement and anonymous image lookup failures. The workflow no longer builds the old platform-owned DSH runtime image.
