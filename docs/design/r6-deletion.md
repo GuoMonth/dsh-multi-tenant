@@ -1,8 +1,6 @@
 # R6 管理删除与集中回归
 
-R6 主路径已实现：精确身份删除、持久化删除屏障、按环境撤权。没有执行真实
-Cell/卷删除，也没有部署。完成本轮主要入口后停止扩功能，进入统一回归；
-本地结果与真实集群验收分别记录。
+当前已实现精确身份删除、持久化删除屏障与按环境撤权；固定组合的真实集群回归覆盖精确删除、响应丢失及 Retain/Delete PVC 处置。writer 停止证明和数据销毁边界仍有限，具体证据见[回归报告](../evidence/cell-regression-2026-09-20.md)。以下记录实现语义，不构成额外安全/恢复认证。
 
 ## 私有管理员入口
 
@@ -11,11 +9,12 @@ Cell/卷删除，也没有部署。完成本轮主要入口后停止扩功能，
 所有 Cell 存储之外。已有 socket 路径会导致启动失败，不自动删除或接管旧文件。
 管理端口不绑定 TCP，不经 Gateway 暴露，不使用普通 OIDC 成员身份。
 
-从运行平台的受控管理环境执行（替换实际路径与查询结果）：
+从可访问私有 socket 的平台主机执行（替换实际路径、环境 ID 及查询结果）：
 
 ```sh
-node integration/cell-platform/dist/admin-cli.js /private/platform/admin.sock inspect alice
-node integration/cell-platform/dist/admin-cli.js /private/platform/admin.sock delete alice ALLOCATION_KEY IDENTITY
+dsh-multi-tenant inspect --socket /private/platform/admin.sock --environment alice
+dsh-multi-tenant delete --socket /private/platform/admin.sock --environment alice \
+  --allocation-key ALLOCATION_KEY --identity IDENTITY
 ```
 
 delete 的三个目标字段必须匹配持久绑定。该命令是显式删除请求，会按照已固定
@@ -69,7 +68,7 @@ runtime 重新验证 Cell identity/归属/模板，使用 UID + resourceVersion 
 不新增 purge、强删、旧卷复用、fencing、HA、升级或恢复服务。无法核实 writer 停止
 时保留人工核验边界，不假报清理成功。本文和代码提交不是实际数据销毁授权。
 
-## 第一批集中回归与后续
+## 有限回归与证据
 
 `npm test --prefix integration/cell-platform` 使用真实临时 SQLite、真实 Sessions、
 本地 Unix socket 和受控 runtime 替身，覆盖：
@@ -82,4 +81,4 @@ runtime 重新验证 Cell identity/归属/模板，使用 UID + resourceVersion 
 Runtime 的本地 TLS API 用例覆盖真实 DELETE 编码、UID/resourceVersion 条件、
 Pending 删除、冲突/替换/缺失/中断和重复请求边界。上述结果不能替代真实 API/GC。
 
-当前固定版本已通过核心集群/浏览器/真实模型回归，详见 [回归报告](../evidence/cell-regression-2026-09-20.md)。真实 API 已覆盖精确删除、响应丢失、旧 UID、Retain/Delete/private PVC；外部 credentialsRef Secret 删除场景未额外集群实测。平台未知/并发屏障属于 SQLite + runtime 替身证据，不混称完整集群崩溃矩阵。主 Issue #82 保持开放，发行制品准备另见 [启动指南](../reference/quickstart.md)。
+当前固定版本已通过核心集群/浏览器/真实模型回归，详见 [回归报告](../evidence/cell-regression-2026-09-20.md)。真实 API 已覆盖精确删除、响应丢失、旧 UID、Retain/Delete/private PVC；外部 credentialsRef Secret 删除场景未额外集群实测。平台未知/并发屏障属于 SQLite + runtime 替身证据，不混称完整集群崩溃矩阵。主 Issue #82 保持开放；公开包安装入口见 [启动指南](../reference/quickstart.md)。

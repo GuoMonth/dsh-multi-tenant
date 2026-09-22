@@ -1,7 +1,6 @@
 # R5 创建、查询与分配状态
 
-R5 连接真实 runtime 创建/查询接口，不增加平台资源控制器。实现待集中回归，
-不代表真实 OIDC、Kubernetes 或浏览器闭环已验收。删除入口见 [R6](r6-deletion.md)。
+当前平台已实现 runtime Cell 创建/查询和 SQLite 分配屏障，并通过有限真实集群/浏览器回归；实际覆盖及边界见[回归报告](../evidence/cell-regression-2026-09-20.md)。本设计保留配置与状态语义，不扩大成完整故障矩阵。API-defaulted `expectedSpec` / `expectedPodSpec` 仍需管理员手动校准；Issue #99 的 P2 简化尚未实施或发布。runtime P1 sandbox 改动 PR #93 尚未合并/发布。删除入口见 [R6](r6-deletion.md)。
 
 ## 当前入口
 
@@ -66,8 +65,7 @@ SQLite 使用 FULL 同步和独占锁，一个状态文件只能由一个平台�
 }
 ```
 
-示例里的两个空 spec **必须替换**为管理员固定部署实际 defaulted Cell/Pod 模板，
-不能直接运行。Cell spec 的 image 必须是 digest；不得含 allocation 或 restoreFrom。
+下面是结构示意，不是可部署配置。profile 字段必须取自管理员固定部署实际 defaulted Cell/Pod 模板，不能直接照抄占位值。Cell spec 的 image 必须是 digest；不得含 allocation 或 restoreFrom。
 Pod 模板字符串仅支持 runtime 定义的 `${INSTANCE_ID}`、`${ORIGIN_HOST}` 替换。
 运行时配置详情见 runtime `docs/design/r5-allocation.md`。模板修订/namespace/镜像
 属于受信部署配置，不能由用户提交。状态内已有环境不允许偷偷更换 owner/template
@@ -83,7 +81,9 @@ RBAC 在读取权限之外增加 Cell `create`，不增加 Pod/PVC 写入、patc
 Gateway/TLS 必须把 `cell-<UID>.<allocation.domain>` 送到平台，并保留 Host；
 该 domain 应在 `oidc.siteDomain` 内。CNI 必须继续阻止绕过平台直接访问新 Cell。
 
-## 回归覆盖范围（非全部通过声明）
+## 已测内容与剩余清单
+
+以下列表是风险检查项，不代表每项都已执行；已完成的真实集群/浏览器范围及替身测试边界见上方回归报告。
 
 - SQLite 分配持久化、独占锁、错误格式/损坏/只读文件/磁盘满；写屏障前后退出。
 - 并发同环境创建、同 key 同意图、冲突归属/模板/实际 profile；CRD 不可变字段拒绝变更。

@@ -1,30 +1,19 @@
 # Documentation map
 
-Read only the row relevant to the task. Current entry is the Cell alpha; historical SDK/workbench documents live in archive/.
+Current product: OIDC access to native DSH in Kubernetes Cells. Start with the row that matches the task; archived standalone/SDK plans are not current deployment requirements.
 
-| Task | Source |
+| Task | Current source |
 | --- | --- |
-| POC scope / next three slices | [POC focus](design/poc-focus.zh-CN.md) |
-| Product principles | [Constitution](../CONSTITUTION.md) |
-| Current work / acceptance | [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) |
-| Platform source assembly | [Private platform app](design/r2-platform-assembly.md) |
-| Proxy scope / alternatives | [POC proxy assessment](design/proxy-choice.zh-CN.md) |
-| Cell contract | [S0](design/s0-runtime-architecture.zh-CN.md), [research](design/s0-references.zh-CN.md) |
-| Cell CLI / alpha startup | [Bundled AI guide](../packages/multi-tenant/AI.md), [quickstart](reference/quickstart.md) |
-| Checks | [Contributing](../CONTRIBUTING.md) |
-| Publishing | [Release runbook](reference/release.md) |
-| Existing DSH baseline | [Compatibility evidence](reference/compatibility.md) |
+| Principles and boundaries | [Constitution](../CONSTITUTION.md) |
+| Roadmap and cross-repository ownership | [Three POC slices](roadmap.md) |
+| Status / acceptance | [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82), [P2 #99](https://github.com/GuoMonth/dsh-multi-tenant/issues/99), [P3 #100](https://github.com/GuoMonth/dsh-multi-tenant/issues/100) |
+| Install the currently published Cell alpha | [Startup](reference/quickstart.md), [中文入口](reference/quickstart.zh-CN.md), [package AI guide](../packages/multi-tenant/AI.md) |
+| Product architecture | [POC scope](design/poc-focus.zh-CN.md), [S0 contract](design/s0-runtime-architecture.zh-CN.md), [proxy choice](design/proxy-choice.zh-CN.md) |
+| Current implementation | [Assembly](design/r2-platform-assembly.md), [OIDC](design/r4-oidc.md), [allocation](design/r5-allocation.md), [deletion](design/r6-deletion.md) |
+| Development / release | [Contributing](../CONTRIBUTING.md), [release runbook](reference/release.md) |
+| Evidence for the existing fixed combination | [Core regression](evidence/cell-regression-2026-09-20.md), [prepublication package checks](evidence/alpha-delivery-2026-09-20.md), [repeatable fixtures](../integration/regression/README.md) |
+| Upstream version | [Pinned DSH source](../scripts/dsh-target.mjs) |
 
-Old assessments and plans live in `archive/`; release records in `releases/`; captured verification in `evidence/`. They describe their recorded revisions, not current obligations. Search them only for a specific historical question. Keep product principles in the constitution, task status in Issues, commands in executable manifests/runbooks; avoid copies of each in agent instructions.
+`design/` explains current decisions and implementation; Issues own mutable task state. `releases/` and `evidence/` describe the artifacts and checks at their recorded dates, not every future commit. Published versions remain immutable. P2/P3 planned behavior is not available merely because the roadmap describes it.
 
-This routing follows OpenAI's [GPT-6 Astra guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra) and [skill guidance](https://learn.chatgpt.com/docs/build-skills), reviewed 2026-09-20: narrow context, task-specific entry points, minimal procedural scaffolding. These sources inform documentation structure, not product requirements or a required model configuration.
-
-- [R4 OIDC and environment sessions](design/r4-oidc.md): source configuration and revocation; current results in the regression report.
-
-- [R5 创建、查询与分配状态](design/r5-allocation.md)：当前配置、状态屏障和集中回归清单。
-
-- [R6 管理删除与集中回归](design/r6-deletion.md)：私有管理员入口、删除屏障及回归启动点。
-
-- [Cell 集中回归](../integration/regression/README.md)：任务专属环境、执行顺序及证据边界。
-
-- [Alpha delivery](reference/quickstart.md) / [packaging evidence](evidence/alpha-delivery-2026-09-20.md).
+Older standalone/Docker and SDK documents live in `archive/` (including the [SDK compatibility history](archive/legacy-sdk/compatibility.md)). Use them only for historical versions or source investigations. They do not add macOS, snapshot, migration, HA or old transport/capability tasks to the current POC. Dependency/security defects are tracked separately from product scope.

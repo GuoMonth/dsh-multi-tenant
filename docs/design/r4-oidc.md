@@ -1,8 +1,6 @@
 # R4 OIDC and environment sessions
 
-The `integration/cell-platform` source, bundled into the Cell CLI, requires OIDC. The R2 fixture
-cookie and `fixtureSessions` configuration have been removed without migration.
-The fixed OIDC/Gateway combination passed regression; see the [current regression report](../evidence/cell-regression-2026-09-20.md) for tested cases and explicit evidence limits.
+The `integration/cell-platform` source is bundled into the published platform CLI (`dsh-multi-tenant@0.9.0-alpha.1`) and requires OIDC. The R2 fixture cookie and `fixtureSessions` configuration were removed without migration. The fixed OIDC/Gateway combination passed finite regression; see the [current regression report](../evidence/cell-regression-2026-09-20.md) for what actually ran and its limits. The broader inventory below is a risk checklist, not a pass claim.
 
 ## Fixed topology and configuration
 

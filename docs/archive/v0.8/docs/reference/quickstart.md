@@ -18,7 +18,7 @@ Each user has a separate localhost hostname. The short-lived URL fragment establ
 
 Linux Docker Engine is verified locally. Native Linux amd64/arm64 have recorded installed-CLI evidence; ongoing checks run locally, with platform coverage recorded by maintainers. Desktop transport no longer relies on host Unix sockets, bind paths or UIDs, but macOS/Windows real-machine acceptance remains experimental until recorded. Remote Docker and Windows containers are rejected. Bridge networking follows Docker policy and is not network tenant isolation.
 
-An instance pins its image, DSH and profile versions. Incompatible startup does not migrate data: use the original CLI or a new data directory. Stop does not delete volumes; there is no automatic destructive reset. Source manifests deliberately contain no pretend published image. Maintainers build runtime/Dockerfile, inspect its image ID and pass it with --image. See the [Chinese guide](quickstart.zh-CN.md) for complete source commands and boundaries.
+An instance pins its image, DSH and profile versions. Incompatible startup does not migrate data: use the original CLI or a new data directory. Stop does not delete volumes; there is no automatic destructive reset. Source manifests deliberately contain no pretend published image. Maintainers build runtime/Dockerfile, inspect its image ID and pass it with --image. See the [Chinese guide](../../../../reference/quickstart.zh-CN.md) for complete source commands and boundaries.
 
 
 Source verification from the repository root (use the pnpm version in package.json):

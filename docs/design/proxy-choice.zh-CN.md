@@ -55,10 +55,8 @@ Cell launcher 的 token 留在原进程内。单独放一个 Nginx/Caddy sidecar
 - [Caddy reverse_proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)、[forward_auth](https://caddyserver.com/docs/caddyfile/directives/forward_auth)：流式转发、外部认证预检查。
 - [Pingora 官方仓库](https://github.com/cloudflare/pingora)：构建可编程网络服务的Rust库/框架。
 
-## 审查过程
+## 后续验证归属
 
-两位 Luna 分别审计代码与成熟替代方案；初稿把仓库中的 standalone Envoy OIDC/authorizer/SAR 当作当前链路，主线程依据 `config/platform`、实际 Gateway YAML 与 Connector 代码提出反证，两位复核后均更正。最终结论不包含这套未启用路径，也不把Node标准库请求API冒称为完整成熟代理封装。这说明当前历史文档/源码共存本身容易制造架构噪音；清理入口标识比再加一个代理更值得优先处理。
+[P2 #99](https://github.com/GuoMonth/dsh-multi-tenant/issues/99)评估`connect()`与发送前地址解析各一次`verify()`的重复：正常成功路径两轮合计约10次K8s读。保留临发送前的UID/目标验证，不先建设缓存系统；没有验证不能宣称删一轮校验无损。
 
-Claude Code 的只读对抗审查已完成（本机实际提供方为 DeepSeek）。采纳其两个具体检查方向：`connect()` 先 `verify()`，实际转发解析地址时又 `verify()`；正常成功路径每轮读取 Cell、StatefulSet、Service、Pod、EndpointSlice 共5次，合计两轮约10次K8s读。应在P2评估合并重复校验，保留真正发送前的身份/目标验证，不承诺未测试的“无损删一行”，也不先建立授权缓存系统。另一个方向是全局1024活跃请求上限与慢上游的相互作用，放入有限socket/容量检查，不据此宣称线上拒绝服务漏洞。
-
-主线程未采纳审查中的三项过度推断：未认证请求在准入被拒绝后不会进入Cell校验，不能把“1024未认证槽位”等同于“上万次K8s读”；未显式设置Node server超时不等于没有默认超时（本机Node24实测requestTimeout=300000ms、headersTimeout=60000ms）；固定DSH/镜像组合与不能独立升级是已确认的POC取舍，不是本轮必须修复的兼容性缺陷。WebSocket非101上游响应在proxy.ts实际保留原状态码，不能一概描述为403；只有准入catch会折叠为403，应在诊断评估时区分。
+[P3 #100](https://github.com/GuoMonth/dsh-multi-tenant/issues/100)覆盖阶段超时、取消与慢上游槽位回收。未认证请求被拒绝后不会进入Cell读取；Node默认入站超时也不能与上游首部等待混为一谈。固定版本不能独立升级是本POC已接受的取舍。审查过程和反证见 [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82)，不另设代理路线图。
