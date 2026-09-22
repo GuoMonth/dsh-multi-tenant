@@ -1,8 +1,8 @@
 # DSH 平台与运行时项目宪法
 
-2026-09-20 用户确认。适用 `dsh-multi-tenant` 与 `dsh-isolated-runtime` 的当前协同开发，不扩展到其他 DSH 项目。本文件是两仓库共享原则的维护源；仓库 AGENTS.md 负责技术执行差异，Issue 负责需求/验收，设计文档负责具体方案。
+2026-09-22 按用户最新 Kubernetes 单后端决定修订。适用 `dsh-multi-tenant` 与 `dsh-isolated-runtime` 的当前协同开发，不扩展到其他 DSH 项目。本文件是两仓库共享原则的维护源；仓库 AGENTS.md 负责技术执行差异，Issue 负责需求/验收，设计文档负责具体方案。
 
-用户最新明确指令优先。原则可以随明确的产品决定调整；不把本文件变成新的审批流程。需求与验收主记录：[Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82)。
+用户最新明确指令优先。原则可以随明确的产品决定调整；不把本文件变成新的审批流程。需求与验收主记录：[Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。
 
 ## 1. 核心验证优先
 
@@ -10,15 +10,17 @@
 
 单集群、上层单副本、一套明确的参考配置足够。HA、多集群、自动扩缩容、灾备、无感执行恢复、完整安装发行产品不阻塞当前闭环。用现有工具和原生 Kubernetes 能力，不另建调度器、资源状态数据库或自动修复系统。
 
-## 2. Cell MVP + 中立内部契约
+## 2. Kubernetes 单后端 + Agent Workspace
 
-- multi-tenant 拥有 OIDC、稳定身份/成员映射、授权、平台会话、用户侧管理协议和访问准入。
-- isolated-runtime 拥有 Cell、资源归属、执行与存储生命周期、真实状态和受限应用通道。
-- 原生 DSH 拥有 Web、Session、工具、workspace 和应用协议；平台透明转发，不重写它们。
+- multi-tenant 拥有 OIDC、稳定身份/成员映射、授权、平台及工作区访问会话、用户侧管理协议和访问准入。
+- isolated-runtime 拥有 Agent Workspace 资源聚合、执行与存储生命周期、真实状态和受限应用通道；通过薄 CRD/Operator 使用原生 StatefulSet、PVC、Service 与策略。
+- 原生 DSH 拥有 Web、对话 Session、工具、workspace 和应用协议；平台透明转发，不重写它们。
 
-上层业务不解析 namespace、Pod/PVC、Cell UID 格式、容器 ID 或 PID；以小的内部接口消费运行时。平台退出、登出或撤权不隐式删除环境。
+明确删除 Process/Docker 产品后端和多后端抽象，不再承诺“等第二个需求”或“类似 Kubernetes”的适配路线。保留清楚的内部模块接口以分工，不建设公共线协议、独立 runtime 服务、后端插件或历史 ABI。Pod 内子进程、OCI 镜像构建、kind 容器底座不属于被删除的产品后端。
 
-正式跨后端兼容推迟到第二个真实需求。Process/Docker 不是本期新增交付项，不强制它们采用 Cell 的持久化或生命周期。内部接口现在就写清前后条件、身份和错误，但不承诺公共线协议、独立服务、多包发行或历史 ABI。
+每个租户内每用户当前最多一个 Agent Workspace，包含多个共享文件/凭据的 DSH 对话；工作区的稳定身份和存储不依赖某个 Pod 存活。平台只保留授权、分配与精确绑定，不复制 Kubernetes 运行状态。登出/撤权不隐式删除或停止环境。详细关系、命名替换和开发边界见 [Agent Workspace 契约](docs/design/agent-workspace.zh-CN.md)。该契约是下一版方向，当前源码仍有 Cell/旧后端，删除由 W1 验收。
+
+显式正常停止/启动可作为有限的下一步功能；自动空闲判断、热池、备份/恢复不随抽象一并引入。没有真实需求与验收，不增加预留字段。允许破坏性演进不授权自动清空旧卷或旧集群。
 
 ## 2.1 一期隔离与协议收缩
 
@@ -64,6 +66,6 @@ Pod 内允许完成用户态任务，但不授予宿主机权限或集群控制�
 
 ## English summary
 
-Build the OIDC + Cell MVP first, with a small backend-neutral internal interface. The platform owns user identity and admission; the runtime owns resources; DSH owns application behavior. Defer formal multi-backend compatibility until a second real requirement.
+Build the Kubernetes-only Agent Workspace MVP. Remove Process/Docker product backends and portability scaffolding; keep in-Pod subprocesses and OCI build tooling. The platform owns identity/admission and allocation bindings; a thin runtime Operator owns resource reconciliation; DSH owns application behavior. Explicit stop/start is bounded next work; automatic idle, pools and backups are separate deferred needs. The target rename and code removal require implementation evidence, not this document alone.
 
 Validate exact source/image versions. Breaking API, configuration and state-format changes are allowed at any time: there is no historical compatibility, upgrade, migration or seamless recovery promise. Fail fast with structured, redacted diagnostics and bounded waits; unknown write results are not successful cancellation. Do not build permanent tombstones, an operation engine or an automatic repair system for unbounded replay guarantees. Preserve tenant/ownership boundaries and never silently erase data. Validate the current flow, not an unlimited historical matrix.

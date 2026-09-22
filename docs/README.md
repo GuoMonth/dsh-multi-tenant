@@ -1,14 +1,14 @@
 # Documentation map
 
-Current product: OIDC access to native DSH in Kubernetes Cells. Start with the row that matches the task; archived standalone/SDK plans are not current deployment requirements.
+Direction: Kubernetes-only Agent Workspace. Current implementation and published artifacts still use Cell; the next contract is not an implementation claim. Start with the row that matches the task; archived standalone/SDK plans are not current deployment requirements.
 
 | Task | Current source |
 | --- | --- |
 | Principles and boundaries | [Constitution](../CONSTITUTION.md) |
-| Roadmap and cross-repository ownership | [Three POC slices](roadmap.md) |
-| Status / acceptance | [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82), [P2 #99](https://github.com/GuoMonth/dsh-multi-tenant/issues/99), [P3 #100](https://github.com/GuoMonth/dsh-multi-tenant/issues/100) |
+| Roadmap and cross-repository ownership | [W1–W3 slices](roadmap.md) |
+| Status / acceptance | [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104); completed Cell baseline: [#82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) |
 | Install the currently published Cell alpha | [Startup](reference/quickstart.md), [中文入口](reference/quickstart.zh-CN.md), [package AI guide](../packages/multi-tenant/AI.md) |
-| Product architecture | [POC scope](design/poc-focus.zh-CN.md), [S0 contract](design/s0-runtime-architecture.zh-CN.md), [proxy choice](design/proxy-choice.zh-CN.md) |
+| Product architecture | [Agent Workspace contract](design/agent-workspace.zh-CN.md), [adversarial review](evidence/agent-workspace-review-2026-09-22.md), current Cell [S0 implementation boundary](design/s0-runtime-architecture.zh-CN.md), [proxy choice](design/proxy-choice.zh-CN.md) |
 | Current implementation | [Assembly](design/r2-platform-assembly.md), [OIDC](design/r4-oidc.md), [allocation](design/r5-allocation.md), [deletion](design/r6-deletion.md) |
 | Development / release | [Contributing](../CONTRIBUTING.md), [release runbook](reference/release.md) |
 | Evidence for the existing fixed combination | [Core regression](evidence/cell-regression-2026-09-20.md), [prepublication package checks](evidence/alpha-delivery-2026-09-20.md), [repeatable fixtures](../integration/regression/README.md) |

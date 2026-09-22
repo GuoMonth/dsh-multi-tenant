@@ -1,4 +1,6 @@
-# S0：Cell MVP 与中立内部契约
+# S0：现有 Cell 实现与内部边界
+
+> 2026-09-22：下一版方向由 [Agent Workspace 契约](agent-workspace.zh-CN.md) 与 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)取代。明确只做K8s，删除Process/Docker后端和多后端承诺；下文保留现有Cell实现依据，不能将旧范围/未验收措辞作为新待办。新Kind/启停尚待W1/W2实现。
 
 2026-09-20 修订。原则已由用户确认，见 [项目宪法](../../CONSTITUTION.md)；本文件记录技术契约；固定版本已完成联调，实际证据见主 Issue。下一阶段收缩以 [POC 边界](poc-focus.zh-CN.md) 为准，不把历史备选方案扩成当前范围。主记录：[Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82)。
 
@@ -15,7 +17,7 @@
 ```mermaid
 flowchart LR
   U[浏览器] --> P[平台：OIDC / 会话 / 授权]
-  P --> I[中立内部端口]
+  P --> I[runtime 内部端口]
   I --> A[同进程 Cell adapter]
   A --> K[Kubernetes API / Operator]
   P --> C[受限 Connector]
@@ -23,7 +25,7 @@ flowchart LR
   K --> D
 ```
 
-内部端口归 runtime 维护；平台通过组合根接入，业务层不导入 K8s 类型或判断 backend。当前一个实现足够，不先拆多个发行包、另起 runtime 服务或冻结 JSON/HTTP 线协议。未来 Process/Docker 需真实场景和第二份验证后再提炼共同语义；本期没有它们的兼容验收表。
+内部端口归 runtime 维护；平台通过组合根接入，业务层不导入 K8s 类型或判断 backend。当前一个实现足够，不先拆多个发行包、另起 runtime 服务或冻结 JSON/HTTP 线协议。下一版明确删除 Process/Docker 产品后端，不再预留多后端兼容；见新版 Agent Workspace 契约。
 
 ## 2. 最小对象与操作
 

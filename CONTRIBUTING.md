@@ -1,6 +1,6 @@
 # Contributing
 
-Product scope lives in [CONSTITUTION.md](CONSTITUTION.md); technical boundaries in [S0](docs/design/s0-runtime-architecture.zh-CN.md). Use [the documentation index](docs/README.md) for task-specific context.
+Product scope lives in [CONSTITUTION.md](CONSTITUTION.md); the current K8s-only Agent Workspace direction is in [the design](docs/design/agent-workspace.zh-CN.md), while tested Cell boundaries remain in [S0](docs/design/s0-runtime-architecture.zh-CN.md). Use [the documentation index](docs/README.md) for task-specific context.
 
 ## Validation by changed surface
 
@@ -16,6 +16,6 @@ Use the Node engine and pnpm version in the manifests; install with `pnpm instal
 
 `release:check` includes metadata/contract, typecheck, tests, build, SQLite proof and installed tarball SDK smoke; it does not publish. Once relevant checks pass, repeat or broaden only for a new change or unresolved failure.
 
-For Cell CLI changes, use `pnpm smoke:cell` to install the packed artifact in a clean consumer. The platform container recipe consumes that same tarball. Relevant cluster/browser evidence is in [the regression runbook](integration/regression/README.md); a packaging change needs a narrow installed-entry smoke, not a repeat of every historical gate. Legacy SDK/native probes remain available for changes to those files and do not validate the Cell CLI.
+For current Cell CLI changes, use `pnpm smoke:cell` to install the packed artifact in a clean consumer. The platform container recipe consumes that same tarball. Relevant cluster/browser evidence is in [the regression runbook](integration/regression/README.md); a packaging change needs a narrow installed-entry smoke, not a repeat of every historical gate. Legacy Process/Docker provider probes describe retained source only; they do not validate the K8s Agent Workspace path. OCI image construction and subprocess execution inside a workspace remain part of the K8s runtime workflow.
 
 Record the tested commit, relevant commands/results and untested surfaces in the PR. User-facing changes keep root and package READMEs aligned. Publishing uses the authorized manual workflow with a reviewed, locally validated main commit and actual image digest; source, tag and artifact identities must match.
