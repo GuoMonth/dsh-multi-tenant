@@ -39,24 +39,16 @@ POC 是受控成员、受控集群的试验，不定位为托管任意敌对租�
 
 Kubernetes 官方依据：[多租户](https://kubernetes.io/docs/concepts/security/multi-tenancy/)、[NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)。这里只保留实现当前承诺的低成本基础约束，不扩展安全认证或全攻击矩阵。
 
-## 只推进三个切片
+## 执行路线
 
-| 顺序 | 交付 | 验收 |
-| --- | --- | --- |
-| P1 收窄运行时 | 移除当前源码的 sandboxed 档位与 RuntimeClass 配置；隔离旧 standalone/snapshot/restore 文档与发布入口，不把它们当一期门禁 | 普通 Cell 主路径与基础约束保留；旧 sandboxed 输入不能被静默降为 standard；已发布旧制品不改写 |
-| P2 降低部署配置 | runtime 拥有一套固定模板和校验实现；平台只提供 identity、模板标识与必要部署参数，移除人工校准和手写 expectedPodSpec | 从已准备的 K8s/OIDC 环境按一份短指南启动，不需要复制测试 lab 或先造校准 Cell；错模板/镜像/UID 仍拒绝 |
-| P3 一次闭环验收 | 固定两用户、一个部署组合；补充真实安装记录，修完当前链路问题后才发下一 Alpha | 登录→显式创建/查询→进入自己的 Cell→真实模型完成一项文件任务→刷新可继续；补测一项命令/子进程或用户态依赖任务；B 不能访问 A；登出关闭访问；普通 Pod 重建文件保留；记录实际 CNI ingress/egress 结果 |
+后续顺序和仓库分工只维护于 [roadmap](../roadmap.md)，任务验收在 [P2 #99](https://github.com/GuoMonth/dsh-multi-tenant/issues/99) / [P3 #100](https://github.com/GuoMonth/dsh-multi-tenant/issues/100)。本设计维护为何收缩、哪些边界不能被简化掉，不重复维护另一套执行清单。
 
-P2 必须先定义可读的模板契约：谁生成 Pod、哪些字段固定、哪些允许 API 默认化、如何核对 Cell→工作负载→Pod UID/owner 链。允许移除对无关默认字段的全量深比较，不能直接删除检查、改成只信用户可写 label，或只做图片/页面截图就声称边界成立。优先复用已有 runtime 渲染逻辑及版本元数据，不另建模板 registry 服务。
-
-快照/恢复、卷克隆、macOS/本地集群安装、standalone 第二认证入口、Process/Docker 后端、HA/多集群/自动修复、长期兼容和完整 Sandbox 产品 roadmap 均不进入这三轮。保留当前身份与未知写结果的最小屏障，不先重写已工作的 SQLite 状态机。Pod 出问题可由管理员检查或在明确授权下重置；不自动销毁数据，也不为了恢复覆盖任意故障。
+P2的模板必须明确谁生成Pod、允许哪些API默认化，以及Cell→工作负载→Pod UID/owner链。不能通过删除全部检查或只信任用户可写label来替代人工校准。
 
 ## 验收终点
 
 另一位开发者在已经提供 K8s、OIDC、DNS/TLS 的约定环境里，不借助维护者私有 lab 数据，按文档完成上述闭环，即达到首版 POC 交付目标。记录实际步骤、失败点与用时，不承诺尚未测量的“一分钟启动”。未达到这个终点前，不因增加可选后端、抽象或发行通道扩展路线图。
 
-## 多方审查裁决
+## 取舍依据
 
-两位 Luna 分别审计 runtime 与平台/roadmap；本机 Claude Code 做只读对抗性审查（其当前配置实际使用 DeepSeek 提供方，不将结果冒称为 Claude 模型结论）。三方均确认 sandboxed 不在 standard 主路径、Pod 基础约束应保留。采纳 Claude Code 对快照/恢复和 standalone 重复访问链的收缩意见：它们不列入 POC 支持与回归门槛，后续按依赖清理，不借本轮名义删掉仍承载已发布版本证据的文件。
-
-未采纳一位 Luna 建议退回静态预建 Cell、删除已工作的分配状态机：这会降低已验证能力并产生新的重写，不能直接改善当前安装配置。也未采纳将 snapshot/restore、standalone authorizer 一律列为必须保留的建议：这是旧产品能力，不是当前 POC 必需品。所有建议以具体代码和目标验收裁决，不按模型多数自动执行。
+保留已验证Operator和最小分配状态机，避免退回预建Cell重新实现已完成能力；快照/恢复与standalone第二认证链不列为POC必需。源码、已发布制品和独立部署验收分开记录。历史审查过程见 [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82)，不作为额外规范或执行门禁。
