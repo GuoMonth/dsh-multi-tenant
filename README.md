@@ -26,9 +26,11 @@ npx dsh-multi-tenant@latest start --config /private/config.json
 
 The command runs in the foreground. SIGINT/SIGTERM stop the platform and retain Cells/data; SIGHUP reloads membership. Record the resolved exact npm version and image digests for deployment; do not resolve latest on every restart. This release does not create kind clusters.
 
-The previously published `0.8.0` CLI starts a local Docker demo, not this Cell flow. See the [alpha startup guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md) for source packaging, existing-cluster deployment, configuration and administrative commands.
+See the [alpha startup guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md) for existing-cluster deployment, configuration and administrative commands.
 
 ## Ownership
+
+The current request path is Envoy TLS/routing → platform `openid-client` OIDC and admission → Node Connector → Go launcher → DSH. Envoy does not perform platform login or tenant authorization.
 
 | Component | Owns | Does not own |
 | --- | --- | --- |
@@ -46,10 +48,10 @@ Captured from the 2026-09-20 OIDC → Cell → native DSH session. deepseek-flas
 
 ![Native file tool calls](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/images/cell-tools.png?raw=true)
 
-The [regression report](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/evidence/cell-regression-2026-09-20.md) distinguishes cluster, local socket and fixture evidence. The [release notes](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/releases/v0.9.0-alpha.1.md) distinguish tested source from pending public artifacts.
+The [regression report](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/evidence/cell-regression-2026-09-20.md) distinguishes cluster, local socket and fixture evidence. The [release record](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/releases/v0.9.0-alpha.1.md) and [startup guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md) describe the published package and its limits.
 
 - [Constitution](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONSTITUTION.md) · [S0 contract](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/s0-runtime-architecture.zh-CN.md)
 - [Alpha/release runbook](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/release.md) · [Contributing](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONTRIBUTING.md)
 - [Documentation](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/README.md) · [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82)
 
-Legacy Process/Docker SDK exports remain historical development entry points, without a backend compatibility promise; the current CLI does not use them. MIT; bundled dependencies retain their licenses in THIRD_PARTY_NOTICES.
+Historical Process/Docker SDK and workbench material is outside the current Cell installation path and remains only as historical source/evidence. MIT; bundled dependencies retain their licenses in THIRD_PARTY_NOTICES.

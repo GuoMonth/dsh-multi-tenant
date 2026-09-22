@@ -26,9 +26,11 @@ npx dsh-multi-tenant@latest start --config /private/config.json
 
 `start` 前台运行；SIGINT/SIGTERM 只停止平台并保留 Cell/数据，SIGHUP 重读成员映射。正式部署记录解析出的精确 npm 版本及镜像 digest，不在每次重启时重新选择 latest。首版不自动创建 kind 集群。
 
-当前已发布的旧 `0.8.0` CLI 是本地 Docker 演示，不能用于这条 Cell 链路。源码候选的打包、现有集群部署、配置与管理员命令见 [内测启动指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md)。
+现有集群部署、配置与管理员命令见[启动指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.zh-CN.md)。
 
 ## 两仓库分工
+
+当前请求链路为 Envoy TLS/路由 → 平台 `openid-client` OIDC/准入 → Node Connector → Go launcher → DSH。Envoy 不负责平台登录或租户授权。
 
 | 层 | 负责 | 不负责 |
 | --- | --- | --- |
@@ -46,10 +48,10 @@ npx dsh-multi-tenant@latest start --config /private/config.json
 
 ![展开的原生文件工具调用](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/images/cell-tools.png?raw=true)
 
-[回归证据及未覆盖项](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/evidence/cell-regression-2026-09-20.md) 区分真实集群、本地 socket 与替身测试；[发行说明](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/releases/v0.9.0-alpha.1.md) 区分已验证源码与待绑定的公开制品。
+[回归证据及未覆盖项](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/evidence/cell-regression-2026-09-20.md) 区分真实集群、本地 socket 与替身测试；[发行记录](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/releases/v0.9.0-alpha.1.md) 和[启动指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.zh-CN.md)说明已发布包及其边界。
 
 - [项目宪法](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONSTITUTION.md) · [S0 契约](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/s0-runtime-architecture.zh-CN.md)
 - [内测与发布流程](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/release.md) · [开发贡献](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONTRIBUTING.md)
 - [文档索引](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/README.md) · [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82)
 
-旧 SDK 的 Process/Docker 导出暂留作历史开发入口，既不承诺后端兼容，也不参与当前 CLI 启动链路。MIT；包内第三方实现许可证见 THIRD_PARTY_NOTICES。
+历史 Process/Docker SDK 和 workbench 资料不属于当前 Cell 安装链路，仅作为历史源码/证据保留。MIT；包内第三方实现许可证见 THIRD_PARTY_NOTICES。

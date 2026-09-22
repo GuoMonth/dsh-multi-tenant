@@ -1,3 +1,5 @@
+> Historical snapshot from before public release. The package was subsequently published as `0.9.0-alpha.1` on npm `latest`, and its GitHub Release is Latest; see [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) for the current delivery record. The candidate/null-digest statements below describe this captured pre-publication check only.
+
 # Cell alpha delivery verification — 2026-09-20
 
 Scope: npm CLI packaging and the existing-Kubernetes entry. This supplements the [core regression](cell-regression-2026-09-20.md); it does not repeat or broaden its acceptance claims. **No npm/GHCR/GitHub release was published and no dist-tag was moved.**

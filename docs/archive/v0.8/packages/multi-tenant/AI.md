@@ -22,7 +22,7 @@ This guide describes the 0.8.0 CLI. If that exact version is absent, use the sou
 | User intent | Entry | Completion evidence |
 | --- | --- | --- |
 | Try native DSH locally | Published CLI below | Native Web opens; Alice/Bob have distinct samples; generated file and history survive restart |
-| Integrate into a platform | Adjacent [README](README.md), [中文](README.zh-CN.md), `examples/native-domains/platform.mjs`, `dist/index.d.mts` | Trusted identity mapped to separate domains; HTTP/WS admission, revocation and cleanup verified |
+| Integrate into a platform | Adjacent [README](../../README.md), [中文](../../README.zh-CN.md), `examples/native-domains/platform.mjs`, `dist/index.d.mts` | Trusted identity mapped to separate domains; HTTP/WS admission, revocation and cleanup verified |
 | Modify this repository | Root [AGENTS.md](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/AGENTS.md), then relevant source/tests | Targeted checks and required installed/native proof pass |
 | Prepare/publish a release | [Release runbook](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/release.md), [中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/release.zh-CN.md) | Local validation, public image digest, installed npm CLI and SDK, matching tag/release |
 

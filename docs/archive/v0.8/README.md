@@ -34,7 +34,7 @@ check the current npm version and my local environment, then help me start and v
 Before changing repository code, read the root AGENTS.md and identify the relevant checks.
 ```
 
-The [AI project guide](packages/multi-tenant/AI.md) covers evaluation, SDK integration, source navigation and troubleshooting. [AGENTS.md](AGENTS.md) provides repository development instructions. The npm package includes `AI.md`; prefer the bundled guide when working with an installed version.
+The [AI project guide](packages/multi-tenant/AI.md) covers evaluation, SDK integration, source navigation and troubleshooting. [AGENTS.md](../../../AGENTS.md) provides repository development instructions. The npm package includes `AI.md`; prefer the bundled guide when working with an installed version.
 
 ## Where it fits
 

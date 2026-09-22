@@ -18,11 +18,11 @@
 npx -y dsh-multi-tenant@0.8.0 start
 ```
 
-本文对应 0.8.0；运行前可用 `npm view dsh-multi-tenant@0.8.0 version` 确认发布状态。如果尚不可用，使用[源码验证流程](docs/reference/quickstart.zh-CN.md)，旧版 0.7.1 没有 CLI。发布后也可用 `@latest` 获取当前稳定版。
+本文对应 0.8.0；运行前可用 `npm view dsh-multi-tenant@0.8.0 version` 确认发布状态。如果尚不可用，使用[源码验证流程](../../../docs/reference/quickstart.zh-CN.md)，旧版 0.7.1 没有 CLI。发布后也可用 `@latest` 获取当前稳定版。
 
 浏览器中选择 Alice 或 Bob，进入各自的原生 DSH 工作台。默认确定性演示模型支持读取样例、生成文件和委派子代理；真实 AI 需要在原生 Settings 配置模型凭据。Ctrl-C 停止运行并保留数据。Linux amd64/arm64 已有原生验证记录；macOS/Windows Docker Desktop 暂为实验支持。
 
-[完整启动、停止与排错说明](docs/reference/quickstart.zh-CN.md)
+[完整启动、停止与排错说明](../../../docs/reference/quickstart.zh-CN.md)
 
 ## 让 AI 帮你使用或开发
 
@@ -34,7 +34,7 @@ npx -y dsh-multi-tenant@0.8.0 start
 如果要修改项目源码，先阅读仓库根目录 AGENTS.md，并说明你要运行哪些相关验证。
 ```
 
-[AI 项目导航](packages/multi-tenant/AI.md)覆盖体验、SDK 集成、源码定位与排错；[AGENTS.md](AGENTS.md)提供仓库开发约定。npm 包内也包含 `AI.md`，已安装的包应优先使用随包指引。
+[AI 项目导航](packages/multi-tenant/AI.md)覆盖体验、SDK 集成、源码定位与排错；[AGENTS.md](../../../AGENTS.md)提供仓库开发约定。npm 包内也包含 `AI.md`，已安装的包应优先使用随包指引。
 
 ## 适合哪些场景
 
