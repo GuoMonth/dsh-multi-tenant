@@ -26,7 +26,9 @@ kubectl -n dsh-system rollout status deployment/cell-operator --timeout=120s
 
 Start from [`config.example.json`](../../integration/distribution/config.example.json). Replace every `REPLACE_*` and profile placeholder with values for the fixed cluster. In particular, `allocation.profiles[].expectedSpec` and `expectedPodSpec` must match the API-defaulted approved Cell and Pod templates. This manual calibration remains a known deployment burden; the proposed simplification in Issue #99 has not shipped. Do not use the placeholder object as a production profile or weaken the comparison. Keep the state database and admin socket in a private directory outside Cell storage, and keep OIDC client secret in a mode-0600 file.
 
-For this published version, create an administrator-approved Cell with the pinned spec, wait for Ready, and capture the API-defaulted Cell spec and StatefulSet `spec.template.spec`; replace only instance UID and origin with `${INSTANCE_ID}` / `${ORIGIN_HOST}`. See [capture-profile.py](../../integration/regression/capture-profile.py) for the capture logic. Its test identities, domain and resources are fixtures, not reusable deployment configuration. This is the current working path until P2 is implemented.
+For this published version, create an administrator-approved Cell with the pinned spec, wait for Ready, and capture the API-defaulted Cell spec and StatefulSet `spec.template.spec`; replace only instance UID and origin with `${INSTANCE_ID}` / `${ORIGIN_HOST}`. See [capture-profile.py](../../integration/regression/capture-profile.py) for the capture logic. Its test identities, domain and resources are fixtures, not reusable deployment configuration. This remains the working path for published `0.9.0-alpha.1`.
+
+The fixed-template configuration is a separate unpublished source candidate and is not supported by this release or npm `@latest`; see the [candidate setup guide](cell-mvp-v1-candidate.md).
 
 Use Node.js 24+ and run the published package in the foreground:
 

@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { startupDiagnostic, type StartupStage } from "./startup.js";
+import {
+  startupDiagnostic,
+  validateCellMvpBinding,
+  type CellMvpAllocationConfiguration,
+  type StartupStage,
+} from "./startup.js";
 import { readFile, stat } from "node:fs/promises";
 import {
   createCellAllocationRuntime,
@@ -14,7 +19,7 @@ import { listenAdmin } from "./admin.js";
 import type { Member } from "./sessions.js";
 interface Configuration {
   kubernetes: KubernetesOptions;
-  allocation: CellAllocationOptions;
+  allocation: CellMvpAllocationConfiguration;
   stateFile: string;
   adminSocket: string;
   environments: EnvironmentDefinition[];
@@ -27,7 +32,10 @@ let startupStage: StartupStage = "configuration";
 async function main() {
   const filename = process.argv[2];
   if (!filename) throw new Error("Configuration required");
-  const config = JSON.parse(await readFile(filename, "utf8")) as Configuration;
+  const parsed: unknown = JSON.parse(await readFile(filename, "utf8"));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new Error("Invalid configuration");
+  const config = parsed as Configuration;
   if (
     "fixtureSessions" in config ||
     "bindings" in config ||
@@ -37,6 +45,7 @@ async function main() {
     config.port > 65535
   )
     throw new Error("Invalid configuration");
+  validateCellMvpBinding(config.allocation, config.environments);
   const validateMembers = (members: Member[]) => {
     if (
       !Array.isArray(members) ||
@@ -71,7 +80,9 @@ async function main() {
     throw new Error("Cell domain must use the configured OIDC site");
   const runtime = createCellAllocationRuntime(
     config.kubernetes,
-    config.allocation,
+    // The paired runtime vendor will publish this contract; keep the factory
+    // boundary stable while the two repositories implement it in parallel.
+    config.allocation as unknown as CellAllocationOptions,
   );
   startupStage = "state";
   const store = new AllocationStore(config.stateFile, config.environments);

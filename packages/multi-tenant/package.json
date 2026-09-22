@@ -1,6 +1,6 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.9.0-alpha.1",
+  "version": "0.10.0-alpha.1",
   "description": "OIDC multi-tenant platform for the DSH Kubernetes Cell MVP",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",

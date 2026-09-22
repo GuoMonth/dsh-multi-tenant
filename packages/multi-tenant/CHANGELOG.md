@@ -1,5 +1,10 @@
 # Changelog / 更新记录
 
+## 0.10.0-alpha.1 — source candidate, not published / 源码候选，未发布
+
+- Replace calibrated allocation profiles with the fixed `cell-mvp-v1` platform binding. The matching runtime Connector and image identities are not bound yet; this candidate is not runnable or publishable until that dependency is supplied and reviewed.
+- 将人工校准的 allocation profiles 替换为固定 `cell-mvp-v1` 平台绑定。匹配的 runtime Connector 与镜像身份尚未绑定；在依赖交付并审查前，此候选不可运行或发布。
+
 ## 0.9.0-alpha.1
 
 - Replace the default Docker-demo CLI with `start --config`, private-socket inspect/delete and Node 24+ Cell platform bundles.

@@ -28,6 +28,10 @@ npx dsh-multi-tenant@latest start --config /private/config.json
 
 现有集群部署、配置与管理员命令见[启动指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.zh-CN.md)。
 
+## 尚未发布的 `cell-mvp-v1` 源码候选
+
+本分支的平台包目标版本为 `dsh-multi-tenant@0.10.0-alpha.1`，尚未发布。已发布 `0.9.0-alpha.1` 与 npm `@latest` 仍使用人工校准 profile 配置，不接受候选格式。匹配的 runtime Connector 和镜像身份尚未绑定，当前候选还不能运行或发布。见[候选配置指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/cell-mvp-v1-candidate.zh-CN.md)。DSH 仍固定为 `0.1.5-rc.2`。
+
 ## 两仓库分工
 
 当前请求链路为 Envoy TLS/路由 → 平台 `openid-client` OIDC/准入 → Node Connector → Go launcher → DSH。Envoy 不负责平台登录或租户授权。

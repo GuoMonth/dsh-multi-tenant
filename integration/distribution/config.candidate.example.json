@@ -1,0 +1,54 @@
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "kubernetes": {
+    "server": "https://kubernetes.default.svc",
+    "caFile": "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+    "tokenFile": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  },
+  "allocation": {
+    "template": "cell-mvp-v1",
+    "image": null,
+    "storage": {
+      "size": "20Gi",
+      "retentionPolicy": "Retain"
+    },
+    "resources": {
+      "requests": { "cpu": "1", "memory": "1Gi" },
+      "limits": { "cpu": "2", "memory": "2Gi" }
+    },
+    "namespaces": {
+      "tenant-a": "tenant-a"
+    },
+    "domain": "cells.example.com"
+  },
+  "stateFile": "/private/state.sqlite",
+  "adminSocket": "/private/admin.sock",
+  "environments": [
+    {
+      "id": "alice-main",
+      "owner": {
+        "tenantId": "tenant-a",
+        "principalId": "alice"
+      },
+      "template": "cell-mvp-v1"
+    }
+  ],
+  "members": [
+    {
+      "issuer": "https://REPLACE_ISSUER",
+      "subject": "REPLACE_VERIFIED_SUBJECT",
+      "owner": {
+        "tenantId": "tenant-a",
+        "principalId": "alice"
+      }
+    }
+  ],
+  "oidc": {
+    "issuer": "https://REPLACE_ISSUER",
+    "clientId": "REPLACE_CLIENT_ID",
+    "clientSecretFile": "/private/client-secret",
+    "platformOrigin": "https://REPLACE_PLATFORM_HOST",
+    "siteDomain": "example.com"
+  }
+}
