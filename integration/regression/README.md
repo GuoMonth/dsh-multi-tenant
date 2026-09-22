@@ -28,7 +28,7 @@ npm run test:transport --prefix integration/regression
 4. 以候选/已发布平台制品 `start --config <private config path>` 启动平台，应用 Gateway/TLS 路由。清单中平台 SQLite/PVC 与管理 socket 保持系统 namespace 私有。浏览器使用专属 profile 和 CA 信任，不设置 `ignoreHTTPSErrors`。
 5. 保持同一精确制品组合完成下面的两用户浏览器步骤。失败时保留专属证据和数据，不自动清理 PVC/namespace；记录实际操作步骤、用时和所有绕路。
 
-固定 Cell 启动环境必须把 `DSH_PERMISSION_MODE` 设为 `danger-full-access`。固定 DSH composition 将该值用于 bash sandbox policy、approval policy 和 permission presets 的新会话默认值；因此原生 DSH `bash` 不再依赖容器内的第二层文件 sandbox runner。上游默认 `workspace-write` 则尝试 Linux bwrap，并可回退到 Landlock；本验收没有假定或探测这两种 runner 在 Cell 镜像中的可用性。此设置不授予 Pod 新权限，也不替代 Kubernetes/CNI 网络边界；平台仍须按租户撤权，并由 NetworkPolicy 管理出站。不要通过修改模式或 sandbox policy 绕过工具失败。
+固定 Cell 启动环境必须把 `DSH_PERMISSION_MODE` 设为 `danger-full-access`。固定 DSH composition 将该值用于 bash sandbox policy、approval policy 和 permission presets 的新会话默认值；因此原生 DSH `bash` 不再依赖容器内的第二层文件 sandbox runner。该默认仅在创建会话时写入权限事件，不会升级已有会话；本 gate 使用本轮新建的 Cell 和会话，不要求迁移历史权限状态。上游默认 `workspace-write` 则尝试 Linux bwrap，并可回退到 Landlock；本验收没有假定或探测这两种 runner 在 Cell 镜像中的可用性。此设置不授予 Pod 新权限，也不替代 Kubernetes/CNI 网络边界；平台仍须按租户撤权，并由 NetworkPolicy 管理出站。不要通过修改模式或 sandbox policy 绕过工具失败。
 
 ## 浏览器验收顺序
 
@@ -49,7 +49,7 @@ node integration/regression/browser/restart.cjs
 - `core`：两个 OIDC subject、每人自己的 Cell、跨 owner 拒绝、原生入口和 host-only cookie 属性。
 - `protocol`：原生 HTTP RPC、并发请求、WebSocket snapshot、HEAD/GET export 和会话隔离。
 - `live-model`：真实模型处理用户文件与上传文本；本轮还需刷新页面后确认同一用户文件仍可读取。
-- `user-command`：通过原生 DSH `bash` 工具启动 Node 子进程，让子进程在 DSH 当前用户 workspace 写文件并输出唯一标记；刷新页面后再经 `bash` 读取相同文件。只把真实工具调用结果计为用户命令证据，file tool 或 `kubectl exec` 均不算此项。
+- `user-command`：通过原生 DSH `bash` 工具启动 Node 子进程，让子进程在 DSH 当前用户 workspace 写文件并输出唯一标记；刷新页面后再经 `bash` 读取相同文件。脚本只检查对应 `[data-tool="bash"][data-state="ok"]` 工具结果卡中的命令片段、stdout 独立 nonce 行和 DSH 非零退出/信号/超时标记。写入命令在 Node 子进程 `status === 0` 后才输出 success nonce，shell 也只在 Node 父进程退出 0 后输出它；结合固定 DSH renderer 未显示失败标记，证据记录 `exitCode: 0`。该值依据真实工具结果行为推得，UI 没有单独暴露结构化 exitCode 字段。file tool、assistant 回复或 `kubectl exec` 均不算此项。
 - `lifecycle`：父会话登出关闭既有 WebSocket 并拒绝后续请求，另一用户不受影响。
 - `negative`：伪造身份头、跨 Origin、缺少 Origin 的写请求拒绝。
 - `delete` / `restart`：使用当前 P3 对应的撤权和持久化边界；只在组合契约要求时执行旧删除回归。普通 Pod 重建应保留本轮文件与会话。
