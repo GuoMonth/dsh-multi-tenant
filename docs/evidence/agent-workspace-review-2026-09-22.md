@@ -1,6 +1,8 @@
 # Agent Workspace 对抗审查与裁决
 
-2026-09-22，主线 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)，最终[设计契约](../design/agent-workspace.zh-CN.md)。这是架构/源码只读审查，未运行新架构、启停、OAuth或性能回归。
+> 历史审查保留当时命名与实现选择。2026-09-23 起使用 [AgentEnvironment](../design/agent-environment.zh-CN.md)，控制器选型见 [agent-sandbox 评估](../design/agent-sandbox-evaluation.zh-CN.md)。
+
+2026-09-22，主线 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)，最终[设计契约](https://github.com/GuoMonth/dsh-multi-tenant/blob/844eb977fa352981a134a6726067aa43bf9709b6/docs/design/agent-workspace.zh-CN.md)。这是架构/源码只读审查，未运行新架构、启停、OAuth或性能回归。
 
 ## 审查来源
 

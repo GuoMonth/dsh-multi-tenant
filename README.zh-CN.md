@@ -1,6 +1,6 @@
 # dsh-multi-tenant
 
-OIDC 多租户平台：负责登录、成员授权和原生 DSH 访问，为每位用户提供 Kubernetes Agent Workspace。当前已测试的运行时以 [dsh-isolated-runtime](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/README.zh-CN.md) 的 Cell 实现该 Workspace。
+OIDC 多租户平台：负责登录、成员授权和原生 DSH 访问，为每位用户提供 Kubernetes AgentEnvironment。当前已测试的运行时以 [dsh-isolated-runtime](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/README.zh-CN.md) 的 Cell 实现该 Workspace。
 
 [English](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/README.md)
 
@@ -44,11 +44,11 @@ npx dsh-multi-tenant@latest start --config /private/config.json
 | `dsh-isolated-runtime` | 当前 Cell Operator、Cell 镜像、资源归属/生命周期、受限 Connector | 重复登录、用户成员权限、平台会话 |
 | DSH | 原生 Web、应用会话、工具与模型调用 | 平台多租户授权 |
 
-## Agent Workspace 方向
+## AgentEnvironment 方向
 
-运行时正式押注 Kubernetes；Process 和 Docker runtime 不作为受支持的后端路线。目标运行时是 `AgentWorkspace` CRD 加薄 Operator。现有 Cell 实现和旧 provider 源码尚未删除，计划在 W1 清理；当前候选尚未实现这项设计。详见 [Agent Workspace 设计](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-workspace.zh-CN.md) 和 [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。
+运行时正式押注 Kubernetes；Process 和 Docker runtime 不作为受支持的后端路线。`AgentEnvironment` 是产品概念；先通过[有限接入试验](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)评估直接映射上游 `agent-sandbox` 的 Sandbox，不套第二层同义 CRD/控制器。当前尚未决定正式采用上游。现有 Cell 实现和旧 provider 源码尚未删除，计划在 W1 清理；当前候选尚未实现这项设计。详见 [AgentEnvironment 设计](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-environment.zh-CN.md) 和 [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。
 
-一个 Agent Workspace 是用户持久化的 DSH 环境，设计上承载多个共享该环境的 DSH 对话。当前已测试的 Cell 在 Pod 替换后保留 workspace 数据和原生 DSH 状态。这证明 Cell 级持久性，但没有证明 home 文件或 OAuth/CLI 凭据按对话隔离。
+一个 AgentEnvironment 是用户持久化的 DSH 环境，设计上承载多个共享该环境的 DSH 对话。当前已测试的 Cell 在 Pod 替换后保留 workspace 数据和原生 DSH 状态。这证明 Cell 级持久性，但没有证明 home 文件或 OAuth/CLI 凭据按对话隔离。
 
 当前发行仍限于一个集群、平台单副本和固定版本组合；不增加 HA 或恢复系统。
 

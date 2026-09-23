@@ -1,6 +1,6 @@
 # POC 收缩：原生 DSH + 普通 Pod
 
-> 2026-09-22：下一版方向由 [Agent Workspace 契约](agent-workspace.zh-CN.md) 与 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)取代。明确只做K8s，删除Process/Docker后端和多后端承诺；下文保留现有Cell实现依据，不能将旧范围/未验收措辞作为新待办。新Kind/启停尚待W1/W2实现。
+> 2026-09-22：下一版方向由 [AgentEnvironment 契约](agent-environment.zh-CN.md) 与 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)取代。明确只做K8s，删除Process/Docker后端和多后端承诺；下文保留现有Cell实现依据，不能将旧范围/未验收措辞作为新待办。新Kind/启停尚待W1/W2实现。
 
 2026-09-21。根据用户要求重新收缩范围；本文件区分当前事实与下一步设计，不宣称待实现简化已经发布。职责原则仍以 [宪法](../../CONSTITUTION.md) 为准，验收状态以 [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) 为准。
 
