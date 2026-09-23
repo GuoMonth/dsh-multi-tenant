@@ -8,11 +8,11 @@
 
 产品对象命名为 **AgentEnvironment**，平台绑定命名为 `EnvironmentBinding`；访问授权命名为 `EnvironmentAccessSession`。DSH 的 workspace 继续表示应用工作目录/项目，Harness 表示应用执行框架，不复用这些词表示环境。仓库/npm 包名不变，不发展 Cell、Seal、AgentWorkspace 多条产品线。
 
-需要保留的是稳定资源身份与唯一生命周期控制者，不是自有 CRD、StatefulSet 或 Operator 代码本身。[agent-sandbox 评估](agent-sandbox-evaluation.zh-CN.md)建议先做 runtime [#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100) 有限试验：AgentEnvironment 在产品层直接映射上游 `Sandbox`，上游控制器管理普通 Pod/Service；runtime 负责固定模板、外部两块 PVC、安全策略和连接核验。不再套一个同义 AgentEnvironment CRD，不 fork 上游，也不运行两个控制器管理同一工作负载。
+需要保留的是稳定资源身份与唯一生命周期控制者。[本地真实接入验证](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md)已通过，runtime [#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)选定 **上游 agent-sandbox core**：AgentEnvironment 直接映射 `Sandbox`，上游控制器管理普通 Pod/Service；runtime 负责固定模板、外部两块 PVC、安全策略和连接核验。不再套同义 AgentEnvironment CRD，不 fork 上游，不运行两个控制器管理同一工作负载。
 
-**上游采用尚未确认。** 若真实集群能以薄适配满足身份、正常启停及删除边界，W1 删除自有 Cell CRD/Operator/StatefulSet 控制路径；否则记录失败依据，保留自有薄控制器。W1 不先做注定可能被删除的 Kind 重命名。当前代码仍是 Cell + 单副本 StatefulSet，既有发行不因此改变。
+**选型已完成，正式实现尚未完成。** W1 删除自有 Cell CRD/Operator/StatefulSet 控制路径，保留现有 launcher/传输并实现生产适配。当前代码仍是 Cell，测试脚本不代表生产 Connector、停止证据持久化或平台并发已交付；W2/W3 继续承担相应验收。无需先重命名随后要删除的 Kind。
 
-下面描述产品契约；产品 `Running/Stopped` 可以映射上游 `Running/Suspended`，但观察状态不能直接照抄。不要把单 Pod 期望误写为任何故障下物理上绝无第二进程。不开放任意 PodSpec/YAML 上传、插件系统、模板 CRD 或第二调度器。
+下面描述产品契约；产品 `Running/Stopped` 映射上游 `Running/Suspended`，但观察状态不能直接照抄。不要把单 Pod 期望误写为任何故障下物理上绝无第二进程。不开放任意 PodSpec/YAML 上传、插件系统、模板 CRD 或第二调度器。
 
 ## 2. 对象关系
 
@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | Principal | OIDC `(issuer, subject)` 经平台映射后的成员身份；不是邮箱或浏览器 | 平台 |
 | AgentEnvironment | 每 `(tenantId, principalId)` 当前最多一个；未创建时可只有分配记录 | 平台负责授权/绑定，K8s CR负责资源期望/事实 |
-| K8s 资源（候选为 Sandbox CR） | 环境的运行资源；UID稳定，同名新UID是另一个实例 | 唯一资源控制器 |
+| K8s Sandbox CR | 环境的运行资源；UID稳定，同名新UID是另一个实例 | 唯一资源控制器 |
 | Pod | Running期望一副本，Stopped期望零；可以重建换UID | Kubernetes及选定控制器 |
 | PVC | 当前两块：data与private；一个Pod可以挂多个PVC | Kubernetes存储与runtime归属管理 |
 | DshSession | 同一AgentEnvironment中多个原生对话，共享文件、工具、HOME和用户凭据 | DSH |
@@ -47,15 +47,15 @@ Kubernetes CR保存资源期望；唯一控制器写观测状态。平台不持�
 
 W2增加**显式停止/启动**，不是自动空闲回收。停止入口说明会中断整个AgentEnvironment的模型调用、工具和后台程序；关闭页面、无新对话、空闲WebSocket均不能证明无人执行。没有可靠DSH活动信号之前，不加自动idle计时器。
 
-正常流程：拒绝新的应用准入并撤销已有连接 → 控制器正常停止Pod（上游候选为Suspended）并观测停止 → 保留CR及两块PVC → 明确启动/进入操作请求Running → 校验原卷身份和固定模板 → Pod就绪后放行。普通查询状态不唤醒；不自动重放之前可能已执行的HTTP写请求。恢复持久文件/对话，不恢复进程内存或被中断任务。
+正常流程：拒绝新的应用准入并撤销已有连接 → 控制器正常停止Pod（上游为Suspended）并观测停止 → 保留CR及两块PVC → 明确启动/进入操作请求Running → 校验原卷身份和固定模板 → Pod就绪后放行。普通查询状态不唤醒；不自动重放之前可能已执行的HTTP写请求。恢复持久文件/对话，不恢复进程内存或被中断任务。
 
 固定模板/镜像改变属于新版本新环境：创建新CR/新UID和新卷，旧卷不能自动认领或克隆。当前不支持原地升级或新CR复用旧卷，不能把“不兼容”解释为自动删除旧数据。
 
-首次创建允许分配两个卷，记录绑定后再放行工作负载；首次写入结果未知按原key/owner查询。绑定完成后，缺卷、同名不同UID或归属冲突必须失败，不能自动造空卷冒充恢复。准入也核验存储绑定。保留显式PVC，禁止使用会自动补建存储的路径绕过此规则。上游候选不设置volumeClaimTemplates；从Suspended完成外部卷分配后才允许Running。入口UID核验不能单独保证平台离线时控制器重建的挂载正确性，须在#100验证限定故障模型，不以新控制器/admission框架兜底。
+首次创建允许分配两个卷，记录绑定后再放行工作负载；首次写入结果未知按原key/owner查询。绑定完成后，缺卷、同名不同UID或归属冲突必须失败，不能自动造空卷冒充恢复。准入也核验存储绑定。保留显式PVC，禁止使用会自动补建存储的路径绕过此规则。上游适配不设置volumeClaimTemplates；从Suspended完成外部卷分配后才允许Running。入口UID核验不能单独保证平台离线时控制器重建的挂载正确性，限定故障模型已在#100做有限验证，生产准入仍由W1/W2实现，不以新控制器/admission框架兜底。
 
 重复同意图请求幂等，相反并发意图使用选定CR的 `metadata.generation/resourceVersion` 约束并明确冲突（不是平台分配序号）；停止尚未证实时不得提前启动另一writer。健康节点上的正常停止是本期故障模型；节点失联、强制删除、管理员绕过控制器或替换PV内容不在自动恢复保证内。不能只凭Pod对象404、节点心跳或RWO名称宣称物理writer已停；失败交管理员，产品不提供假安全force-resume或自建fencing。
 
-Stopped正面验收：针对本次已知Pod UID，观测到kubelet上报的容器终止/Pod终态；资源控制器已观测本次停止generation；若采用现有StatefulSet方案，还需STS已观测缩容generation且副本为零；该AgentEnvironment不再有Pod或可用应用endpoint；两卷绑定仍一致。若原本从未启动过，需确证首次分配没有创建过工作负载。正常终止事件遗漏或controller重启后证据不足，返回停止未证实，不能把一次404当成功；只保存本次必要退出观测，不建设历史日志引擎。此判据依赖健康节点与受信K8s的正常终止路径，不能覆盖强删/分区下的物理进程保证。实现和实际可观测性在W2验证，文档不冒充已跑通。
+Stopped正面验收：针对本次已知Pod UID，观测到kubelet上报的容器终止/Pod终态；资源控制器已观测本次停止generation；该AgentEnvironment不再有Pod或可用应用endpoint；两卷绑定仍一致。若原本从未启动过，需确证首次分配没有创建过工作负载。正常终止事件遗漏或controller重启后证据不足，返回停止未证实，不能把一次404当成功；只保存本次必要退出观测，不建设历史日志引擎。此判据依赖健康节点与受信K8s的正常终止路径，不能覆盖强删/分区下的物理进程保证。实现和实际可观测性在W2验证，文档不冒充已跑通。
 
 显式删除与休眠不同：下一版MVP data PVC固定Retain，不以环境CR的 ownerReference级联删除，保留不可变归属标记；private PVC及Pod/Service等运行资源随AgentEnvironment删除清理，入口先明确私有状态/凭据销毁范围。外部Secret不由环境CR持有，不自动删除。管理员另行授权清理保留的data PVC；PVC真正被删除后，底层PV按StorageClass/PV的reclaimPolicy处置，因此应用的“Retain PVC”不等于PV的“Retain回收策略”。旧环境保留，不自动改旧ownerReference或执行卸载。
 
@@ -88,7 +88,7 @@ Pod非root、系统目录只读继续保留。系统依赖预装镜像，用户�
 
 ## 7. 有限开发顺序
 
-1. **W1收缩与统一**：runtime [#97](https://github.com/GuoMonth/dsh-isolated-runtime/issues/97) + 平台 [#105](https://github.com/GuoMonth/dsh-multi-tenant/issues/105)。先完成[#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)上游接入试验并明确采用/不采用，再同步AgentEnvironment产品类型、选定K8s资源/模板/消费契约，删除Process/Docker、standalone第二认证链、snapshot/restore活跃代码与仅服务它们的测试/发布门禁。原生资源仍由K8s负责。两侧可并行，runtime契约先固定，平台随后绑定。
+1. **W1收缩与统一**：runtime [#97](https://github.com/GuoMonth/dsh-isolated-runtime/issues/97) + 平台 [#105](https://github.com/GuoMonth/dsh-multi-tenant/issues/105)。依据已通过的[#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)采用上游core，同步AgentEnvironment产品类型、选定K8s资源/模板/消费契约，删除Process/Docker、standalone第二认证链、snapshot/restore活跃代码与仅服务它们的测试/发布门禁。原生资源仍由K8s负责。两侧可并行，runtime契约先固定，平台随后绑定。
 2. **W2显式停止/启动**：runtime [#98](https://github.com/GuoMonth/dsh-isolated-runtime/issues/98)，包含平台消费端。验证原AgentEnvironment/两PVC身份、并发、异常诊断、后台任务终止和连接撤销。不依赖自动idle。
 3. **W3真实授权、性能、发行**：平台 [#106](https://github.com/GuoMonth/dsh-multi-tenant/issues/106)。真实MCP/CLI授权、持久HOME、两用户回归、冷启动/API调用测量，公开镜像+配套npm+固定DSH并由另一操作者安装。工具与授权供应方未确定时先记录缺口，不拿mock冒充真实验证。
 

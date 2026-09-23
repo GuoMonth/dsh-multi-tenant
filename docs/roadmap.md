@@ -6,11 +6,11 @@
 
 | 切片 | 边界 | 主记录 |
 | --- | --- | --- |
-| W1 删除与统一 | 先完成 runtime [#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)上游有限接入试验，确定唯一控制器；AgentEnvironment统一产品词汇；删除Process/Docker产品后端、standalone第二认证链、snapshot/restore活跃代码及对应导出/打包/门禁；不套同义CRD，不提前重命名可能删除的自有Kind | runtime [#97](https://github.com/GuoMonth/dsh-isolated-runtime/issues/97)，平台 [#105](https://github.com/GuoMonth/dsh-multi-tenant/issues/105) |
+| W1 删除与统一 | 依据已通过的 runtime [#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)采用上游core Sandbox/Pod，删除自有Cell CRD/Operator/STS控制路径；AgentEnvironment统一产品词汇；删除Process/Docker产品后端、standalone第二认证链、snapshot/restore活跃代码及对应导出/打包/门禁；不套同义CRD，不提前重命名可能删除的自有Kind | runtime [#97](https://github.com/GuoMonth/dsh-isolated-runtime/issues/97)，平台 [#105](https://github.com/GuoMonth/dsh-multi-tenant/issues/105) |
 | W2 显式启停 | AgentEnvironment/PVC身份不变、Pod运行或停止；后台任务停止语义、原卷校验、并发、错误诊断和访问撤销 | runtime [#98](https://github.com/GuoMonth/dsh-isolated-runtime/issues/98)，两仓库协同 |
 | W3 工具与联合内测发行 | 持久HOME和真实MCP/CLI授权；两用户回归；性能/资源测量；公开镜像及配套npm/DSH，第二操作者安装 | 平台 [#106](https://github.com/GuoMonth/dsh-multi-tenant/issues/106) |
 
-先验证上游是否满足当前契约；通过则直接使用Sandbox/Pod并删除自有控制器，否则保留自有薄实现。选型不扩成新长期轮次。W1两侧可并行删旧路径；runtime提供精确候选，平台固定消费，再执行W2/W3。每片提供源码/产物证据；文档完成不等于代码删除、休眠实现或发行完成。边界测试随相应风险执行，集中联合回归在组合就绪后进行，不重复旧后端矩阵。
+上游有限接入已通过，正式采用目标已确定；[本地证据](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md)不代表生产W1/W2/W3已完成。W1两侧可并行删旧路径；runtime提供精确候选，平台固定消费，再执行W2/W3。每片提供源码/产物证据；文档完成不等于代码删除、休眠实现或发行完成。边界测试随相应风险执行，集中联合回归在组合就绪后进行，不重复旧后端矩阵。
 
 Pod内子进程、OCI镜像构建和kind底座继续可用。自动idle、热池、备份/恢复、多环境/共享工作区、HA/多集群、其他后端、任意工具兼容和迁移均不在本轮；不为它们预留CRD字段。
 
