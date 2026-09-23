@@ -1,12 +1,12 @@
 # AgentEnvironment 复用 agent-sandbox 评估
 
-2026-09-23。主线 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)，有限接入试验 [runtime #100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)。本次是源码、安装清单与局部测试评估，**未部署上游，未完成 DSH 集成，未决定正式替换**。
+2026-09-23。主线 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)，有限接入试验 [runtime #100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)。下文保留本轮最初的源码评估依据；后续[真实本地接入](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md)已通过，**现已选定上游 core 进入 W1，production 仍为 Cell**。
 
 ## 结论
 
-**值得做一次有限接入试验，不直接无条件替换。** 上游与我们需要的持久用户环境高度相近：一个稳定 Kubernetes 对象，控制一个可替换 Pod，支持显式停止和重新启动。它不是 Pod 内逐命令的第二层沙箱；名字含 Sandbox 不意味着必须安装 gVisor/Kata。产品统一叫 `AgentEnvironment`，应用内部仍使用 DSH 原有 workspace/Session。
+**有限接入试验已通过，选择上游 core；W1 负责正式替换。** 上游与我们需要的持久用户环境高度相近：一个稳定 Kubernetes 对象，控制一个可替换 Pod，支持显式停止和重新启动。它不是 Pod 内逐命令的第二层沙箱；名字含 Sandbox 不意味着必须安装 gVisor/Kata。产品统一叫 `AgentEnvironment`，应用内部仍使用 DSH 原有 workspace/Session。
 
-推荐候选结构：
+已验证的接入结构：
 
 ```text
 平台：OIDC / EnvironmentBinding / 授权、未知结果和删除屏障
@@ -18,7 +18,7 @@
 
 不额外造同义 `AgentEnvironment` CRD，不 fork 上游，不同时运行自有和上游控制器管理同一组 Pod。产品 API 不直接暴露上游宽 PodSpec、拓扑 status 或 Kubernetes 写权限。StatefulSet 不是需求本身；若直接 Pod 能满足验收，就删除这层实现。
 
-试验若必须引入新生命周期控制器、admission 系统或大幅 fork 才能成立，就停止复用，保留自有薄实现。沉没成本不支持自研，上游名气也不证明适配已经成立。
+试验未引入新生命周期控制器、admission 系统或 fork；不扩出这些实现层。沉没成本不支持自研，上游名气也不证明适配已经成立。
 
 ## 固定证据
 
@@ -29,7 +29,7 @@
 | 源码 | `527d9346fe1d237dea5c003f3c720531c7bab1df`，以下源码链接固定此提交 |
 | API | `agents.x-k8s.io/v1beta1` / `Sandbox`；release v1 不等于 API 或集成已稳定 |
 | Core manifest | release `sandbox.yaml`，SHA256 `725fafdabe6aac202a89dc57f1cfe0e2e92f3164c8c2bd343fffca52f7039d96` |
-| Controller image | 清单为 `registry.k8s.io/agent-sandbox/agent-sandbox-controller:v1.0.3`；本轮未解析/验证 digest，接入前必须固定公开 digest |
+| Controller image | 清单为 `registry.k8s.io/agent-sandbox/agent-sandbox-controller:v1.0.3`；初评仅有 tag；后续本地验证已固定公开 amd64 digest，见接入报告 |
 | 构建依赖 | Go 1.26、toolchain 1.26.4，K8s Go 库 0.37.0；不等同于已验证的服务端兼容矩阵 |
 
 Core 安装是一个 Sandbox CRD、一个 controller Deployment，以及 Namespace、ServiceAccount、ClusterRole/Binding 和 metrics Service。没有 core webhook、cert-manager 或快照组件依赖；extensions 默认不启用，不安装 SandboxClaim/Template/WarmPool。Controller 仍是可信的集群级基础设施，具备 Pod/PVC/Service/Sandbox 及事件、Lease 等权限，不能发给用户 Pod。依据：[core 安装](https://github.com/kubernetes-sigs/agent-sandbox/blob/527d9346fe1d237dea5c003f3c720531c7bab1df/k8s/controller.yaml)、[RBAC](https://github.com/kubernetes-sigs/agent-sandbox/blob/527d9346fe1d237dea5c003f3c720531c7bab1df/k8s/rbac.generated.yaml)、[可选扩展](https://github.com/kubernetes-sigs/agent-sandbox/blob/527d9346fe1d237dea5c003f3c720531c7bab1df/k8s/kustomization.yaml)。
@@ -85,8 +85,8 @@ GOTOOLCHAIN=local go test ./controllers \
 - 不采纳“上游 PodSpec/status 宽，必然破坏产品边界”；限制租户只走窄产品接口即可，但受信部署者权限和实际 Pod 验证必须明确。
 - 不增加离线镜像仓库、强隔离内核、HA 或管理员带外操作防护作为当前选型门槛；公开镜像 digest 与可复现安装足够。
 
-## 下一步与退出条件
+## 试验结果与下一步
 
-[#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100) 只验证一个环境、一条原生 DSH HTTP/WS 链及创建→停止→启动→删除；覆盖缺卷、UID 冲突、未知创建结果、平台离线重建和停止并发。固定实际集群/存储版本及公开镜像 digest，记录延迟、API 调用量和最终待删/保留模块。
+[#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100) 已完成普通 Pod、外部 PVC、原生 DSH HTTP/WS、启停、UID/缺卷/冲突及删除有限验证，证据与限制见[本地报告](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md)。选型 GO 进入 W1，删除自有控制器路径；下面最初评估中的待验证项以本地报告的实际覆盖为准。
 
-硬门槛全部成立且适配保持薄，才在 Issue 明确采用，然后 W1 替换；不成立则记录具体失败并结束试验。W2/W3 仍承担正式启停、真实授权、两用户回归与联合发行。此评估不关闭这些实现任务，不为热池、自动 idle、备份或其他后端预留字段。
+W2/W3 仍负责正式启停/证据缺失与相反意图并发、真实授权、两用户回归及联合发行。本次不把测试适配当生产实现，不为热池、自动 idle、备份或其他后端预留字段。

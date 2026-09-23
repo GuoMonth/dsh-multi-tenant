@@ -13,7 +13,7 @@
 ## 2. Kubernetes 单后端 + AgentEnvironment
 
 - multi-tenant 拥有 OIDC、稳定身份/成员映射、授权、平台及工作区访问会话、用户侧管理协议和访问准入。
-- isolated-runtime 拥有 AgentEnvironment 资源聚合、执行与存储生命周期、真实状态和受限应用通道；通过一个 Kubernetes 资源控制器管理 Pod、PVC、Service 与策略。产品名称不要求同名 CRD；是否复用上游控制器由有界接入验证决定，不叠加同义资源和双重调谐。
+- isolated-runtime 拥有 AgentEnvironment 资源聚合、执行与存储生命周期、真实状态和受限应用通道；通过一个 Kubernetes 资源控制器管理 Pod、PVC、Service 与策略。产品名称不要求同名 CRD；已通过有界接入验证，选定上游 agent-sandbox core，正式实现由 W1 交付，不叠加同义资源和双重调谐。
 - 原生 DSH 拥有 Web、对话 Session、工具、workspace 和应用协议；平台透明转发，不重写它们。
 
 明确删除 Process/Docker 产品后端和多后端抽象，不再承诺“等第二个需求”或“类似 Kubernetes”的适配路线。保留清楚的内部模块接口以分工，不建设公共线协议、独立 runtime 服务、后端插件或历史 ABI。Pod 内子进程、OCI 镜像构建、kind 容器底座不属于被删除的产品后端。

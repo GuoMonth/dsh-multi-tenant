@@ -46,7 +46,7 @@ npx dsh-multi-tenant@latest start --config /private/config.json
 
 ## AgentEnvironment 方向
 
-运行时正式押注 Kubernetes；Process 和 Docker runtime 不作为受支持的后端路线。`AgentEnvironment` 是产品概念；先通过[有限接入试验](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)评估直接映射上游 `agent-sandbox` 的 Sandbox，不套第二层同义 CRD/控制器。当前尚未决定正式采用上游。现有 Cell 实现和旧 provider 源码尚未删除，计划在 W1 清理；当前候选尚未实现这项设计。详见 [AgentEnvironment 设计](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-environment.zh-CN.md) 和 [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。
+运行时正式押注 Kubernetes；Process 和 Docker runtime 不作为受支持的后端路线。`AgentEnvironment` 是产品概念；[本地接入试验](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md)已通过，W1 将直接映射上游 `agent-sandbox` 的 Sandbox，不套第二层同义 CRD/控制器。正式生产适配尚未实现。现有 Cell 实现和旧 provider 源码尚未删除，计划在 W1 清理；当前候选尚未实现这项设计。详见 [AgentEnvironment 设计](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-environment.zh-CN.md) 和 [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。
 
 一个 AgentEnvironment 是用户持久化的 DSH 环境，设计上承载多个共享该环境的 DSH 对话。当前已测试的 Cell 在 Pod 替换后保留 workspace 数据和原生 DSH 状态。这证明 Cell 级持久性，但没有证明 home 文件或 OAuth/CLI 凭据按对话隔离。
 
