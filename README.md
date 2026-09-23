@@ -1,6 +1,6 @@
 # dsh-multi-tenant
 
-OIDC, membership authorization and native DSH access, with a Kubernetes Agent Workspace for each user. The current tested runtime implements that workspace as a Cell from [dsh-isolated-runtime](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/README.md).
+OIDC, membership authorization and native DSH access, with a Kubernetes AgentEnvironment for each user. The current tested runtime implements that workspace as a Cell from [dsh-isolated-runtime](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/README.md).
 
 [中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/README.zh-CN.md)
 
@@ -44,11 +44,11 @@ The current request path is Envoy TLS/routing → platform `openid-client` OIDC 
 | `dsh-isolated-runtime` | Current Cell Operator/images, resource identity/lifecycle, restricted Connector | User login, membership or platform sessions |
 | DSH | Native Web, application sessions, tools and model calls | Platform tenant authorization |
 
-## Agent Workspace direction
+## AgentEnvironment direction
 
-Kubernetes is the runtime direction; Process and Docker runtime backends are not planned as supported alternatives. The target runtime is an `AgentWorkspace` CRD with a thin Operator. The existing Cell implementation and legacy provider source have not yet been removed; that cleanup is planned for W1. This design is not implemented by the current candidate. See [Agent Workspace design](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-workspace.zh-CN.md) and [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104).
+Kubernetes is the runtime direction; Process and Docker runtime backends are not planned as supported alternatives. AgentEnvironment is the product concept. A [bounded integration trial](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100) will assess mapping it directly to the upstream `agent-sandbox` Sandbox, without a second CRD or controller. The existing Cell implementation and legacy provider source have not yet been removed; that cleanup is planned for W1. This design is not implemented by the current candidate. See [AgentEnvironment design](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-environment.zh-CN.md) and [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104).
 
-One Agent Workspace is the user's persistent DSH environment and is intended to contain multiple DSH conversations sharing that workspace. The currently tested Cell preserves its workspace data and native DSH state across Pod replacement. This demonstrates Cell-level persistence; it does not establish session-level isolation for home files or OAuth/CLI credentials.
+One AgentEnvironment is the user's persistent DSH environment and is intended to contain multiple DSH conversations sharing that workspace. The currently tested Cell preserves its workspace data and native DSH state across Pod replacement. This demonstrates Cell-level persistence; it does not establish session-level isolation for home files or OAuth/CLI credentials.
 
 The current release remains limited to one cluster, one platform replica and a fixed version combination; it does not add HA or a recovery system.
 

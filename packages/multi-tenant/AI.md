@@ -1,4 +1,4 @@
-# Agent Workspace alpha operating guide
+# AgentEnvironment alpha operating guide
 
 Use `dsh-multi-tenant --help`. The published platform package is `0.9.0-alpha.1`, requires Node 24+, and starts with `start --config /private/config.json`. The runtime release is `0.3.0-alpha.1`; `release` prints the fixed image/version data and `manifests` prints the pinned Operator/CRD/RBAC YAML. Review and apply those resources as an administrator. Neither npm command creates a cluster.
 
@@ -8,12 +8,12 @@ Prerequisites, the published configuration template, startup and operational lim
 
 ## Runtime direction and session terms
 
-The product direction is Kubernetes-only. The target runtime is an `AgentWorkspace` CRD with a thin Operator; Process and Docker runtime backends are not supported alternatives. Existing Cell and legacy provider source remains in this branch until the planned W1 cleanup. The current candidate does not implement the AgentWorkspace CRD. See [Agent Workspace design](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-workspace.zh-CN.md) and [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104). This direction does not disable OCI image builds or subprocesses running inside a workspace.
+The product direction is Kubernetes-only. AgentEnvironment is the product concept; a bounded trial will assess mapping it directly to the upstream `agent-sandbox` Sandbox, without a second CRD or controller. Process and Docker runtime backends are not supported alternatives. Existing Cell and legacy provider source remains in this branch until the planned W1 cleanup. The current candidate still uses Cell; upstream adoption is not yet validated. See [AgentEnvironment design](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-environment.zh-CN.md) and [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104). This direction does not disable OCI image builds or subprocesses running inside a workspace.
 
 Keep these sessions distinct:
 
-- A platform AuthSession is OIDC-derived authorization to enter a user's Agent Workspace. Its expiry or revocation controls platform access.
-- A DSH Session is a native DSH conversation. The product model places multiple DSH Sessions in one Agent Workspace, sharing its workspace/home state; closing a platform AuthSession does not mean deleting those conversations or the workspace.
+- A platform AuthSession is OIDC-derived authorization to enter a user's AgentEnvironment. Its expiry or revocation controls platform access.
+- A DSH Session is a native DSH conversation. The product model places multiple DSH Sessions in one AgentEnvironment, sharing its workspace/home state; closing a platform AuthSession does not mean deleting those conversations or the workspace.
 
 The currently tested Cell preserves workspace data and native DSH state across Pod replacement, and model credentials are configured in DSH's private settings. This establishes persistence at the Cell/workspace level. It does not prove per-conversation isolation of home files, OAuth tokens or CLI credentials; treat those as workspace-shared unless a future design explicitly separates them.
 
