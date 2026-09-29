@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 const help = `dsh-multi-tenant — OIDC + Kubernetes environment alpha
+  render --values FILE --namespace NAME
+  preflight | install --values FILE --namespace NAME --kubeconfig FILE --context NAME
   start --config /absolute/private/config.json
   inspect --socket /absolute/private/admin.sock --environment ID
   stop | resume --socket /absolute/private/admin.sock --environment ID --allocation-key KEY --identity UID
@@ -28,6 +30,10 @@ async function main() {
       environment: { type: "string" },
       "allocation-key": { type: "string" },
       identity: { type: "string" },
+      values: { type: "string" },
+      namespace: { type: "string" },
+      kubeconfig: { type: "string" },
+      context: { type: "string" },
     },
     allowPositionals: true,
   });
@@ -45,6 +51,9 @@ async function main() {
     return;
   }
   const allowed: Record<string, string[]> = {
+    render: ["values", "namespace"],
+    preflight: ["values", "namespace", "kubeconfig", "context"],
+    install: ["values", "namespace", "kubeconfig", "context"],
     start: ["config"],
     inspect: ["socket", "environment"],
     stop: ["socket", "environment", "allocation-key", "identity"],
@@ -62,7 +71,9 @@ async function main() {
   if (values.environment && !/^[A-Za-z0-9_-]{1,80}$/.test(values.environment))
     throw new Error("Invalid environment");
   const argv =
-    command === "start"
+    ["render", "preflight", "install"].includes(command!)
+      ? ["../charts/install.mjs", command!, ...required.flatMap((key) => ["--" + key, String(values[key as keyof typeof values])])]
+      : command === "start"
       ? ["platform.mjs", resolve(values.config!)]
       : [
           "admin.mjs",

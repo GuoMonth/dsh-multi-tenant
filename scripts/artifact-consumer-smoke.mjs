@@ -78,6 +78,10 @@ options.storage.size satisfies string;
   const cli = join(dir, "node_modules/dsh-multi-tenant/dist/cli.mjs");
   assert.match(run(process.execPath, [cli, "--help"]), /resume/);
   assert.match(run(process.execPath, [cli, "--version"]), /^0\./);
+  assert.match(run(process.execPath, [cli, "--help"]), /preflight \| install/);
+  const rendered = run(process.execPath, [cli, "render", "--values", resolve("integration/installation/fixture.values.json"), "--namespace", "dsh-package-smoke"]);
+  assert.match(rendered, /"kind": "Deployment"/);
+  assert.match(rendered, /"kind": "PersistentVolumeClaim"/);
   let rejected = false;
   try {
     run(process.execPath, [cli, "docker"]);

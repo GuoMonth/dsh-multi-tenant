@@ -1,43 +1,58 @@
 # DSH multi-tenant
 
-An Alpha OIDC platform for one persistent DSH environment per authorized user. Kubernetes is the only execution backend. DSH provides its native Web, conversations, tools and application protocols; the platform owns login, membership, environment binding and access revocation. The in-process environment connector provisions a fixed upstream agent-sandbox template.
+[中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/README.zh-CN.md)
 
-This candidate targets **DSH 0.2.0-rc.2**, commit `639ed015397290b3745d163aafe02ffee4aa3f84`. It is under integration validation, not a published or production-ready release. There is no compatibility layer or migration from old Alpha state, Cell, Process or Docker backends. Use a fresh private platform state file for this format; do not erase existing data to bypass an error.
+Give each authorized user a persistent AI working environment with the native DeepSeek Harness interface. Employees sign in with OIDC, enter their environment, and keep their files, conversations, tool installations and credentials across normal stop/start and Pod recreation.
 
-Local joint validation passed real two-subject OIDC, native HTTP/WebSocket and retained-data lifecycle after installation fixes. **G3 remains open for real model execution and external-tool authorization.** Use the [installation guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/installation/README.md) and [exact candidate evidence](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/installation/joint-validation-2026-09-29.md); these local checks do not authorize publication.
+**Alpha · Kubernetes · Linux/amd64 · DSH 0.2.0-rc.2 · one platform replica.** Each user has one independently owned PVC. This is intended for trusted organization members; backup, high availability and cross-node disaster recovery are outside the current guarantees.
 
-Each owner has one independently bound PVC mounted at `/var/lib/dsh/data`, with `workspace/`, `home/` and `dsh/`. CPU/memory use Kubernetes requests/limits; storage has one requested capacity, not a directory hard quota. Normal stop/start retains that volume. Logout, membership revocation and platform shutdown do not delete it.
+## Install with an AI assistant
 
-## Candidate operation
+Copy this prompt to your AI assistant:
 
-Use Node 24+ and the exact reviewed platform tarball. The platform must reach the Kubernetes API and workload network. It requires upstream agent-sandbox core, approved runtime RBAC, an existing StorageClass, HTTPS OIDC, TLS/DNS for the platform and environment domain, and the pinned workload image. Installation assets and final combined validation are tracked in [MVP #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104); source checks alone do not prove installation.
+> Install DSH multi-tenant using the current release. First read https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/AI.md and follow its versioned installation guide. Check my Kubernetes context, OIDC, DNS/TLS, storage and image availability before changing the cluster. Ask for missing settings, use private files for credentials, preserve existing data, and verify two-user access and persistence after installation.
 
-```sh
-npm install --ignore-scripts /absolute/path/dsh-multi-tenant-0.10.0-alpha.1.tgz
-./node_modules/.bin/dsh-multi-tenant start --config /private/config.json
-```
+The [AI installation guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/AI.md) is included as `AI.md` in the npm package. It defines the installation sequence, required inputs, checks and failure handling.
 
-Configuration has seven top-level fields: `runtime`, `stateFile`, `adminSocket`, `oidc`, `members`, `host`, `port`. See the [candidate configuration](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/integration/distribution/config.example.json). `runtime` contains the Kubernetes server and CA/token file paths, namespace prefix, domain, exact image digest, storage size/class, native resources and platform namespace. The fixed workload template belongs to the runtime, not the user or platform configuration. Kubernetes credentials and OIDC client secrets are file references outside user domains. The client secret must be mode 0600; the platform state and admin socket live in a private mode-0700 directory owned by the platform process. The state file is mode 0600 and has a single writer.
+## Install
 
-`members` maps exact OIDC issuer/subject pairs to `{tenantId, principalId}`. No per-user namespace or environment list is required. After login the platform reserves the owner's stable environment binding; **Enter / create** submits its first allocation. Use **Inspect / resolve status**, **Stop**, **Start stopped environment**, then **Open environment** when Ready. The native DSH page has its own session; it is separate from the platform login and environment access session. Responses expose the lifecycle result or a redacted diagnostic and next action; pending/unknown is not success. Return to the platform page after inspecting a result to open a Ready environment.
-
-Send SIGHUP after changing `members`; removed or remapped members lose existing HTTP/WebSocket connections. Invalid reloads revoke all sessions. Other configuration changes need a restart. SIGINT/SIGTERM shut down the platform and its connections while retaining environments and PVCs.
-
-Administrators use the private Unix socket. Inspect before supplying the persisted allocation key and Sandbox UID:
+Use an existing Kubernetes cluster with a NetworkPolicy-capable CNI, dynamic StorageClass and HTTPS ingress. Supply an OIDC client, platform domain and wildcard environment domain, TLS Secret and explicit member mappings. The installer requires Node 24+, Helm 3 and kubectl; it creates the fixed platform and upstream controller resources. Employees do not need individual namespace setup.
 
 ```sh
-dsh-multi-tenant inspect --socket /private/admin.sock --environment env-ID
-dsh-multi-tenant stop --socket /private/admin.sock --environment env-ID --allocation-key KEY --identity SANDBOX_UID
-dsh-multi-tenant resume --socket /private/admin.sock --environment env-ID --allocation-key KEY --identity SANDBOX_UID
-dsh-multi-tenant delete --socket /private/admin.sock --environment env-ID --allocation-key KEY --identity SANDBOX_UID
+npm install --global dsh-multi-tenant@0.10.0-alpha.1
+dsh-multi-tenant --version
+dsh-multi-tenant preflight --values /private/values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context YOUR_CONTEXT
+dsh-multi-tenant install --values /private/values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context YOUR_CONTEXT
 ```
 
-Delete requires positively verified Stopped, deletes runtime resources and retains data. It leaves the allocation blocked for administrator inspection; it is not a recreate button. Unknown create/start/stop/delete outcomes are queried against the original binding, never automatically replaced or retried. Missing or changed Sandbox/PVC identities fail closed. Node partition and unproven writer termination require administrator action; there is no automatic recovery controller.
+Prepare the private values file with the [installation guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/installation/README.md). Use the platform and workload image digests attached to the [matching release](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.10.0-alpha.1). The npm package includes the installer and Chart. Installing npm alone does not start a server or create a cluster.
 
-## Development and evidence
+## Use
 
-Use the manifest-pinned pnpm version. `pnpm install --frozen-lockfile`, then `pnpm release:check` validates metadata, types, unit/transport tests, build and a clean installed-tarball consumer without publishing. Tests identify connector fixtures explicitly; real runtime/cluster/native DSH/OIDC/model/tool verification belongs to the exact combined candidate in [#106](https://github.com/GuoMonth/dsh-multi-tenant/issues/106). The SDK exports the environment contract, binding store, platform control, OIDC and ingress APIs for trusted platform code only.
+Open the platform URL and sign in. **Enter / create** allocates your environment; **Inspect / resolve status** checks it; **Open environment** enters native DSH when Ready. Configure your model and authorize your tools in DSH. **Stop** interrupts the entire environment, including running tools and background commands. **Start stopped environment** resumes access with the same data volume.
 
-The container recipe at [integration/distribution/Dockerfile](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/integration/distribution/Dockerfile) installs the same local tarball and invokes the CLI. No npm publication, public image push or Release is implied by these checks. The user performs final E2E before deciding publication.
+The user PVC contains `/var/lib/dsh/data/workspace` (files), `home` (user tools and configuration) and `dsh` (conversations and native credentials). CPU/memory use Kubernetes requests and limits. The requested storage capacity is not a directory hard quota on every storage backend. Logout and membership removal revoke access without deleting data.
 
-Container UID/GID is 1000:1000. `GET /healthz` returns local readiness without authentication or runtime/model calls; it is not workload or model health.
+## Two repositories, one installation
+
+| Component | Responsibility | Entry |
+| --- | --- | --- |
+| **dsh-multi-tenant** | OIDC login, membership, authorization, environment bindings, HTTP/WS access, CLI and Helm installation | This repository and npm package |
+| **[dsh-isolated-runtime](https://github.com/GuoMonth/dsh-isolated-runtime)** | In-process Connector, fixed workload image, namespace/PVC identity and explicit lifecycle | [Runtime contract](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/design/environment-contract.zh-CN.md) |
+| Upstream Agent Sandbox core | Reconciles Sandbox resources into Pods and Services | Installed at the release's fixed version |
+| DeepSeek Harness | Native UI, conversations, model calls, files and tools | Runs inside each user's environment |
+
+Install through this repository. The internal Connector is bundled into the platform; runtime is not a separately deployed service. Developers changing resource lifecycle work in runtime; developers changing user authorization or installation work here.
+
+## Operate and develop
+
+The platform process accepts `start --config /private/config.json`. Administrators use `inspect`, `stop`, `resume` and `delete` through a private Unix socket with exact allocation/instance identities. `resume` starts an environment; `start --config` starts the platform. See [operations](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md).
+
+An unverified stop, missing volume or changed resource UID blocks access and requires inspection. Deleting a stopped environment retains its PVC. Platform uninstall retains control storage and user resources. Persistent storage is not a backup.
+
+- [Installation and troubleshooting](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/installation/README.md)
+- [AI installation guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/AI.md)
+- [Contributing and local checks](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONTRIBUTING.md)
+- [Release notes and artifacts](https://github.com/GuoMonth/dsh-multi-tenant/releases)
+
+MIT licensed.
