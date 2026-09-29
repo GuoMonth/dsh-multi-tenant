@@ -1,0 +1,54 @@
+name: Publish package
+run-name: Publish verified npm and GitHub release
+on:
+  workflow_dispatch:
+    inputs:
+      platform_run:
+        description: Successful prepare-release run locally verified
+        required: true
+        type: string
+      runtime_run:
+        description: Successful runtime prepare-release run locally verified
+        required: true
+        type: string
+      package_integrity:
+        description: Locally verified platform tarball SHA512 integrity
+        required: true
+        type: string
+      workload_digest:
+        description: Locally verified workload sha256 digest
+        required: true
+        type: string
+      runtime_tag:
+        description: Paired verified runtime release tag
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+  id-token: write
+concurrency:
+  group: npm-dsh-multi-tenant-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm-release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Publish the locally accepted artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLATFORM_RUN: ${{ inputs.platform_run }}
+          RUNTIME_RUN: ${{ inputs.runtime_run }}
+          PACKAGE_INTEGRITY: ${{ inputs.package_integrity }}
+          WORKLOAD_DIGEST: ${{ inputs.workload_digest }}
+          RUNTIME_TAG: ${{ inputs.runtime_tag }}
+        run: node scripts/publish-release.mjs

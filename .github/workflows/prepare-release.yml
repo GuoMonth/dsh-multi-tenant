@@ -1,0 +1,44 @@
+name: Prepare release candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: prepare-platform-release
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        with:
+          install: false
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - run: bash scripts/install-ci-helm.sh
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm release:check
+      - name: Pack and build exact candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir candidate
+          npm pack ./packages/multi-tenant --ignore-scripts --pack-destination candidate --json > candidate/pack.json
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          image="ghcr.io/guomonth/dsh-multi-tenant:source-${GITHUB_SHA}"
+          docker buildx build --platform linux/amd64 --provenance=false --push --metadata-file candidate/image.json -f integration/distribution/Dockerfile -t "$image" candidate
+          node scripts/candidate-manifest.mjs
+          cd candidate
+          sha256sum *.tgz candidate.json > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: platform-candidate
+          path: candidate/
+          retention-days: 30

@@ -1,6 +1,8 @@
-# RC2 single-cluster installation candidate
+# Kubernetes installation
 
-[中文](README.zh-CN.md). The local reference installation and two-user native access were exercised by a second operator; see [exact artifacts, results and limitations](joint-validation-2026-09-29.md). Real model file/command execution and genuinely authorized external tools remain unaccepted, so G3 is open. Nothing has been publicly published.
+[中文](README.zh-CN.md) · [AI guide](../../packages/multi-tenant/AI.md) · [Release artifacts](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.10.0-alpha.1)
+
+Install `dsh-multi-tenant@0.10.0-alpha.1` from npm. Its CLI includes the fixed Helm chart and checksummed upstream assets. Use image digests from the matching release manifest.
 
 ## Prerequisites
 
@@ -14,12 +16,16 @@ Private issuer CAs use optional `oidc.caSecretName` / `oidc.caSecretKey` (defaul
 
 ## Install
 
-Copy `integration/installation/fixture.values.json` to a private file, replace every fixture domain/digest and secret reference, and use the exact candidate image identities from the result table. Fixture `.invalid` hosts and repeated-character digests are deliberately refused by live installation. Images must be pullable or already imported into the node; digest syntax is not availability proof.
+```sh
+npm install --global dsh-multi-tenant@0.10.0-alpha.1
+```
+
+Copy [values.example.json](values.example.json) to a private file, replace every fixture domain/digest and secret reference, and use the exact image identities from the release manifest. Fixture `.invalid` hosts and repeated-character digests are deliberately refused by live installation. Images must be pullable or already imported into the node; digest syntax is not availability proof.
 
 ```sh
-node charts/install.mjs render --values /private/values.json --namespace dsh-platform
-node charts/install.mjs preflight --values /private/values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context YOUR_CONTEXT
-node charts/install.mjs install --values /private/values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context YOUR_CONTEXT
+dsh-multi-tenant render --values /private/values.json --namespace dsh-platform
+dsh-multi-tenant preflight --values /private/values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context YOUR_CONTEXT
+dsh-multi-tenant install --values /private/values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context YOUR_CONTEXT
 ```
 
 Preflight reads actual namespace/storage/ingress/node state, Secret keys, TLS host coverage and OIDC discovery before writes. Install verifies the vendored core checksums, installs the one upstream controller/CRD and runtime RBAC, then waits for platform rollout. The exact existing core may be reused; a different core image is refused. A timeout or interrupted operation is not rollback or permission to erase PVCs.

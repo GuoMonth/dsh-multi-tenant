@@ -1,4 +1,4 @@
-# No public platform/workload candidate has been published. Supply real digests.
+# Supply exact platform/workload digests from the matching release manifest.
 platformImage: ""
 workloadImage: ""
 domain: ""

@@ -1,10 +1,12 @@
-# RC2 单集群安装草稿
+# Kubernetes 安装
 
-本目录对应 [平台 #111](https://github.com/GuoMonth/dsh-multi-tenant/issues/111)。
-安装资产现已由 E 作为第二操作者在专用 kind 中实际安装；两处真实联动缺陷已修复，结果见 [联合验证](joint-validation-2026-09-29.md)。真实模型和外部工具授权未验收，G3 未通过，也未发行。
-平台与 workload 镜像尚未公开发布；fixture 的 `.invalid` 地址和重复字符 digest
-明确不可安装。本地镜像、包与源码固定组合见联合验证版本表。
-DSH 固定 `0.2.0-rc.2` / `639ed015397290b3745d163aafe02ffee4aa3f84`。
+[English](README.md) · [AI 安装引导](../../packages/multi-tenant/AI.md) · [发行制品](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.10.0-alpha.1)
+
+使用 npm 包 `dsh-multi-tenant@0.10.0-alpha.1`，CLI 自带固定 Chart 和经过校验的上游资产。镜像 digest 从同版本 Release 的 `release.json` 获取。DSH 固定为 `0.2.0-rc.2`。
+
+```sh
+npm install --global dsh-multi-tenant@0.10.0-alpha.1
+```
 
 ## 前提
 
@@ -23,7 +25,7 @@ DSH 固定 `0.2.0-rc.2` / `639ed015397290b3745d163aafe02ffee4aa3f84`。
 - OIDC issuer 必须 HTTPS，网络和 CA 信任可用；私有 CA 可通过 `oidc.caSecretName` / `oidc.caSecretKey`（默认 `ca.crt`）引用同 namespace 的 PEM Secret，Chart 用只读挂载与原生 `NODE_EXTRA_CA_CERTS`。宿主安装器也需 `NODE_EXTRA_CA_CERTS=/private/issuer-ca.crt`，不关闭 TLS 验证。注册平台 client，回调为
   `https://<平台域名>/auth/callback`。members 显式映射 issuer/subject 到 tenantId/principalId；
   无需预建用户 namespace/PVC。
-- 使用 B/C 通过验证的真实平台和 workload digest，节点能够拉取或已经导入。
+- 使用 发行清单中的平台和 workload digest，节点能够拉取或已经导入。
   安装器不会把任意语法合法 digest 当作镜像可用证据；镜像故障会使有限 rollout 等待失败。
   没有内置 registry 凭据分发，参考路径使用节点可访问镜像或本地导入。
 
@@ -43,19 +45,19 @@ namespace create。用户 Pod 不获得这些权限；平台身份和控制存�
 
 ## 一条入口
 
-先复制 `integration/installation/fixture.values.json` 为私有 values 文件，替换所有 fixture
+先复制 [values.example.json](values.example.json) 为私有 values 文件，替换所有 fixture
 字段，并按 `charts/dsh-platform/values.yaml` 设置少量默认额度。values 仅放 Secret 名称/key。
 `storageSize` 是每用户唯一卷容量，默认 10Gi；原生 CPU/Memory requests 为 250m/512Mi，
 limits 为 2/2Gi。平台的 `controlStorageSize` 默认 1Gi，只存平台 SQLite 绑定，不是第二个用户卷。
 申请容量不等于目录硬配额，local-path 的宿主磁盘耗尽边界仍需管理员管理。
 
 ```sh
-# 离线渲染（fixture 只允许在此使用；不访问集群）
-node charts/install.mjs render --values integration/installation/fixture.values.json --namespace dsh-install-test
+# 离线渲染已填写的私有配置（不访问集群）
+dsh-multi-tenant render --values /private/install.values.json --namespace dsh-platform
 
 # 使用联合验证的真实制品 pin、私有 values 与明确集群目标
-node charts/install.mjs preflight --values /private/install.values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context dsh-mvp-rc2
-node charts/install.mjs install --values /private/install.values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context dsh-mvp-rc2
+dsh-multi-tenant preflight --values /private/install.values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context YOUR_CONTEXT
+dsh-multi-tenant install --values /private/install.values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context YOUR_CONTEXT
 ```
 
 入口先检查 schema、成员、制品校验和、namespace、Ready amd64 节点、StorageClass、IngressClass、
@@ -78,7 +80,7 @@ controller、安装唯一 runtime role，最后 `helm install --wait` 平台。�
 | 现象 | 检查 |
 | --- | --- |
 | schema/镜像 pin 拒绝 | 用真实 digest；补全 OIDC、域名、TLS、存储和至少一个 member；不要带旧配置字段 |
-| 候选未固定 | 使用经审查的 B RBAC 提交和 C/B 镜像，不用 fixture 安装 |
+| 候选未固定 | 使用发行清单中的 RBAC 提交和镜像，不用 fixture 安装 |
 | Secret/TLS/DNS/OIDC 拒绝 | 检查 namespace、Secret key、证书范围/有效期、CA 和 issuer 注册 |
 | Forbidden | 管理员核对安装权限和唯一 runtime role；不授予用户 token 或临时 cluster-admin |
 | ImagePull/rollout 超时 | 核对真实 amd64 镜像可用性、Pod events、容量和平台脱敏启动错误 |
@@ -89,9 +91,9 @@ controller、安装唯一 runtime role，最后 `helm install --wait` 平台。�
 平台控制 PVC 使用 `helm.sh/resource-policy: keep`，core/CRD/runtime role 由入口独立安装且保留。
 保留控制状态是归属绑定所必需，不得通过删状态强行绕过未知结果。没有自动清理命令、备份/恢复或 HA 承诺。
 
-## G2 后验收记录
+## 安装验收
 
-第二操作者在独立安装 namespace，按此文档验证一次：两个真实 OIDC subject 首次进入各自
+在独立安装 namespace，按此文档验证一次：两个真实 OIDC subject 首次进入各自
 原生 DSH、HTTP/WS、跨用户拒绝、退出/撤权、真实模型读写文件和命令、至少一条工具授权、
 正常启停及 Pod 重建保留文件/会话/配置、缺卷/换 UID 拒绝。记录平台/runtime commit、
 Connector/平台包 integrity、三镜像 digest、集群/CNI/存储版本与实际命令结果；与 #106 共用证据。

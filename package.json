@@ -9,6 +9,6 @@
     "test": "pnpm -r test",
     "verify": "node scripts/verify-packages.mjs && node integration/environment-contract/verify.mjs",
     "smoke": "node scripts/artifact-consumer-smoke.mjs",
-    "release:check": "pnpm verify && pnpm typecheck && pnpm test && pnpm build && pnpm smoke"
+    "release:check": "pnpm verify && pnpm typecheck && pnpm test && pnpm build && pnpm smoke && node --test integration/installation/verify.test.mjs"
   }
 }

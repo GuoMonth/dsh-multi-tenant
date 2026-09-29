@@ -33,6 +33,7 @@
     "README.zh-CN.md",
     "LICENSE",
     "AI.md",
+    "charts",
     "THIRD_PARTY_NOTICES"
   ],
   "keywords": [
@@ -58,7 +59,7 @@
     "openid-client": "6.8.8"
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && node ../../scripts/package-installation.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts"
   },

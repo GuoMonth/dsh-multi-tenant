@@ -1,6 +1,6 @@
 # Contributing
 
-Follow [CONSTITUTION.md](CONSTITUTION.md) and the active [MVP plan](docs/plans/mvp-rc2.zh-CN.md). The package manifest pins Node/pnpm and scripts/dsh-target.mjs pins DSH.
+Follow [CONSTITUTION.md](CONSTITUTION.md) and the active [MVP plan](docs/plans/mvp-rc2.zh-CN.md). The [release procedure](docs/reference/release.md) governs verified publication. The package manifest pins Node/pnpm and scripts/dsh-target.mjs pins DSH.
 
 `pnpm install --frozen-lockfile` installs development dependencies. `pnpm release:check` runs metadata/pin validation, TypeScript, platform tests, build and clean installed-tarball smoke without publishing. Use the relevant subset while iterating. No legacy backend matrix is supported.
 

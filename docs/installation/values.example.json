@@ -1,0 +1,22 @@
+{
+  "platformImage": "REPLACE_WITH_RELEASE_PLATFORM_IMAGE_DIGEST",
+  "workloadImage": "REPLACE_WITH_RELEASE_WORKLOAD_IMAGE_DIGEST",
+  "domain": "dsh.company.example",
+  "ingressClassName": "nginx",
+  "tlsSecretName": "dsh-tls",
+  "oidc": {
+    "issuer": "https://id.company.example",
+    "clientId": "dsh-platform",
+    "secretName": "dsh-oidc",
+    "secretKey": "client-secret"
+  },
+  "storageClassName": "REPLACE_WITH_STORAGE_CLASS",
+  "members": [
+    {
+      "issuer": "https://id.company.example",
+      "subject": "REPLACE_WITH_OIDC_SUBJECT",
+      "tenantId": "company",
+      "principalId": "employee-1"
+    }
+  ]
+}
