@@ -4,6 +4,8 @@ Alpha OIDC 平台，每个授权用户一个持久 DSH 环境，仅支持 Kubern
 
 本候选固定 **DSH 0.2.0-rc.2**，commit `639ed015397290b3745d163aafe02ffee4aa3f84`，仍在联合验证中，不代表已发布或生产可用。不提供旧 Alpha 状态、Cell、Process、Docker 后端兼容或迁移。新格式使用全新私有平台状态文件；不能通过删除既有数据绕过错误。
 
+本地联合验证已通过两实际 OIDC subject、原生 HTTP/WebSocket 和持久生命周期，并修复实际安装缺陷。**真实模型执行与外部工具授权仍待验收，G3 未通过。** 参见[安装说明](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/installation/README.zh-CN.md)与[精确候选证据](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/installation/joint-validation-2026-09-29.md)；本地验证不代表允许发布。
+
 每个 owner 一个独立 PVC，挂载 `/var/lib/dsh/data`，包含 `workspace/`、`home/`、`dsh/`。CPU/Memory 使用 Kubernetes 原生 requests/limits；存储仅一个申请容量，不承诺目录硬配额。正常启停保留该卷；退出、撤权和关闭平台不会删除用户数据。
 
 ## 运行候选
