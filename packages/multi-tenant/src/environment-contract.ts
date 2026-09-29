@@ -12,5 +12,5 @@ export type {
   EnvironmentMutation,
   EnvironmentDeletion,
   EnvironmentFailure,
-} from '@dsh/environment-connector-internal'
-export { EnvironmentError } from '@dsh/environment-connector-internal'
+} from "@dsh/environment-connector-internal";
+export { EnvironmentError } from "@dsh/environment-connector-internal";

@@ -1,6 +1,6 @@
 # DSH RC2 MVP 准备与执行计划
 
-2026-09-29。用户已明确启动全计划并授权检查通过后创建 PR、由协调者统一审查并直接合并；不授权 npm publish、公网产品镜像推送或对外 Release。A 阶段已完成契约/真实 RC 接入候选，B/C/D 仍须协调者检查 G1 后派发，不代表 MVP 完成。需求与验收唯一主记录为 [平台 #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。协调者通过 Orca 派发和监督任务；用户最后执行 E2E 后决定发布。
+2026-09-29。用户已明确启动全计划并授权检查通过后创建 PR、由协调者统一审查并直接合并；不授权 npm publish、公网产品镜像推送或对外 Release。A 阶段已完成契约/真实 RC 接入并合并，协调者接受 G1 后已派发 B/C/D；C 平台源码与本地检查已形成审查候选，B 生产包 pin 和 E 联合验收仍待收口，不代表 MVP 完成。需求与验收唯一主记录为 [平台 #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。协调者通过 Orca 派发和监督任务；用户最后执行 E2E 后决定发布。
 
 ## 目标与冻结项
 
@@ -14,7 +14,7 @@
 
 ## 基线和准备工作区
 
-准备前远端 main：平台 `74deba5a752cff551bfe812f8a1dcc2a150cf53b`；runtime `8a0fde1dc9ce035f58478b417068b5ecf88b52c7`。准备 PR 已合并；A 实施基线为平台 `96bc9116f38e551670ab6ba8325942acea2390cc` / runtime `497a18ecd3315dfad5bf9b328193a2d2e6d4ffba`。两仓库当前生产源码仍是旧 Cell 和 DSH 0.1.5-rc.2，不将准备文档当成新代码。
+准备前远端 main：平台 `74deba5a752cff551bfe812f8a1dcc2a150cf53b`；runtime `8a0fde1dc9ce035f58478b417068b5ecf88b52c7`。准备 PR 已合并；A 实施基线为平台 `96bc9116f38e551670ab6ba8325942acea2390cc` / runtime `497a18ecd3315dfad5bf9b328193a2d2e6d4ffba`。上述准备基线的生产源码当时仍是旧 Cell 和 DSH 0.1.5-rc.2；后续 A 已合并 RC2 契约，B/C 实现按实际候选推进，不将准备文档当成新代码。
 
 复用两个干净、无运行中 Agent 的 Orca `enterprise-positioning` 工作区，由协调者独占准备文档写入：平台 [PR #114](https://github.com/GuoMonth/dsh-multi-tenant/pull/114)，runtime [PR #104](https://github.com/GuoMonth/dsh-isolated-runtime/pull/104)。本轮改为 Alpha MVP 范围，消除双卷/历史迁移/企业门槛冲突；不另开重复规划 PR。准备文档建议平台先、runtime 后；最终合并按用户授权执行。后续实现从协调者确认的精确基线创建工作区，不根据 Orca 父子关系猜测 Git 基线。
 
@@ -108,3 +108,11 @@ flowchart LR
 真实验证及制品身份见 [A 阶段证据](../evidence/mvp-a-rc2-2026-09-29.md)。完整生产启停/负例由 B 实现验证；平台 OIDC/模型/真实外部工具及安装联合验收由 C/D/E 收口。已有旧 Cell 导出仅为后续删除的中间状态，不作为兼容模式。
 
 精确文件所有权：B 独占 runtime（含模板/RBAC/Connector/launcher/image）；C 独占平台 packages、scripts、vendor、根 package/lock 和非安装 integration；D 仅 charts、integration/installation、docs/installation。A 后的包/锁/pin 由各仓库实现 owner 独占；D 不复制 runtime 模板、不改包锁。集群唯一写入权按 A→B→E 转移。
+
+## C 平台实现候选（2026-09-29，尚待 B pin）
+
+平台已将绑定/OIDC/会话/ingress/管理入口归入正式包，删除 RuntimeProvider/coordinator、多后端、Cell Connector、旧 SDK/体验入口和旧发布门禁。配置仅 runtime、stateFile、adminSocket、oidc、members、host、port；members 映射登录身份，平台自动按 owner 预留唯一环境，不再维护逐用户 environments 清单。
+
+绑定保存完整 owner/allocationKey/Sandbox UID/单 PVC UID、创建/启停未知屏障及删除屏障；Ready 才发布访问，停止与撤权关闭连接，缺失或换 UID 拒绝，删除后查询缺失仍保留具体诊断而非声称停止/删除证据。CLI 提供平台 start 及环境 inspect/stop/resume/delete，容器 UID/GID 1000，GET /healthz 仅本地 readiness。
+
+本地类型、平台单元/真实 socket transport、OIDC 签名回调正负例、构建和干净 tarball consumer 已通过；具体命令/数量以 C PR 报告为准。生命周期测试使用明确契约 fixture，尚未消费 B 最终生产制品，不能算联合验收；B pin 后须移除 A 缺失 factory 的临时启动拒绝并复验。E 仍负责真实集群、原生 DSH、两用户、模型和工具以及安装闭环；未 npm publish、未推公网镜像、未创建 Release。

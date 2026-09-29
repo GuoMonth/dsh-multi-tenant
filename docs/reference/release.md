@@ -1,25 +1,9 @@
-# Cell alpha release runbook
+# RC2 candidate and release boundary
 
-Published baseline: `dsh-multi-tenant@0.9.0-alpha.1`, npm **latest**, GitHub **Release / Latest**. The version name explicitly identifies Alpha maturity; do not enable GitHub Pre-release. Runtime [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1) is public and the exact image pair is bound in the manifest. npm publication uses the manual workflow below. Historical 0.8.0 workbench instructions are in [archive](../archive/v0.8/docs/reference/release.md).
+No publication is authorized during the current implementation wave. Do not run npm publish, push public product images, or create a Release. The user decides after final E2E. Old Cell/Process/Docker publication paths have been removed.
 
-## Coordinated inputs
+For local candidate preparation, use the manifest-pinned tools and run `pnpm install --frozen-lockfile` then `pnpm release:check`. These checks do not publish. Pack with `npm pack --ignore-scripts` from `packages/multi-tenant` after building; `integration/distribution/Dockerfile` installs that reviewed archive into the platform image.
 
-The runtime repository owns Cell/Operator images and their source/DSH acceptance. The platform repository owns its npm package, OIDC ingress and platform container. It bundles the pinned private Connector (with its license); it does not publish a second runtime service or rebuild runtime images.
+The integration owner must record both repository commits, DSH 0.2.0-rc.2 / 639ed015397290b3745d163aafe02ffee4aa3f84, connector archive SHA256/SHA512, platform archive integrity, workload/platform/upstream controller digests, and the actual cluster/OIDC/model/tool verification. A contract-only connector fixture or package build is not production runtime acceptance.
 
-`packages/multi-tenant/cell-release.json` records the fixed runtime, Connector, DSH and platform version. Null images and `source-candidate` explicitly mean publication is pending. Never substitute old standalone images just because they are already public. `runtime-manifest.json` belongs to the retained historical SDK and is not the Cell CLI's release identity.
-
-## Fixed dependency boundary
-
-Current DSH: `0.1.5-rc.2` at `fb2c4b9e698e30edb738bca4cf0618587db7d203`. Release Cell/Operator images must be publicly pullable and fixed by digest; deploy the platform image by digest as well. A bound manifest may be checked again with the same inputs, but cannot silently accept another release tag or image pair. Changing the combination is an explicit new iteration, with affected-flow validation and no historical compatibility obligation. Candidate null digests mean unpublished; they never enable fallback to an old public image.
-
-## Before authorized publication
-
-1. Select a new explicit candidate version/combination and review its changes. Merge runtime provider changes before platform consumers, record Connector source and image identities, and keep Issue #82 as the integration record. Existing published versions are never overwritten; a documentation merge alone does not publish a new package.
-2. Run `pnpm release:check`. This includes the packed npm consumer check and platform tests. Use the [regression report](../evidence/cell-regression-2026-09-20.md) for unchanged core behavior, plus [delivery verification](../evidence/alpha-delivery-2026-09-20.md) for this package. Do not substitute old standalone installation gates for integrated acceptance.
-3. Obtain the accepted **public** Cell and Operator digests for the manifest's runtime source/DSH combination. Publication is blocked until those artifacts exist and can be fetched anonymously. Review the runtime release manifest against the fixed source and images. A public repository alone does not make GHCR images public.
-4. Dispatch the manual `Publish package` workflow on the reviewed main commit with that runtime release tag and its exact public image digests. Binding rejects source/DSH/image disagreement and anonymous image lookup failures. The workflow no longer builds the old platform-owned DSH runtime image.
-5. The workflow packs/checks the Cell entry points, publishes via npm Trusted Publishing to `latest`, verifies exact registry version/tag and creates a matching GitHub Release marked Latest. No npm publish or moving tag is performed by local checks or PR creation.
-6. Preserve and attach the original workflow tarball, `cell-release.json`, `npm-publication.json` (exact package version, source commit and observed registry integrity), and checksums to the matching GitHub Release. The current platform workflow retains the tarball as an Actions artifact; it does not automatically create these Release attachments. Compare existing attachments and never replace different bytes. Verify anonymous download and the package integrity; the 0.9.0-alpha.1 attachments were recorded separately after publication.
-7. On a clean consumer, install the exact published package, build the platform container using `integration/distribution/Dockerfile`, record its digest and follow [startup](quickstart.md). Save the final versions, digests and narrow installation result to Issue #82 before inviting users. Source-level regression is not proof that a public artifact has been installed.
-
-No cluster installer, macOS matrix, upgrade compatibility, HA, migration or recovery guarantees are added. Both npm projects use latest for future authorized releases; runtime npm 0.3.0-alpha.1 supplies the pinned Cell release/deployment manifests, while the platform npm runs the OIDC/user server. The historical 0.2 standalone launcher is not the current runtime entry.
+After separate user publication authorization, define a new release job against the exact reviewed candidate and actual image identities. Do not resurrect deleted legacy gates or follow floating latest. There is no supported Alpha migration, backup/restore or disaster-recovery promise in this MVP.

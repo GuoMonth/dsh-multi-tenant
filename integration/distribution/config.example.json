@@ -1,55 +1,17 @@
 {
-  "host": "0.0.0.0",
-  "port": 8080,
-  "kubernetes": {
-    "server": "https://kubernetes.default.svc",
-    "caFile": "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-    "tokenFile": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  "runtime": {
+    "kubernetes": {"server":"https://kubernetes.default.svc","caFile":"/var/run/secrets/kubernetes.io/serviceaccount/ca.crt","tokenFile":"/var/run/secrets/kubernetes.io/serviceaccount/token"},
+    "namespacePrefix":"dsh-user",
+    "domain":"environments.example.test",
+    "image":"local/dsh@sha256:REPLACE_WITH_REVIEWED_WORKLOAD_DIGEST",
+    "storage":{"size":"10Gi","storageClassName":"local-path"},
+    "resources":{"requests":{"cpu":"100m","memory":"512Mi"},"limits":{"cpu":"2","memory":"2Gi"}},
+    "platformNamespace":"dsh-platform"
   },
-  "allocation": {
-    "namespaces": {
-      "tenant-a": "tenant-a"
-    },
-    "domain": "REPLACE_SITE_DOMAIN",
-    "profiles": [
-      {
-        "template": "approved-v1",
-        "expectedSpec": {
-          "REPLACE": "API-defaulted approved Cell spec"
-        },
-        "expectedPodSpec": {
-          "REPLACE": "API-defaulted approved StatefulSet Pod spec"
-        }
-      }
-    ]
-  },
-  "stateFile": "/private/state.sqlite",
-  "adminSocket": "/private/admin.sock",
-  "environments": [
-    {
-      "id": "alice-main",
-      "owner": {
-        "tenantId": "tenant-a",
-        "principalId": "alice"
-      },
-      "template": "approved-v1"
-    }
-  ],
-  "members": [
-    {
-      "issuer": "https://REPLACE_ISSUER",
-      "subject": "REPLACE_VERIFIED_SUBJECT",
-      "owner": {
-        "tenantId": "tenant-a",
-        "principalId": "alice"
-      }
-    }
-  ],
-  "oidc": {
-    "issuer": "https://REPLACE_ISSUER",
-    "clientId": "REPLACE_CLIENT_ID",
-    "clientSecretFile": "/private/client-secret",
-    "platformOrigin": "https://REPLACE_PLATFORM_HOST",
-    "siteDomain": "REPLACE_SITE_DOMAIN"
-  }
+  "stateFile":"/private/state.sqlite",
+  "adminSocket":"/private/admin.sock",
+  "oidc":{"issuer":"https://id.example.test","clientId":"dsh-platform","clientSecretFile":"/secrets/oidc-client-secret","platformOrigin":"https://platform.example.test","siteDomain":"example.test"},
+  "members":[{"issuer":"https://id.example.test","subject":"REPLACE_WITH_AUTHORIZED_SUBJECT","owner":{"tenantId":"team","principalId":"alice"}}],
+  "host":"0.0.0.0",
+  "port":8080
 }

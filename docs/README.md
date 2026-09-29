@@ -1,21 +1,15 @@
 # Documentation map
 
-Direction: Kubernetes-only AgentEnvironment. Current implementation and published artifacts still use Cell; the next contract is not an implementation claim. Start with the row that matches the task; archived standalone/SDK plans are not current deployment requirements.
+The current source candidate is Kubernetes-only AgentEnvironment on DSH RC2. Acceptance and mutable progress belong to [MVP #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104); a source change or local fixture does not prove combined deployment.
 
-| Task | Current source |
+| Task | Source |
 | --- | --- |
-| Principles and boundaries | [Constitution](../CONSTITUTION.md) |
-| Alpha MVP scope and deferred enterprise targets | [Product scope](design/enterprise-positioning.zh-CN.md) |
-| RC2 implementation waves and acceptance gates | [MVP execution plan](plans/mvp-rc2.zh-CN.md) |
-| Roadmap and cross-repository ownership | [W1–W3 slices](roadmap.md) |
-| Status / acceptance | [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104); completed Cell baseline: [#82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) |
-| Install the currently published Cell alpha | [Startup](reference/quickstart.md), [中文入口](reference/quickstart.zh-CN.md), [package AI guide](../packages/multi-tenant/AI.md) |
-| Product architecture | [AgentEnvironment contract](design/agent-environment.zh-CN.md), [agent-sandbox evaluation](design/agent-sandbox-evaluation.zh-CN.md), [adversarial review](evidence/agent-workspace-review-2026-09-22.md), current Cell [S0 implementation boundary](design/s0-runtime-architecture.zh-CN.md), [proxy choice](design/proxy-choice.zh-CN.md) |
-| Current implementation | [Assembly](design/r2-platform-assembly.md), [OIDC](design/r4-oidc.md), [allocation](design/r5-allocation.md), [deletion](design/r6-deletion.md) |
-| Development / release | [Contributing](../CONTRIBUTING.md), [release runbook](reference/release.md) |
-| Evidence for the existing fixed combination | [Core regression](evidence/cell-regression-2026-09-20.md), [prepublication package checks](evidence/alpha-delivery-2026-09-20.md), [repeatable fixtures](../integration/regression/README.md) |
-| Upstream version | [Pinned DSH source](../scripts/dsh-target.mjs) |
+| Principles | [Constitution](../CONSTITUTION.md) |
+| Candidate operation | [English README](../README.md), [中文 README](../README.zh-CN.md), [quickstart](reference/quickstart.md), [AI guide](../packages/multi-tenant/AI.md) |
+| Implementation waves and ownership | [MVP plan](plans/mvp-rc2.zh-CN.md) |
+| Architecture direction | [AgentEnvironment](design/agent-environment.zh-CN.md) |
+| Platform implementation | [Bindings](../packages/multi-tenant/src/platform/bindings.ts), [control](../packages/multi-tenant/src/platform/control.ts), [OIDC](../packages/multi-tenant/src/platform/oidc.ts) |
+| Development and publication boundary | [Contributing](../CONTRIBUTING.md), [release runbook](reference/release.md) |
+| Exact dependency identities | [DSH pin](../scripts/dsh-target.mjs), [connector pin](../vendor/environment-connector.json) |
 
-`design/` explains current decisions and implementation; Issues own mutable task state. `releases/` and `evidence/` describe the artifacts and checks at their recorded dates, not every future commit. Published versions remain immutable. The fixed-template candidate has a separate [2026-09-22 acceptance record](evidence/cell-mvp-2026-09-22.md); it does not change the previously published artifacts.
-
-Older standalone/Docker and SDK documents live in `archive/` (including the [SDK compatibility history](archive/legacy-sdk/compatibility.md)). Use them only for historical versions or source investigations. They do not add macOS, snapshot, migration, HA or old transport/capability tasks to the current POC. Dependency/security defects are tracked separately from product scope.
+Cell/S0, r2–r6, old standalone/Docker and published-release records describe their dated versions only. They are not current executable paths, installation requirements, or proof that RC2 has passed E2E. Keep those historical artifacts immutable; no migration or old-Alpha export project is part of this candidate.
