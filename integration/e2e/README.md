@@ -15,7 +15,7 @@ E_NAMESPACE=dsh-mvp-e-platform-final node integration/e2e/prepare-install.mjs
 # prepare-install writes only private values/kubeconfig, test Secrets, and the
 # one local issuer DNS entry in this dedicated cluster. It saves original DNS once.
 export E_NAMESPACE=dsh-mvp-e-platform-final E_NODE_ADDRESS=192.168.64.2
-export E_PLATFORM_IMAGE=docker.io/library/dsh-mvp-rc2@sha256:f9c2b6975909f4ba0f61b7c352232e9a5c553361158e710a5a7bd3bc693d3967
+export E_PLATFORM_IMAGE=docker.io/library/dsh-mvp-rc2@sha256:51a70c4aadf107813b37c51b3a6dd6a760c2a275a3f56c52d672671c959736f2
 bash integration/e2e/install-reference.sh preflight
 bash integration/e2e/install-reference.sh install
 # PLAYWRIGHT_MODULE may point to an isolated installed playwright module.

@@ -9,11 +9,12 @@ E followed D's installation documentation as a second operator on the dedicated 
 | Runtime merged source | `7f762c6c3cdf6bba6970cf2f08cc7d23c580c6a2` (runtime PR106); no E runtime changes |
 | Connector source | `286a68d3ae592fc1ab6193297b79f5fdc9964a3b` |
 | Platform installation baseline | `47c43e93e708c191a92b3e3c97ce32cc4f5cd2ff` (C/D merged) |
+| Final package source | `af88e61eac941252340093e48f41cd515a2eccf0` (clean committed package inputs) |
 | E executable/chart fixes | `9ece200c3f13329e1c91be7ffad6e274dba84924` |
 | DSH | npm `0.2.0-rc.2`, source `639ed015397290b3745d163aafe02ffee4aa3f84` |
 | Upstream core | v1.0.3, `registry.k8s.io/agent-sandbox/agent-sandbox-controller@sha256:b2160ee08dd4f2285b382d4b5073948891adfacbc9808a4ba9cf247766243c8c` |
 | Workload | `docker.io/library/dsh-mvp-rc2@sha256:338d50f33680b8b1e10c6691596118e2273e48f084a609ea2734143c54a5feff` |
-| Final platform | `docker.io/library/dsh-mvp-rc2@sha256:f9c2b6975909f4ba0f61b7c352232e9a5c553361158e710a5a7bd3bc693d3967` |
+| Final platform | `docker.io/library/dsh-mvp-rc2@sha256:51a70c4aadf107813b37c51b3a6dd6a760c2a275a3f56c52d672671c959736f2` |
 | Actual joint-flow platform | `docker.io/library/dsh-mvp-rc2@sha256:b04b47aa9ccab958801335cdd56b9a003272dde67a7dc7c53dbb6fe1f2d2346c` |
 | Fixture ingress | Traefik v3.7.13, `docker.io/library/traefik@sha256:3429c14149401de2ac82fc72ddc6a92642332b90deb3012301ff211b9d2d0f18` |
 | Fixture IdP | Dex v2.45.1, `ghcr.io/dexidp/dex@sha256:f5f9fb373188b0f701b80edd68b3f4745ced69306c9d382999f11b7774335a98` |
@@ -21,12 +22,12 @@ E followed D's installation documentation as a second operator on the dedicated 
 
 All image identities above are Linux/amd64 manifest digests, not the local Docker multi-platform/attestation index. Product images remain local/imported into kind. Workload retains A's proven one-line settings patch; E did not change its protocol or launcher.
 
-The final platform repack differs from the full-flow package only in `dist/oidc-CUqe0Cxg.mjs.map`, incorporating a source comment explaining the form policy. Extracted executable files are byte-identical. Final image rollout and real OIDC/native HTTP access were rechecked; unchanged lifecycle tests were not repeated for a sourcemap-only change.
+The final platform repack differs from the full-flow package only in the two package READMEs, AI guide, and `dist/oidc-CUqe0Cxg.mjs.map` (a source comment explaining the form policy). Extracted executable files are byte-identical. Final image rollout and real OIDC/native HTTP access were rechecked; unchanged lifecycle tests were not repeated for documentation/sourcemap-only changes.
 
 | Local tarball | SHA256 / npm integrity |
 | --- | --- |
 | Connector `0.0.0-rc.2` | `d2d22257c69f1f87e3ca982557530a1133cb7abfa7c94cc9719f84837222224c` / `sha512-91yvF4rleoFOFcK+CCJwLDi/zeOOQPpcTr8ANb9dPsOnSgvMSUZjgxlblxlVCmQOGzkFz1jD9csTwI6fhWfLNA==` |
-| Final platform `0.10.0-alpha.1` | `4235f3e4ec70c996bf91c05db6fe5c83f34a5520d6f1df039f3dea7376692ade` / `sha512-zm6pMkrxjyLEba9W3tIfdOdhPbQbk/k9XjXZbKSTXyEwPoIhf25+Fh2zvujSDmQcdV+YmuiT6kA7KdYTLT4E0g==` |
+| Final platform `0.10.0-alpha.1` | `bbe874870786de7612e51d9d57fc9603830e82fd5ce63f70df295b3fb8393426` / `sha512-Z5seb1pjMhRYno5e8GWptdwrt2NtYvh0eJo4Rur8rPAKeJg06pg9wQ2uwLSXLEV/90JAKuynjJzkKyG3WQSDyw==` |
 | Full-flow platform `0.10.0-alpha.1` | `5e0a1d09385503c611c0a5afa452d559b25965f230225c0bab750d61a6fd8c24` / `sha512-xMDYQ972lTjgmCUSaX//mQnZqT4UKWKoqpvWSXrL+s8udrQ6K/u9SAIRWVvyX6HbivRq9Qz+4uedKNPGsRU2Dg==` |
 
 ## Actual installation findings
