@@ -47,7 +47,8 @@ core apply/等待、Helm真实安装均须 E 在其独占集群阶段验证。�
 平台初启、用户 Pod 供应、Ingress HTTP/WS、实际 Secret/PVC权限、两用户OIDC、真实模型或工具授权证据。
 以上属于 #106/#111 的联合验收，不因离线检查通过而关闭。
 
-入口使用明确 kubeconfig/context，拒绝 fixture、已有控制 PVC/平台绑定和非参考 K8s1.37。
+入口使用明确 kubeconfig/context，拒绝 fixture、已有控制 PVC/平台绑定；K8s1.37 是参考验证版本，
+不把其他未验证 minor 作为无依据的安装硬门槛。
 未发布公网候选时仅消费 E 已导入的本地镜像。安装失败保留现场，卸载保留用户卷和平台控制 PVC；
 不承诺自动恢复、升级、备份或HA。没有 npm publish、推公网产品镜像、创建Release或自行merge。
 

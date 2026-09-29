@@ -8,7 +8,7 @@ DSH 固定 `0.2.0-rc.2` / `639ed015397290b3745d163aafe02ffee4aa3f84`。
 
 ## 前提
 
-- 已有 Linux/amd64 Kubernetes 1.37，支持 NetworkPolicy 的 CNI、动态供应的 StorageClass，
+- 已有 Linux/amd64 Kubernetes，支持 NetworkPolicy 的 CNI、动态供应的 StorageClass，
   已安装 Ingress controller。参考环境为 Kubernetes 1.37、Calico 3.32.2、local-path。
   不安装集群、CNI 或 Ingress controller。Ingress controller 必须透明保留 Host、
   支持 HTTP/WebSocket，TLS 终止后转发到平台 8080，公网 HTTP 必须关闭或重定向到 HTTPS；

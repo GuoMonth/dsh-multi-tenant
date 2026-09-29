@@ -88,8 +88,6 @@ export async function main(args) {
   const { config, pod, ingress, secret } = target;
   // All checks precede any write. Only fixed, redacted diagnostics leave this process.
   get('namespace', namespace);
-  const version = JSON.parse(k('version', '-o', 'json')).serverVersion;
-  if (version.major !== '1' || !/^37(?:\D|$)/.test(version.minor)) throw new Error('Reference installation requires Kubernetes 1.37; other versions are unverified');
   get('storageclass', config.runtime.storage.storageClassName);
   get('ingressclass', ingress.spec.ingressClassName);
   const nodes = get('nodes').items;
