@@ -72,7 +72,8 @@ function page(response: ServerResponse, body: string) {
   response.writeHead(200, {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
-    "referrer-policy": "no-referrer",
+    // Keep browser form POST Origin for CSRF; suppress cross-origin referrers.
+    "referrer-policy": "same-origin",
     "content-security-policy":
       "default-src 'none'; form-action 'self'; frame-ancestors 'none'",
   });

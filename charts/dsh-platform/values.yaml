@@ -9,6 +9,9 @@ oidc:
   clientId: ""
   secretName: ""
   secretKey: client-secret
+  # Optional trust anchor for a private HTTPS issuer; never disables verification.
+  caSecretName: ""
+  caSecretKey: ca.crt
 members: []
 storageClassName: ""
 storageSize: 10Gi
