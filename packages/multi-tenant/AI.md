@@ -6,6 +6,8 @@ Prerequisites, the published configuration template, startup and operational lim
 
 `cell-release.json` records the runtime/DSH/Connector combination. `source-candidate` with null image digests indicates an unpublished candidate only; the published 0.9.0-alpha.1 package is bound to the fixed public Cell/Operator images in its release manifest. npm `latest` is an installation channel, not a compatibility or stability promise.
 
+**Product direction:** persistent AI workspaces for internal enterprise deployment, targeting up to 50,000 members and 5,000 concurrent online users. Favor simple setup, manageable access and recoverable data over millisecond startup. These are targets, not current Alpha guarantees; see [enterprise positioning](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/enterprise-positioning.zh-CN.md).
+
 ## Runtime direction and session terms
 
 The product direction is Kubernetes-only. AgentEnvironment is the product concept; the [local trial](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md) selected upstream `agent-sandbox` core for W1, without a second CRD or controller. Process and Docker runtime backends are not supported alternatives. Existing Cell and legacy provider source remains in this branch until the planned W1 cleanup. The current candidate still uses Cell; the upstream integration is validated only as a test adapter; production adoption remains W1 work. See [AgentEnvironment design](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-environment.zh-CN.md) and [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104). This direction does not disable OCI image builds or subprocesses running inside a workspace.

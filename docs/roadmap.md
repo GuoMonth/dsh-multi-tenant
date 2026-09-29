@@ -1,8 +1,10 @@
-# Kubernetes AgentEnvironment roadmap
+# 企业持久 AI 工作环境路线图
+
+目标人群与取舍见[企业定位](design/enterprise-positioning.zh-CN.md)：一般不超过 5 万成员、最多 5000 在线，低配置成本与数据保障优先，允许秒级启动。规模与恢复是待验收目标。
 
 当前主线 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。唯一产品后端为 Kubernetes；以一个用户工作环境聚合计算、存储和访问资源。设计裁决见 [AgentEnvironment](design/agent-environment.zh-CN.md)，共同原则见[宪法](../CONSTITUTION.md)。
 
-## 三轮交付
+## 保留技术切片，增加企业交付
 
 | 切片 | 边界 | 主记录 |
 | --- | --- | --- |
@@ -12,7 +14,9 @@
 
 上游有限接入已通过，正式采用目标已确定；[本地证据](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md)不代表生产W1/W2/W3已完成。W1两侧可并行删旧路径；runtime提供精确候选，平台固定消费，再执行W2/W3。每片提供源码/产物证据；文档完成不等于代码删除、休眠实现或发行完成。边界测试随相应风险执行，集中联合回归在组合就绪后进行，不重复旧后端矩阵。
 
-Pod内子进程、OCI镜像构建和kind底座继续可用。自动idle、热池、备份/恢复、多环境/共享工作区、HA/多集群、其他后端、任意工具兼容和迁移均不在本轮；不为它们预留CRD字段。
+Pod内子进程、OCI镜像构建和kind底座继续可用。热池、自动idle、内存恢复、多集群、其他后端和任意工具兼容暂缓；不自研调度器、备份引擎或通用安装平台。
+
+企业交付补充三项：[#111](https://github.com/GuoMonth/dsh-multi-tenant/issues/111) 一套安装路径/按需开通，[#112](https://github.com/GuoMonth/dsh-multi-tenant/issues/112) 数据恢复/受控升级，[#113](https://github.com/GuoMonth/dsh-multi-tenant/issues/113) 容量/过载验证。设计可与W1并行，联合验收依赖真实候选。W3仅完成有限Alpha；企业主线需补充门槛验收后才能关闭，不把Alpha直接标为5000在线企业版本。旧Issue保留并修订，不重新开一套相同任务。
 
 ## 已完成基线与未发布事实
 

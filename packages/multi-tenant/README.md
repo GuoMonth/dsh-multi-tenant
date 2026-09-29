@@ -1,5 +1,7 @@
 # dsh-multi-tenant
 
+**Product direction:** persistent AI workspaces for internal enterprise deployment, targeting up to 50,000 members and 5,000 concurrent online users. Favor simple setup, manageable access and recoverable data over millisecond startup. These are targets, not current Alpha guarantees; see [enterprise positioning](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/enterprise-positioning.zh-CN.md).
+
 OIDC, membership authorization and native DSH access, with a Kubernetes AgentEnvironment for each user. The current tested runtime implements that workspace as a Cell from [dsh-isolated-runtime](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/README.md).
 
 [中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/README.zh-CN.md)
@@ -10,7 +12,7 @@ OIDC, membership authorization and native DSH access, with a Kubernetes AgentEnv
 
 DSH is exactly **0.1.5-rc.2**, source **`fb2c4b9e698e30edb738bca4cf0618587db7d203`**. Each release locks the publicly pullable Cell and Operator images by `@sha256` digest, with matching runtime source and DSH identity in `cell-release.json` (platform) / `release.json` (runtime). Pin the deployed platform image by digest too. npm `latest` selects a package at installation; it does not authorize moving image tags or a DSH version range at runtime.
 
-Breaking updates are allowed: publish a new explicit combination, update configuration/state expectations as needed and validate the affected flow. No compatibility shim, historical upgrade or migration promise is required. Published artifact identities stay immutable. The public runtime pair is locked to [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1), Linux/amd64. Exact digests are in the [release manifest](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/cell-release.json). Null digests block publication.
+Breaking updates are allowed: publish a new explicit combination, update configuration/state expectations as needed and validate the affected flow. The published Alpha has no general historical upgrade guarantee. Future enterprise releases must validate supported upgrade pairs and data preservation; arbitrary-version compatibility is not promised. Published artifact identities stay immutable. The public runtime pair is locked to [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1), Linux/amd64. Exact digests are in the [release manifest](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/cell-release.json). Null digests block publication.
 
 
 ## Start
