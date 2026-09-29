@@ -1,3 +1,5 @@
+> Current MVP: DSH 0.2.0-rc.2 is the implementation target, not yet a shipped baseline. One PVC per user; fixed workspace/home/dsh directories. Breaking Alpha changes are permitted without legacy compatibility or migration. Enterprise backup/upgrade and scale gates are deferred. See the [execution plan](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/plans/mvp-rc2.zh-CN.md).
+
 # AgentEnvironment alpha operating guide
 
 Use `dsh-multi-tenant --help`. The published platform package is `0.9.0-alpha.1`, requires Node 24+, and starts with `start --config /private/config.json`. The runtime release is `0.3.0-alpha.1`; `release` prints the fixed image/version data and `manifests` prints the pinned Operator/CRD/RBAC YAML. Review and apply those resources as an administrator. Neither npm command creates a cluster.
@@ -6,7 +8,7 @@ Prerequisites, the published configuration template, startup and operational lim
 
 `cell-release.json` records the runtime/DSH/Connector combination. `source-candidate` with null image digests indicates an unpublished candidate only; the published 0.9.0-alpha.1 package is bound to the fixed public Cell/Operator images in its release manifest. npm `latest` is an installation channel, not a compatibility or stability promise.
 
-**Product direction:** persistent AI workspaces for internal enterprise deployment, targeting up to 50,000 members and 5,000 concurrent online users. Favor simple setup, manageable access and recoverable data over millisecond startup. These are targets, not current Alpha guarantees; see [enterprise positioning](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/enterprise-positioning.zh-CN.md).
+**Product direction:** an open-source Alpha for persistent AI workspaces inside an enterprise. The MVP covers OIDC, native DSH, one PVC per user, explicit stop/start and one installation path. Breaking changes are expected; historical compatibility and migration are out of scope. Enterprise scale, disaster recovery and supported upgrades are deferred; see [product scope](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/enterprise-positioning.zh-CN.md).
 
 ## Runtime direction and session terms
 

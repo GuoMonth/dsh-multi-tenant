@@ -5,7 +5,8 @@ Direction: Kubernetes-only AgentEnvironment. Current implementation and publishe
 | Task | Current source |
 | --- | --- |
 | Principles and boundaries | [Constitution](../CONSTITUTION.md) |
-| Audience, usability, data protection and scale targets | [Enterprise positioning](design/enterprise-positioning.zh-CN.md) — target requirements, not current Alpha guarantees |
+| Alpha MVP scope and deferred enterprise targets | [Product scope](design/enterprise-positioning.zh-CN.md) |
+| RC2 implementation waves and acceptance gates | [MVP execution plan](plans/mvp-rc2.zh-CN.md) |
 | Roadmap and cross-repository ownership | [W1–W3 slices](roadmap.md) |
 | Status / acceptance | [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104); completed Cell baseline: [#82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82) |
 | Install the currently published Cell alpha | [Startup](reference/quickstart.md), [中文入口](reference/quickstart.zh-CN.md), [package AI guide](../packages/multi-tenant/AI.md) |

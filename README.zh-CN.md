@@ -1,6 +1,6 @@
 # dsh-multi-tenant
 
-**产品定位：**面向企业内网的持久 AI 工作环境，目标为一般不超过 5 万成员、最多 5000 同时在线。优先简单配置、易于控制和数据可恢复，接受秒级启动。上述是目标而非当前 Alpha 能力，详见[企业定位](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/enterprise-positioning.zh-CN.md)。
+**产品定位：**开源 Alpha 阶段的企业内网持久 AI 工作环境。首版聚焦 OIDC 登录、原生 DSH、每用户单 PVC、显式启停与一条安装路径；允许破坏性变更，不维护旧版本兼容或迁移。企业规模、灾备和受支持升级后置，详见[产品边界](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/enterprise-positioning.zh-CN.md)。
 
 OIDC 多租户平台：负责登录、成员授权和原生 DSH 访问，为每位用户提供 Kubernetes AgentEnvironment。当前已测试的运行时以 [dsh-isolated-runtime](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/README.zh-CN.md) 的 Cell 实现该 Workspace。
 
@@ -12,7 +12,7 @@ OIDC 多租户平台：负责登录、成员授权和原生 DSH 访问，为每�
 
 依赖的 DSH 明确为 **0.1.5-rc.2**，源码 **`fb2c4b9e698e30edb738bca4cf0618587db7d203`**。每次发行锁定可公开拉取的 Cell、Operator 镜像 `@sha256` digest，并在平台 `cell-release.json` / runtime `release.json` 中记录匹配的运行时源码与 DSH 身份；实际部署的平台镜像也固定 digest。npm `latest` 只用于安装时选择包，不让运行中的镜像标签或 DSH 版本范围漂移。
 
-允许破坏性更新：新迭代明确新的固定组合，按需修改配置/状态要求并验证受影响链路，已发布 Alpha 不承诺通用历史迁移；未来企业版本必须验证支持的升级组合与数据保全，不承诺任意版本兼容。已发布制品身份不改写。已锁定公开运行时 [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1)，架构 Linux/amd64；精确 digest 见[发行清单](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/cell-release.json)。空 digest 仍会阻止发布。
+允许破坏性更新：新迭代明确新的固定组合，按需修改配置/状态要求并验证受影响链路，已发布 Alpha 不承诺通用历史迁移；本轮不开发旧版本升级、迁移或兼容层。已发布制品身份不改写。已锁定公开运行时 [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1)，架构 Linux/amd64；精确 digest 见[发行清单](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/cell-release.json)。空 digest 仍会阻止发布。
 
 
 ## 启动

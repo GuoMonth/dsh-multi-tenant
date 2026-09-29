@@ -1,22 +1,14 @@
-# 企业持久 AI 工作环境路线图
+# 开源 Alpha MVP 路线图
 
-目标人群与取舍见[企业定位](design/enterprise-positioning.zh-CN.md)：一般不超过 5 万成员、最多 5000 在线，低配置成本与数据保障优先，允许秒级启动。规模与恢复是待验收目标。
+当前目标：固定 DSH `0.2.0-rc.2`，单 PVC、原生 DSH、企业 OIDC、正常启停与简单安装。允许破坏性变更，不维护历史兼容或迁移。范围见 [定位](design/enterprise-positioning.zh-CN.md)，任务入口为 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)，具体分工与验收门见 [执行计划](plans/mvp-rc2.zh-CN.md)。
 
-当前主线 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。唯一产品后端为 Kubernetes；以一个用户工作环境聚合计算、存储和访问资源。设计裁决见 [AgentEnvironment](design/agent-environment.zh-CN.md)，共同原则见[宪法](../CONSTITUTION.md)。
-
-## 保留技术切片，增加企业交付
-
-| 切片 | 边界 | 主记录 |
+| 波次 | 工作 | 放行条件 |
 | --- | --- | --- |
-| W1 删除与统一 | 依据已通过的 runtime [#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)采用上游core Sandbox/Pod，删除自有Cell CRD/Operator/STS控制路径；AgentEnvironment统一产品词汇；删除Process/Docker产品后端、standalone第二认证链、snapshot/restore活跃代码及对应导出/打包/门禁；不套同义CRD，不提前重命名可能删除的自有Kind | runtime [#97](https://github.com/GuoMonth/dsh-isolated-runtime/issues/97)，平台 [#105](https://github.com/GuoMonth/dsh-multi-tenant/issues/105) |
-| W2 显式启停 | AgentEnvironment/PVC身份不变、Pod运行或停止；后台任务停止语义、原卷校验、并发、错误诊断和访问撤销 | runtime [#98](https://github.com/GuoMonth/dsh-isolated-runtime/issues/98)，两仓库协同 |
-| W3 工具与联合内测发行 | 持久HOME和真实MCP/CLI授权；两用户回归；性能/资源测量；公开镜像及配套npm/DSH，第二操作者安装 | 平台 [#106](https://github.com/GuoMonth/dsh-multi-tenant/issues/106) |
+| A：单负责人 | RC 兼容薄层、固定目录与跨仓库契约 | 真实 RC 最小链路通过，双方契约/制品候选固定 |
+| B/C/D：最多三路 | runtime W1/W2；平台接入；安装路径 | 按文件所有权独立交付，各自测试通过 |
+| E：单负责人收口 | 固定组合、两用户与真实工具、安装、文档和发行准备 | 联合证据通过，发布制品待授权发布 |
 
-上游有限接入已通过，正式采用目标已确定；[本地证据](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md)不代表生产W1/W2/W3已完成。W1两侧可并行删旧路径；runtime提供精确候选，平台固定消费，再执行W2/W3。每片提供源码/产物证据；文档完成不等于代码删除、休眠实现或发行完成。边界测试随相应风险执行，集中联合回归在组合就绪后进行，不重复旧后端矩阵。
-
-Pod内子进程、OCI镜像构建和kind底座继续可用。热池、自动idle、内存恢复、多集群、其他后端和任意工具兼容暂缓；不自研调度器、备份引擎或通用安装平台。
-
-企业交付补充三项：[#111](https://github.com/GuoMonth/dsh-multi-tenant/issues/111) 一套安装路径/按需开通，[#112](https://github.com/GuoMonth/dsh-multi-tenant/issues/112) 数据恢复/受控升级，[#113](https://github.com/GuoMonth/dsh-multi-tenant/issues/113) 容量/过载验证。设计可与W1并行，联合验收依赖真实候选。W3仅完成有限Alpha；企业主线需补充门槛验收后才能关闭，不把Alpha直接标为5000在线企业版本。旧Issue保留并修订，不重新开一套相同任务。
+沿用 runtime #97/#98、平台 #105/#106/#111；不新建重复需求 Issue。#112 数据恢复/升级与 #113 企业规模是后续增强，不阻塞 MVP。W3 与 #111 共用第二操作者安装证据。既有 PR 只承载准备文档，不代表实现完成。
 
 ## 已完成基线与未发布事实
 
