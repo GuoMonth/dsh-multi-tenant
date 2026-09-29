@@ -1,6 +1,6 @@
 # AgentEnvironment：Kubernetes 单后端架构裁决
 
-2026-09-29 对齐[企业持久 AI 工作环境定位](enterprise-positioning.zh-CN.md)。主线 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。本文是目标契约，不是新能力已实现或已发行的声明。现有 `Cell` 候选和 [9 月 22 日回归](../evidence/cell-mvp-2026-09-22.md)保持其原有范围。数据保障与低配置成本优先，接受秒级启动；首版安装见 #111；恢复/升级 #112 和目标规模 #113 后置，不阻塞 MVP。开源 Alpha 直接破坏性变更，不维护旧接口或迁移路径；固定基线与开发波次见 [MVP 计划](../plans/mvp-rc2.zh-CN.md)。
+2026-09-29：本文定义当前 Kubernetes 单后端契约。主线 [#104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104) 已完成；已发行组合与实测边界见 [v0.10.0-alpha.1 验证报告](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.10.0-alpha.1/validation.md)。安装见 [quickstart](../reference/quickstart.md)。恢复/升级 #112 和目标规模 #113 后置；开源 Alpha 不维护旧接口或迁移路径。设计约束不代替实现和测试证据。
 
 ## 1. 决策与反方
 
@@ -10,7 +10,7 @@
 
 需要保留的是稳定资源身份与唯一生命周期控制者。[本地真实接入验证](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md)已通过，runtime [#100](https://github.com/GuoMonth/dsh-isolated-runtime/issues/100)选定 **上游 agent-sandbox core**：AgentEnvironment 直接映射 `Sandbox`，上游控制器管理普通 Pod/Service；runtime 负责固定模板、外部单个用户 PVC、安全策略和连接核验。不再套同义 AgentEnvironment CRD，不 fork 上游，不运行两个控制器管理同一工作负载。
 
-**选型已完成，正式实现尚未完成。** W1 删除自有 Cell CRD/Operator/StatefulSet 控制路径，保留现有 launcher/传输并实现生产适配。当前代码仍是 Cell，测试脚本不代表生产 Connector、停止证据持久化或平台并发已交付；W2/W3 继续承担相应验收。无需先重命名随后要删除的 Kind。
+**生产适配与联合验收已完成。** 当前实现使用上游 Sandbox、固定模板、单 PVC 和同进程 Connector；已删除自有 Cell 控制路径。正常停止证据、未知停止拒绝恢复、平台并发与双用户链路的实测范围见发行验证报告。
 
 下面描述产品契约；产品 `Running/Stopped` 映射上游 `Running/Suspended`，但观察状态不能直接照抄。不要把单 Pod 期望误写为任何故障下物理上绝无第二进程。不开放任意 PodSpec/YAML 上传、插件系统、模板 CRD 或第二调度器。
 
