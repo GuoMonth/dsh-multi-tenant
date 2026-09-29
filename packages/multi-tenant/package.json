@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant",
   "version": "0.10.0-alpha.1",
-  "description": "OIDC multi-tenant platform for the DSH Kubernetes Cell MVP",
+  "description": "OIDC platform for persistent DSH Kubernetes environments",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
   "repository": {
@@ -25,24 +25,15 @@
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
-    },
-    "./native/runtime-control.mjs": "./src/native/runtime-control.mjs"
+    }
   },
   "files": [
     "dist",
-    "src/native/runtime-control.mjs",
     "README.md",
     "README.zh-CN.md",
     "LICENSE",
-    "examples",
-    "CHANGELOG.md",
-    "runtime",
-    "src/native/tcp-relay.mjs",
-    "experience",
-    "runtime-manifest.json",
     "AI.md",
-    "THIRD_PARTY_NOTICES",
-    "cell-release.json"
+    "THIRD_PARTY_NOTICES"
   ],
   "keywords": [
     "deepseek-harness",
@@ -63,14 +54,13 @@
     "vitest": "^4.1.8",
     "ws": "8.18.3",
     "@types/ws": "8.18.1",
-    "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2.tgz"
+    "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz",
+    "openid-client": "6.8.8"
   },
   "scripts": {
-    "build": "npm ci --ignore-scripts --prefix ../../integration/cell-platform && tsdown",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts",
-    "prepare": "npm ci --ignore-scripts --prefix ../../integration/cell-platform && tsdown",
-    "prepublishOnly": "node ../../scripts/verify-cell-publication.mjs"
+    "test": "vitest run --config vitest.config.ts"
   },
   "dshRuntime": {
     "version": "0.2.0-rc.2",

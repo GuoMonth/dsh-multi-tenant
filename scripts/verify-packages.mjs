@@ -1,35 +1,42 @@
-#!/usr/bin/env node
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { join } from 'node:path'
-
-const root = fileURLToPath(new URL('..', import.meta.url))
-const errors = []
-const names = []
-
-for (const directory of readdirSync(join(root, 'packages'))) {
-  const manifest = join(root, 'packages', directory, 'package.json')
-  if (!existsSync(manifest)) continue
-  let pkg
-  try {
-    pkg = JSON.parse(readFileSync(manifest, 'utf8'))
-  } catch {
-    errors.push(`packages/${directory}: missing or invalid package.json`)
-    continue
-  }
-  names.push(pkg.name ?? directory)
-  for (const script of ['build', 'typecheck', 'test']) {
-    if (typeof pkg.scripts?.[script] !== 'string') errors.push(`${pkg.name}: missing ${script} script`)
-  }
-  if (pkg.private !== true) {
-    if (pkg.main !== 'dist/index.mjs') errors.push(`${pkg.name}: invalid main`)
-    if (pkg.types !== 'dist/index.d.mts') errors.push(`${pkg.name}: invalid types entry`)
-    if (typeof pkg.engines?.node !== 'string') errors.push(`${pkg.name}: missing Node engine`)
-  }
-}
-
-if (errors.length > 0) {
-  console.error(`package verification failed:\n- ${errors.join('\n- ')}`)
-  process.exit(1)
-}
-console.log(`package verification passed (${names.join(', ')})`)
+import { execFileSync } from "node:child_process";
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { DSH_TARGET } from "./dsh-target.mjs";
+const read = (p) => JSON.parse(readFileSync(p, "utf8"));
+const pkg = read("packages/multi-tenant/package.json"),
+  pin = read("vendor/environment-connector.json");
+assert.deepEqual(pkg.dshRuntime, {
+  version: DSH_TARGET.version,
+  commit: DSH_TARGET.commit,
+});
+assert.deepEqual(Object.keys(pkg.exports), ["."]);
+assert.deepEqual(pkg.bin, { "dsh-multi-tenant": "dist/cli.mjs" });
+const archive = readFileSync("vendor/" + pin.artifact);
+assert.equal(createHash("sha256").update(archive).digest("hex"), pin.sha256);
+assert.equal(
+  "sha512-" + createHash("sha512").update(archive).digest("base64"),
+  pin.integrity,
+);
+const source = JSON.parse(
+  execFileSync(
+    "tar",
+    ["-xOf", "vendor/" + pin.artifact, "package/source.json"],
+    { encoding: "utf8" },
+  ),
+);
+assert.equal(source.repository, pin.repository);
+assert.equal(source.commit, pin.commit);
+assert.equal(
+  pkg.devDependencies["@dsh/environment-connector-internal"],
+  "file:../../vendor/" + pin.artifact,
+);
+for (const name of ["README.md", "README.zh-CN.md"])
+  assert.equal(
+    readFileSync(name, "utf8"),
+    readFileSync("packages/multi-tenant/" + name, "utf8"),
+  );
+assert.ok(!readdirSync("vendor").some((n) => n.includes("cell")));
+console.log(
+  "Exact DSH/connector pin, public exports and README copies verified",
+);

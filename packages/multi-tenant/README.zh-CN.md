@@ -1,71 +1,41 @@
-# dsh-multi-tenant
+# DSH 多租户平台
 
-**产品定位：**开源 Alpha 阶段的企业内网持久 AI 工作环境。首版聚焦 OIDC 登录、原生 DSH、每用户单 PVC、显式启停与一条安装路径；允许破坏性变更，不维护旧版本兼容或迁移。企业规模、灾备和受支持升级后置，详见[产品边界](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/enterprise-positioning.zh-CN.md)。
+Alpha OIDC 平台，每个授权用户一个持久 DSH 环境，仅支持 Kubernetes。DSH 提供原生 Web、对话、工具和应用协议；平台负责登录、成员授权、环境绑定和访问撤销。进程内环境 Connector 按固定模板供应上游 agent-sandbox。
 
-OIDC 多租户平台：负责登录、成员授权和原生 DSH 访问，为每位用户提供 Kubernetes AgentEnvironment。当前已测试的运行时以 [dsh-isolated-runtime](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/README.zh-CN.md) 的 Cell 实现该 Workspace。
+本候选固定 **DSH 0.2.0-rc.2**，commit `639ed015397290b3745d163aafe02ffee4aa3f84`，仍在联合验证中，不代表已发布或生产可用。不提供旧 Alpha 状态、Cell、Process、Docker 后端兼容或迁移。新格式使用全新私有平台状态文件；不能通过删除既有数据绕过错误。
 
-[English](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/README.md)
+每个 owner 一个独立 PVC，挂载 `/var/lib/dsh/data`，包含 `workspace/`、`home/`、`dsh/`。CPU/Memory 使用 Kubernetes 原生 requests/limits；存储仅一个申请容量，不承诺目录硬配额。正常启停保留该卷；退出、撤权和关闭平台不会删除用户数据。
 
-**当前为 Cell MVP alpha。** 核心双用户与真实模型回归已通过。版本 `0.9.0-alpha.1` 使用 npm `latest` 通道；latest 是安装通道，不代表稳定版。允许破坏性变更，不承诺历史兼容、升级或无感恢复。
+## 运行候选
 
-## 固定发行边界
+使用 Node 24+ 和已审查的精确平台 tarball。平台须能访问 Kubernetes API 和工作负载网络；前提包括 upstream agent-sandbox core、批准的 runtime RBAC、StorageClass、HTTPS OIDC、平台及环境域名的 TLS/DNS、固定 workload 镜像。安装及联合验证由 [MVP #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104) 跟踪，源码检查不代表安装通过。
 
-依赖的 DSH 明确为 **0.1.5-rc.2**，源码 **`fb2c4b9e698e30edb738bca4cf0618587db7d203`**。每次发行锁定可公开拉取的 Cell、Operator 镜像 `@sha256` digest，并在平台 `cell-release.json` / runtime `release.json` 中记录匹配的运行时源码与 DSH 身份；实际部署的平台镜像也固定 digest。npm `latest` 只用于安装时选择包，不让运行中的镜像标签或 DSH 版本范围漂移。
-
-允许破坏性更新：新迭代明确新的固定组合，按需修改配置/状态要求并验证受影响链路，已发布 Alpha 不承诺通用历史迁移；本轮不开发旧版本升级、迁移或兼容层。已发布制品身份不改写。已锁定公开运行时 [v0.3.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.3.0-alpha.1)，架构 Linux/amd64；精确 digest 见[发行清单](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/packages/multi-tenant/cell-release.json)。空 digest 仍会阻止发布。
-
-
-## 启动
-
-管理员先配置 K8s、平台模式 Cell Operator、OIDC、DNS/TLS、存储和权限。平台需要直接访问 Kubernetes API 与 Cell Pod IP，推荐在集群内运行；普通宿主机上的 npx 不会自动获得集群网络。
-
-运行时准备：`npx dsh-isolated-runtime@0.3.0-alpha.1 manifests` 输出固定镜像的 Operator/CRD/RBAC 清单，由管理员审阅部署；`release` 输出固定 Cell 镜像及 DSH 版本。新版替代旧 standalone 启动器，不启动第二个用户服务。
-
-```bash
-# Node.js 24+
-npx dsh-multi-tenant@latest start --config /private/config.json
+```sh
+npm install --ignore-scripts /absolute/path/dsh-multi-tenant-0.10.0-alpha.1.tgz
+./node_modules/.bin/dsh-multi-tenant start --config /private/config.json
 ```
 
-`start` 前台运行；SIGINT/SIGTERM 只停止平台并保留 Cell/数据，SIGHUP 重读成员映射。正式部署记录解析出的精确 npm 版本及镜像 digest，不在每次重启时重新选择 latest。首版不自动创建 kind 集群。
+配置只有七个顶层字段：`runtime`、`stateFile`、`adminSocket`、`oidc`、`members`、`host`、`port`。参见[候选配置](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/integration/distribution/config.example.json)。`runtime` 包含 Kubernetes server/CA/token 文件路径、namespace 前缀、domain、精确 image digest、单一 storage size/class、原生 resources 和平台 namespace。固定工作负载模板归 runtime 管理。集群凭据和 OIDC client secret 通过用户环境之外的文件引用注入；client secret 为 0600，状态和管理 socket 位于平台进程所有的 0700 私有目录，状态文件为 0600 且仅允许单 writer。
 
-现有集群部署、配置与管理员命令见[启动指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.zh-CN.md)。
+`members` 将精确 OIDC issuer/subject 映射为 `{tenantId, principalId}`。无需逐用户配置 namespace 或第二份环境清单。登录后平台自动预留稳定绑定；点击 **Enter / create** 首次创建，使用 **Inspect / resolve status** 查看原结果，**Stop** 停止，**Start stopped environment** 启动已确认停止的环境，Ready 后用 **Open environment** 进入。平台登录、环境访问会话和原生 DSH 会话彼此独立。操作页面显示结果或脱敏诊断及下一步，pending/unknown 不表示成功；查看结果后返回平台页进入 Ready 环境。
 
-## 尚未发布的 `cell-mvp-v1` 源码候选
+更新 `members` 后发送 SIGHUP，删除或改属成员会关闭已有 HTTP/WebSocket 连接。重载无效时撤销全部会话；其他配置需要重启。SIGINT/SIGTERM 关闭平台及访问连接，保留环境和 PVC。
 
-本分支的平台包目标版本为 `dsh-multi-tenant@0.10.0-alpha.1`，尚未发布。已发布 `0.9.0-alpha.1` 与 npm `@latest` 仍使用人工校准 profile 配置，不接受候选格式。Connector 已绑定 runtime 源码 `ed914317e98a93752e8af4f7831c384fc1e92f13`；Cell/Operator 镜像 digest 仍为空，因为本地候选镜像不是公开发行物。见[候选配置指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/cell-mvp-v1-candidate.zh-CN.md)。DSH 仍固定为 `0.1.5-rc.2`。
+管理员通过私有 Unix socket 操作，先 inspect，再提供持久保存的 allocation key 和 Sandbox UID：
 
-本地候选已通过 [2026-09-22 MVP 内测](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/evidence/cell-mvp-2026-09-22.md)，包括无校准部署和原生 Bash 子进程；这不等于已公开发布。
+```sh
+dsh-multi-tenant inspect --socket /private/admin.sock --environment env-ID
+dsh-multi-tenant stop --socket /private/admin.sock --environment env-ID --allocation-key KEY --identity SANDBOX_UID
+dsh-multi-tenant resume --socket /private/admin.sock --environment env-ID --allocation-key KEY --identity SANDBOX_UID
+dsh-multi-tenant delete --socket /private/admin.sock --environment env-ID --allocation-key KEY --identity SANDBOX_UID
+```
 
-## 两仓库分工
+Delete 必须有正面 Stopped 证据，仅删除运行资源并保留数据，绑定保持封锁供管理员检查，不自动重建。创建/启停/删除结果未知时只查询原绑定，不自动替换或重放。Sandbox/PVC 缺失或 UID 改变即拒绝访问。节点分区或 writer 停止未经证实须管理员处理，不建设自动恢复控制器。
 
-当前请求链路为 Envoy TLS/路由 → 平台 `openid-client` OIDC/准入 → Node Connector → Go launcher → DSH。Envoy 不负责平台登录或租户授权。
+## 开发与证据
 
-| 层 | 负责 | 不负责 |
-| --- | --- | --- |
-| 本仓库 / `dsh-multi-tenant` | OIDC、可信成员映射、用户协议、父子会话、持久化分配意图、授权代理 | Pod/PVC 控制、运行时镜像构建 |
-| `dsh-isolated-runtime` | 当前 Cell Operator、Cell 镜像、资源归属/生命周期、受限 Connector | 重复登录、用户成员权限、平台会话 |
-| DSH | 原生 Web、应用会话、工具与模型调用 | 平台多租户授权 |
+使用清单固定的 pnpm，执行 `pnpm install --frozen-lockfile` 和 `pnpm release:check`，验证元数据、类型、单元/transport、构建和干净 tarball consumer，不发布。测试明确标注 Connector fixture；真实 runtime/集群/原生 DSH/OIDC/模型/工具的精确组合验收归 [#106](https://github.com/GuoMonth/dsh-multi-tenant/issues/106)。SDK 仅供可信平台代码消费，导出环境契约、绑定存储、控制、OIDC 和 ingress。
 
-## AgentEnvironment 方向
+[容器配方](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/integration/distribution/Dockerfile) 安装同一份本地 tarball 并运行 CLI。本轮检查不包含 npm publish、公网镜像推送或对外 Release；用户最后 E2E 后决定发布。
 
-运行时正式押注 Kubernetes；Process 和 Docker runtime 不作为受支持的后端路线。`AgentEnvironment` 是产品概念；[本地接入试验](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md)已通过，W1 将直接映射上游 `agent-sandbox` 的 Sandbox，不套第二层同义 CRD/控制器。正式生产适配尚未实现。现有 Cell 实现和旧 provider 源码尚未删除，计划在 W1 清理；当前候选尚未实现这项设计。详见 [AgentEnvironment 设计](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-environment.zh-CN.md) 和 [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。
-
-一个 AgentEnvironment 是用户持久化的 DSH 环境，设计上承载多个共享该环境的 DSH 对话。当前已测试的 Cell 在 Pod 替换后保留 workspace 数据和原生 DSH 状态。这证明 Cell 级持久性，但没有证明 home 文件或 OAuth/CLI 凭据按对话隔离。
-
-当前发行仍限于一个集群、平台单副本和固定版本组合；不增加 HA 或恢复系统。
-
-## 真实内测画面
-
-以下来自 2026-09-20 的真实 OIDC → Cell → 原生 DSH 会话；使用 deepseek-flash 完成文件写入、读取和附件验证。画面不是平台重新实现的聊天 UI；模型凭据不随项目提供。
-
-![Cell 内原生 DSH 的真实模型验证](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/images/cell-native.png?raw=true)
-
-![展开的原生文件工具调用](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/images/cell-tools.png?raw=true)
-
-[回归证据及未覆盖项](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/evidence/cell-regression-2026-09-20.md) 区分真实集群、本地 socket 与替身测试；[发行记录](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/releases/v0.9.0-alpha.1.md) 和[启动指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.zh-CN.md)说明已发布包及其边界。
-
-- [项目宪法](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONSTITUTION.md) · [S0 契约](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/s0-runtime-architecture.zh-CN.md)
-- [内测与发布流程](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/release.md) · [开发贡献](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONTRIBUTING.md)
-- [文档索引](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/README.md) · [Issue #82](https://github.com/GuoMonth/dsh-multi-tenant/issues/82)
-
-历史 Process/Docker SDK 和 workbench 资料不属于当前 Cell 安装链路，仅作为历史源码/证据保留。MIT；包内第三方实现许可证见 THIRD_PARTY_NOTICES。
+容器 UID/GID 为 1000:1000；`GET /healthz` 无需登录且不调用 runtime/模型，仅表示平台本地已启动，不表示工作负载或模型健康。

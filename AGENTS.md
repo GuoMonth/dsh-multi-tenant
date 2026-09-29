@@ -8,7 +8,7 @@ Product boundaries: [CONSTITUTION.md](CONSTITUTION.md). Interface and phase desi
 - Follow nearby TypeScript ESM patterns. Check commands and validation selection: [CONTRIBUTING.md](CONTRIBUTING.md).
 - User-facing changes update root READMEs and their package copies; shipped links must work outside the checkout. Keep the bundled AI guide aligned with CLI behavior.
 - Preserve fail-closed admission/revocation and exact instance ownership. Platform identity, control storage and secrets remain outside user domains.
-- Public exports and tests define implemented behavior. Current Cell implementation: [S0 architecture](docs/design/s0-runtime-architecture.zh-CN.md). Historical standalone and Envoy OIDC/authorizer guides are not active-path requirements.
+- Public exports and tests define implemented behavior. Current platform implementation: [bindings](packages/multi-tenant/src/platform/bindings.ts), [control](packages/multi-tenant/src/platform/control.ts), and [OIDC](packages/multi-tenant/src/platform/oidc.ts). S0/Cell, standalone and Envoy OIDC/authorizer guides are historical, not active-path requirements.
 
 ## References
 

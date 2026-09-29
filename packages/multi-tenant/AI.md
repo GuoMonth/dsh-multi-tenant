@@ -1,30 +1,13 @@
-> Current MVP: DSH 0.2.0-rc.2 is the implementation target, not yet a shipped baseline. One PVC per user; fixed workspace/home/dsh directories. Breaking Alpha changes are permitted without legacy compatibility or migration. Enterprise backup/upgrade and scale gates are deferred. See the [execution plan](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/plans/mvp-rc2.zh-CN.md).
+# Trusted platform integration guide
 
-# AgentEnvironment alpha operating guide
+Read the packaged README. The only backend is Kubernetes through the exact bundled `@dsh/environment-connector-internal` artifact. DSH is fixed at 0.2.0-rc.2 / 639ed015397290b3745d163aafe02ffee4aa3f84. No legacy RuntimeProvider, Cell, Process or Docker APIs exist.
 
-Use `dsh-multi-tenant --help`. The published platform package is `0.9.0-alpha.1`, requires Node 24+, and starts with `start --config /private/config.json`. The runtime release is `0.3.0-alpha.1`; `release` prints the fixed image/version data and `manifests` prints the pinned Operator/CRD/RBAC YAML. Review and apply those resources as an administrator. Neither npm command creates a cluster.
+Run `dsh-multi-tenant start --config /private/config.json`. Configuration is exactly runtime/stateFile/adminSocket/oidc/members/host/port; runtime uses EnvironmentRuntimeOptions. Members maps exact issuer/subject to tenantId/principalId. Do not configure per-user environments, PodSpecs, endpoints, templates or secrets in user domains. Runtime owns namespace/PVC/Sandbox provisioning. There is one PVC with workspace/home/dsh and one requested capacity; CPU/Memory use native requests/limits.
 
-Prerequisites, the published configuration template, startup and operational limits: [startup guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/reference/quickstart.md). The platform needs Kubernetes API and Cell Pod-IP connectivity. The administrator configures cluster, Gateway/TLS, CNI, storage, RBAC and OIDC. The published `0.9.0-alpha.1` instructions below describe that release; the unpublished `0.10.0-alpha.1` source candidate uses a fixed runtime template and rejects the old calibrated profiles.
+Platform SDK APIs are trusted: EnvironmentBindingStore, createEnvironmentControl, createOIDCAuthentication, createPlatformIngress, plus narrow environment contract types and EnvironmentError. Keep the private binding DB outside user PVCs and use one platform process. Preserve exact owner/allocationKey/Sandbox UID/PVC UID; do not derive authorization from a hostname or namespace.
 
-`cell-release.json` records the runtime/DSH/Connector combination. `source-candidate` with null image digests indicates an unpublished candidate only; the published 0.9.0-alpha.1 package is bound to the fixed public Cell/Operator images in its release manifest. npm `latest` is an installation channel, not a compatibility or stability promise.
+Enter/create reserves one stable allocation. Unknown writes are durable barriers: inspect the original key/ref, never allocate another key or automatically replay. Stop withdraws access and waits for positive writer-stop evidence. Start requires Stopped with the same PVC. Delete requires Stopped and retains data; no automatic recreate. User UI exposes entry, inspection, stop and start; CLI has inspect/stop/resume/delete with a private socket and exact allocation key/Sandbox UID for mutations. `resume` is the CLI spelling for environment start; `start --config` starts the platform process.
 
-**Product direction:** an open-source Alpha for persistent AI workspaces inside an enterprise. The MVP covers OIDC, native DSH, one PVC per user, explicit stop/start and one installation path. Breaking changes are expected; historical compatibility and migration are out of scope. Enterprise scale, disaster recovery and supported upgrades are deferred; see [product scope](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/enterprise-positioning.zh-CN.md).
+SIGHUP reloads membership only. Removed/remapped members, invalid reload, logout and expiry invalidate active HTTP/WS connections. Platform SIGINT/SIGTERM retains runtime resources and data. Native DSH payloads/protocols belong to DSH; the platform must not rewrite them.
 
-## Runtime direction and session terms
-
-The product direction is Kubernetes-only. AgentEnvironment is the product concept; the [local trial](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/docs/evidence/agent-sandbox-local-2026-09-23.md) selected upstream `agent-sandbox` core for W1, without a second CRD or controller. Process and Docker runtime backends are not supported alternatives. Existing Cell and legacy provider source remains in this branch until the planned W1 cleanup. The current candidate still uses Cell; the upstream integration is validated only as a test adapter; production adoption remains W1 work. See [AgentEnvironment design](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/design/agent-environment.zh-CN.md) and [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104). This direction does not disable OCI image builds or subprocesses running inside a workspace.
-
-Keep these sessions distinct:
-
-- A platform AuthSession is OIDC-derived authorization to enter a user's AgentEnvironment. Its expiry or revocation controls platform access.
-- A DSH Session is a native DSH conversation. The product model places multiple DSH Sessions in one AgentEnvironment, sharing its workspace/home state; closing a platform AuthSession does not mean deleting those conversations or the workspace.
-
-The currently tested Cell preserves workspace data and native DSH state across Pod replacement, and model credentials are configured in DSH's private settings. This establishes persistence at the Cell/workspace level. It does not prove per-conversation isolation of home files, OAuth tokens or CLI credentials; treat those as workspace-shared unless a future design explicitly separates them.
-
-SIGINT/SIGTERM stop only the platform; SIGHUP reloads membership. Use one process per private SQLite state file. Restart requires login; do not delete SQLite or volumes to repair an unknown write.
-
-`inspect --socket PATH --environment ID` is read-only. `delete --socket PATH --environment ID --allocation-key KEY --identity UID` uses the exact inspected target and requires applicable operator authorization. An accepted delete is not proof of writer cessation. Unknown outcomes require inspection of the original key; never automatically replay or recreate.
-
-Credentials belong in private mode-0600 files and DSH private state, never command arguments, docs or issue logs. Share structured diagnostics after redaction.
-
-The runtime repository owns current Cell resources and the Connector; this repository owns OIDC, membership, AuthSessions and protocol admission. The current release remains a fixed-version Cell MVP, without HA or upgrades. Historical SDK and standalone workbench sources do not describe this package's installation path. Later source changes do not alter the published package; the current architecture direction and work are tracked in [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104).
+`pnpm release:check` checks local sources and packed consumer, not cluster/native E2E. Fixtures do not validate the production runtime. Publication, public images and Releases require the user's separate decision after final E2E; do not perform them as part of these commands.

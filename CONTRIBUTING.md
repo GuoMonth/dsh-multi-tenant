@@ -1,21 +1,9 @@
 # Contributing
 
-Product scope lives in [CONSTITUTION.md](CONSTITUTION.md); the current K8s-only AgentEnvironment direction is in [the design](docs/design/agent-environment.zh-CN.md), while tested Cell boundaries remain in [S0](docs/design/s0-runtime-architecture.zh-CN.md). Use [the documentation index](docs/README.md) for task-specific context.
+Follow [CONSTITUTION.md](CONSTITUTION.md) and the active [MVP plan](docs/plans/mvp-rc2.zh-CN.md). The package manifest pins Node/pnpm and scripts/dsh-target.mjs pins DSH.
 
-## Validation by changed surface
+`pnpm install --frozen-lockfile` installs development dependencies. `pnpm release:check` runs metadata/pin validation, TypeScript, platform tests, build and clean installed-tarball smoke without publishing. Use the relevant subset while iterating. No legacy backend matrix is supported.
 
-Use the Node engine and pnpm version in the manifests; install with `pnpm install --frozen-lockfile` when dependencies are needed.
+The platform and connector are separate owners. Tests using a connector fixture prove platform control/authorization behavior only. Cluster/native proxy/DSH and actual model/tool acceptance need the exact runtime/platform/installation candidates in #106. Do not claim published availability or joint E2E from a local build.
 
-| Change | Relevant check |
-| --- | --- |
-| Documentation | Links, referenced commands, `git diff --check`; no runtime build solely for prose |
-| Package metadata / DSH pin | `node scripts/verify-packages.mjs`, `node scripts/verify-contract.mjs` |
-| TypeScript / behavior | Affected package tests and typecheck; scripts in root `package.json` |
-| Runtime / CLI / ingress / public API | Relevant installed/native proof; [probe guide](scripts/native-host-probe/README.md) |
-| Release preparation | `pnpm release:check`, then [release runbook](docs/reference/release.md) |
-
-`release:check` includes metadata/contract, typecheck, tests, build, SQLite proof and installed tarball SDK smoke; it does not publish. Once relevant checks pass, repeat or broaden only for a new change or unresolved failure.
-
-For current Cell CLI changes, use `pnpm smoke:cell` to install the packed artifact in a clean consumer. The platform container recipe consumes that same tarball. Relevant cluster/browser evidence is in [the regression runbook](integration/regression/README.md); a packaging change needs a narrow installed-entry smoke, not a repeat of every historical gate. Legacy Process/Docker provider probes describe retained source only; they do not validate the K8s AgentEnvironment path. OCI image construction and subprocess execution inside a workspace remain part of the K8s runtime workflow.
-
-Record the tested commit, relevant commands/results and untested surfaces in the PR. User-facing changes keep root and package READMEs aligned. Publishing uses the authorized manual workflow with a reviewed, locally validated main commit and actual image digest; source, tag and artifact identities must match.
+Keep both root READMEs and their package copies identical, update the bundled AI guide with CLI behavior, and use hosted links in shipped documentation. Record actual commands/results and untested surfaces in the PR. Never print or commit credentials.
