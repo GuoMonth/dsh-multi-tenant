@@ -11,7 +11,7 @@
   "runtimeRole": {
     "repository": "https://github.com/GuoMonth/dsh-isolated-runtime",
     "path": "config/runtime/cluster-role.yaml",
-    "sourceStatus": "B candidate; final commit to be recorded before G2 installation",
+    "commit": "29530cbd2fec4da4b457efd8dfec64e239e7313d",
     "file": "runtime-cluster-role.yaml",
     "sha256": "ccc79877cbca2e48da39b51252ee7de1e9157aa17641990acdc1fe6aae843723"
   }

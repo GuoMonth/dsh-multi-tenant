@@ -32,8 +32,9 @@ DSH 固定 `0.2.0-rc.2` / `639ed015397290b3745d163aafe02ffee4aa3f84`。
 `charts/dsh-platform/files/sources.json` 记录 upstream core 原始文件和固定 digest 副本的哈希，
 安装前检查副本只修改了 controller image。固定 core v1.0.3，只有上游单控制器。
 `runtime-cluster-role.yaml` 是 B 的 `config/runtime/cluster-role.yaml` 逐字打包副本，
-不能在此手工演进。D 转为可审查 PR 前核对 B 最终副本与哈希，并在 `runtimeRole.commit`
-记录实际40位提交；E 使用该固定组合。不是另建 runtime Deployment 或第二控制器。
+不能在此手工演进。已核对 B 提交 `29530cbd2fec4da4b457efd8dfec64e239e7313d` 的逐字副本，
+SHA256 为 `ccc79877cbca2e48da39b51252ee7de1e9157aa17641990acdc1fe6aae843723`，
+来源记录在 `runtimeRole.commit`；E 使用该固定组合。不是另建 runtime Deployment 或第二控制器。
 
 runtime 以平台 SA 身份按唯一模板供应 namespace、单 PVC、无集群 token 的用户 SA、
 NetworkPolicy 和 upstream Sandbox。角色没有读取 Secret、写 Pod、删除 namespace/PVC
