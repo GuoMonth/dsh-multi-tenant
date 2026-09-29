@@ -10,3 +10,5 @@ The user authorizes publication after strict local validation. npm and the match
 6. Verify registry installation, public image pulls, both GitHub releases, lightweight tag objects and cross-links. Then close acceptance Issues and clean completed workspaces without deleting user PVCs or private evidence.
 
 GitHub Actions needs Node24/npm>=11.5.1, `id-token: write`, workflow `release.yml` and environment `npm-release` matching npm Trusted Publishing. No local npm token is needed. If publication partially succeeds, rerun only the same source/candidate: the script verifies existing npm integrity before continuing. Registry/network failures are not proof of absence. Correct a mismatched source or artifact rather than retrying with a new payload under the same version.
+
+Registry acceptance can precede public metadata availability. Poll fresh version metadata for up to 15 minutes; if that still times out, verify registry visibility and rerun the same workflow attempt with the same candidates. Do not dispatch a rebuilt archive or bump the version to work around delayed visibility.

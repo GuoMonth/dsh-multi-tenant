@@ -1,6 +1,6 @@
 # DSH RC2 MVP 准备与执行计划
 
-2026-09-29。用户已明确启动全计划并授权检查通过后创建 PR、由协调者统一审查并直接合并；不授权 npm publish、公网产品镜像推送或对外 Release。A 阶段已完成契约/真实 RC 接入并合并，协调者接受 G1 后已派发 B/C/D；C 平台源码与本地检查已形成审查候选，B 生产包已固定消费，E 联合验收仍待收口，不代表 MVP 完成。需求与验收唯一主记录为 [平台 #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。协调者通过 Orca 派发和监督任务；用户最后执行 E2E 后决定发布。
+2026-09-29 已完成 A–E、真实 DeepSeek/GitHub CLI 联合验收与用户授权的发布。平台 [v0.10.0-alpha.1](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.10.0-alpha.1) 与 runtime [v0.4.0-alpha.1](https://github.com/GuoMonth/dsh-isolated-runtime/releases/tag/v0.4.0-alpha.1) 已发行；精确组合、测试结果和限制见 [最终验证报告](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.10.0-alpha.1/validation.md)。需求与验收记录为 [平台 #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。下文保留执行计划供追溯，不再代表待执行任务；当前安装入口见 [quickstart](../reference/quickstart.md)。
 
 ## 目标与冻结项
 

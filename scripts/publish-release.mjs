@@ -48,14 +48,14 @@ const release={version:pkg.version,tag,platform:p,runtime:{...r,tag:env.RUNTIME_
 writeFileSync('publication/release.json',JSON.stringify(release,null,2)+'\n');
 writeFileSync('publication/SHA256SUMS',`${sha256}  ${p.package.filename}\n${createHash('sha256').update(readFileSync('publication/release.json')).digest('hex')}  release.json\n`);
 const registry=`https://registry.npmjs.org/${pkg.name}/${pkg.version}`;
-async function metadata(){const res=await fetch(registry,{signal:AbortSignal.timeout(20000)});if(res.status===404)return null;if(!res.ok)throw Error('Registry metadata HTTP '+res.status);return res.json();}
+async function metadata(){const res=await fetch(`${registry}?release-check=${Date.now()}`,{signal:AbortSignal.timeout(20000)});if(res.status===404)return null;if(!res.ok)throw Error('Registry metadata HTTP '+res.status);return res.json();}
 let published=await metadata();
 if(published)assert.equal(published.dist.integrity,integrity,'Existing npm version differs; never overwrite');
 else{
  run('npm',['publish','--dry-run','--ignore-scripts','--access','public','--tag','latest',artifact]);
  run('npm',['publish','--ignore-scripts','--access','public','--provenance','--tag','latest',artifact]);
 }
-for(let i=0;i<24;i++){
+for(let i=0;i<180;i++){
  published=await metadata();
  if(published?.dist?.integrity===integrity)break;
  await new Promise(resolve=>setTimeout(resolve,5000));
