@@ -1,6 +1,6 @@
 # DSH RC2 MVP 准备与执行计划
 
-2026-09-29。用户已授权准备环境和规划；尚未授权启动本轮并行子任务。本文件不创建 Orca Run/Task/Dispatch，不代表实现完成。需求与验收唯一主记录为 [平台 #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。用户说开始后由协调者用 Orca CLI 建任务、隔离工作区并监督推进。
+2026-09-29。用户已明确启动全计划并授权检查通过后创建 PR、由协调者统一审查并直接合并；不授权 npm publish、公网产品镜像推送或对外 Release。A 阶段已完成契约/真实 RC 接入候选，B/C/D 仍须协调者检查 G1 后派发，不代表 MVP 完成。需求与验收唯一主记录为 [平台 #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。协调者通过 Orca 派发和监督任务；用户最后执行 E2E 后决定发布。
 
 ## 目标与冻结项
 
@@ -14,7 +14,7 @@
 
 ## 基线和准备工作区
 
-准备前远端 main：平台 `74deba5a752cff551bfe812f8a1dcc2a150cf53b`；runtime `8a0fde1dc9ce035f58478b417068b5ecf88b52c7`。两仓库当前生产源码仍是旧 Cell 和 DSH 0.1.5-rc.2，不将准备文档当成新代码。
+准备前远端 main：平台 `74deba5a752cff551bfe812f8a1dcc2a150cf53b`；runtime `8a0fde1dc9ce035f58478b417068b5ecf88b52c7`。准备 PR 已合并；A 实施基线为平台 `96bc9116f38e551670ab6ba8325942acea2390cc` / runtime `497a18ecd3315dfad5bf9b328193a2d2e6d4ffba`。两仓库当前生产源码仍是旧 Cell 和 DSH 0.1.5-rc.2，不将准备文档当成新代码。
 
 复用两个干净、无运行中 Agent 的 Orca `enterprise-positioning` 工作区，由协调者独占准备文档写入：平台 [PR #114](https://github.com/GuoMonth/dsh-multi-tenant/pull/114)，runtime [PR #104](https://github.com/GuoMonth/dsh-isolated-runtime/pull/104)。本轮改为 Alpha MVP 范围，消除双卷/历史迁移/企业门槛冲突；不另开重复规划 PR。准备文档建议平台先、runtime 后；最终合并按用户授权执行。后续实现从协调者确认的精确基线创建工作区，不根据 Orca 父子关系猜测 Git 基线。
 
@@ -76,7 +76,7 @@ flowchart LR
 
 ## Orca 协调规则与启动步骤
 
-本轮准备不创建子任务或启动 worker。用户说开始后：
+用户已授权启动，本轮按以下监督顺序执行：
 
 1. `orca-ide status --json`；重读当前版本 `orca-ide skills get orchestration --json`。创建本轮 Run，A 使用独立任务 worktree，读 exact repo/base/host，不复用其他产品终端。
 2. 将以上 A–E 作为自包含 task spec：target/change/constraints/ownership/observable acceptance。创建真实依赖 A→B/C/D→E；Task spec 同时引用主 Issue 和本计划的固定提交。模型/effort 默认继承，不擅自指定。
@@ -98,3 +98,13 @@ flowchart LR
 - 集群资源登记为 `dsh-mvp-rc2-kind-control-plane`。私有 kubeconfig 在 `/home/aigs/projects/runtime/dsh-mvp-rc2/private/kubeconfig`；证据在相邻 `evidence/`，机密不进入仓库/PR。
 - 后续需要测试 OIDC 两账号、TLS/DNS、模型和外部工具授权。部署配置与临时测试身份由 A/D/E 构造；不将 fixture IdP 当真实企业 SSO 兼容证明。复用已有授权凭据时仅私有文件注入，不打印；若目标工具没有授权或需人工登录，明确提出具体缺项。准备阶段不以其替代真实业务验收。
 - 不需要生产 Kubernetes、RustFS/MinIO 或新备份平台。旧 `dsh-issue82` 集群已按用户后续明确要求删除并释放登记，只保留本轮 `dsh-mvp-rc2`；不清理其他项目资源。本轮无 root 权限缺口；后续若系统依赖需要权限再报告实际错误。
+
+## A 阶段实际交付（2026-09-29）
+
+官方 npm RC2 精确锁定；runtime 删除旧源码重构建配方，用 npm 发行模块前后 SHA256 限定的一行 settings 补丁解决真实远程 hostname Models 不可用。原生 workspace-controller documentsDirectory 配置解决无桌面环境默认工作区查找。
+
+新包 `@dsh/environment-connector-internal@0.0.0-rc.2` 提供窄类型及可执行单 PVC 模板，平台以 vendor 精确 tarball 消费并完成导入/类型检查；该包尚无生产 lifecycle factory。B 固定实现 `createAgentEnvironmentRuntime(options: EnvironmentRuntimeOptions)`；配置和语义见 runtime `docs/design/environment-contract.zh-CN.md`。
+
+真实验证及制品身份见 [A 阶段证据](../evidence/mvp-a-rc2-2026-09-29.md)。完整生产启停/负例由 B 实现验证；平台 OIDC/模型/真实外部工具及安装联合验收由 C/D/E 收口。已有旧 Cell 导出仅为后续删除的中间状态，不作为兼容模式。
+
+精确文件所有权：B 独占 runtime（含模板/RBAC/Connector/launcher/image）；C 独占平台 packages、scripts、vendor、根 package/lock 和非安装 integration；D 仅 charts、integration/installation、docs/installation。A 后的包/锁/pin 由各仓库实现 owner 独占；D 不复制 runtime 模板、不改包锁。集群唯一写入权按 A→B→E 转移。
