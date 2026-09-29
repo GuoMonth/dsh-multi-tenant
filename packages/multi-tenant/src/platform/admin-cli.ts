@@ -12,7 +12,7 @@ if (
     : allocationKey || identity)
 ) {
   console.error(
-    "Usage: node dist/admin-cli.js SOCKET inspect ENVIRONMENT | SOCKET delete ENVIRONMENT ALLOCATION_KEY IDENTITY",
+    "Usage: node dist/admin-cli.js SOCKET inspect ENVIRONMENT | SOCKET stop|start|delete ENVIRONMENT ALLOCATION_KEY SANDBOX_UID",
   );
   process.exitCode = 1;
 } else {

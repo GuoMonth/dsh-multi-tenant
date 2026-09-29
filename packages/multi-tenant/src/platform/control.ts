@@ -99,12 +99,13 @@ export function createEnvironmentControl(
       if (!view) {
         withdraw(id);
         // A missing unknown create is not authority to replay or replace its allocation.
-        return {
-          id,
-          phase: record.phase,
-          allocationKey: record.allocationKey,
-          unresolved: true,
-        };
+        throw new PlatformError(
+          record.ref ? "StaleInstance" : "AllocationUnresolved",
+          ctx.correlationId,
+          "No exact instance was observed; inspect the original allocation, never recreate or infer termination",
+          { allocationKey: record.allocationKey },
+          { stage: "inspect", effect: "unknown" },
+        );
       }
       verify(record, view, ctx);
       if (record.phase === "delete-requested") {

@@ -7,7 +7,7 @@ const actions = {
   runtime:
     "Check the fixed environment image, storage, resources, namespace prefix and domain against the runtime contract",
   state:
-    "Check private SQLite permissions, exclusive ownership and current schema; configure one environment per owner; do not erase existing allocations",
+    "Check private SQLite permissions, exclusive ownership and current schema; check owner bindings; do not erase existing allocations",
   oidc: "Check HTTPS issuer discovery, CA trust, client registration and membership mapping",
   admin:
     "Check private socket directory ownership and mode 0700; inspect an existing socket before any manual removal",

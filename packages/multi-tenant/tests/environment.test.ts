@@ -171,13 +171,9 @@ test("unknown create survives restart; missing read never replaces key or resubm
   const old = f.reopen().get(f.record.id)!;
   const control = createEnvironmentControl(f.runtime, f.store);
   control.setRevoker(() => {});
-  const result = await control.administer(
-    f.record.id,
-    "enter",
-    undefined,
-    ctx(),
-  );
-  expect(result).toMatchObject({ unresolved: true, phase: "submitted" });
+  await expect(
+    control.administer(f.record.id, "enter", undefined, ctx()),
+  ).rejects.toThrow("AllocationUnresolved");
   expect(f.runtime.create).toHaveBeenCalledTimes(1);
   expect(f.store.get(f.record.id)?.allocationKey).toBe(old.allocationKey);
 });
@@ -349,4 +345,16 @@ test("deleted-resource inspect preserves StaleInstance and durable deletion barr
   expect(result.body).not.toHaveProperty("state", "Deleted");
   expect(f.store.get(f.record.id)?.phase).toBe("delete-requested");
   expect(f.runtime.create).toHaveBeenCalledTimes(1);
+});
+
+test("exclusive state writer rejects a second process/store owner", () => {
+  const dir = mkdtempSync(join(tmpdir(), "environment-exclusive-"));
+  const file = join(dir, "state.sqlite");
+  const store = new EnvironmentBindingStore(file);
+  try {
+    expect(() => new EnvironmentBindingStore(file)).toThrow();
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true });
+  }
 });
