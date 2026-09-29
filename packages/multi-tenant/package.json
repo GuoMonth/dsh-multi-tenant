@@ -54,7 +54,7 @@
     "vitest": "^4.1.8",
     "ws": "8.18.3",
     "@types/ws": "8.18.1",
-    "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz",
+    "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz",
     "openid-client": "6.8.8"
   },
   "scripts": {

@@ -115,4 +115,4 @@ flowchart LR
 
 绑定保存完整 owner/allocationKey/Sandbox UID/单 PVC UID、创建/启停未知屏障及删除屏障；Ready 才发布访问，停止与撤权关闭连接，缺失或换 UID 拒绝，删除后查询缺失仍保留具体诊断而非声称停止/删除证据。CLI 提供平台 start 及环境 inspect/stop/resume/delete，容器 UID/GID 1000，GET /healthz 仅本地 readiness。
 
-本地类型、平台单元/真实 socket transport、OIDC 签名回调正负例、构建和干净 tarball consumer 已通过；具体命令/数量以 C PR 报告为准。生命周期测试使用明确契约 fixture，不能算联合验收；现固定 B 生产 Connector 来源 `29530cbd2fec4da4b457efd8dfec64e239e7313d`，vendor SHA256 `3d25a33658824adf4ded3b38add48334bd23fa7871429742b14c658c1c3a1da0`，平台静态导入真实 factory 并执行包复验。E 仍负责真实集群、原生 DSH、两用户、模型和工具以及安装闭环；未 npm publish、未推公网镜像、未创建 Release。
+本地类型、平台单元/真实 socket transport、OIDC 签名回调正负例、构建和干净 tarball consumer 已通过；具体命令/数量以 C PR 报告为准。生命周期测试使用明确契约 fixture，不能算联合验收；现固定 B 生产 Connector 来源 `286a68d3ae592fc1ab6193297b79f5fdc9964a3b`，vendor SHA256 `d2d22257c69f1f87e3ca982557530a1133cb7abfa7c94cc9719f84837222224c`，平台静态导入真实 factory 并执行包复验。E 仍负责真实集群、原生 DSH、两用户、模型和工具以及安装闭环；未 npm publish、未推公网镜像、未创建 Release。

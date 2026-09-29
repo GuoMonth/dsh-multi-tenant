@@ -1,8 +1,8 @@
 {
   "repository": "GuoMonth/dsh-isolated-runtime",
-  "commit": "29530cbd2fec4da4b457efd8dfec64e239e7313d",
-  "artifact": "dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz",
-  "integrity": "sha512-XwLOsWoJTqzJ1/WxEPjCZQeYJmplchz5BMKjR1Oo4zQ/iPpKMMCD8k8gEjLN8LGDNNSHpbRc0PxWXtiX7w8f1w==",
-  "sha256": "3d25a33658824adf4ded3b38add48334bd23fa7871429742b14c658c1c3a1da0",
+  "commit": "286a68d3ae592fc1ab6193297b79f5fdc9964a3b",
+  "artifact": "dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz",
+  "integrity": "sha512-91yvF4rleoFOFcK+CCJwLDi/zeOOQPpcTr8ANb9dPsOnSgvMSUZjgxlblxlVCmQOGzkFz1jD9csTwI6fhWfLNA==",
+  "sha256": "d2d22257c69f1f87e3ca982557530a1133cb7abfa7c94cc9719f84837222224c",
   "stage": "B production lifecycle; combined platform/installation E2E remains under E"
 }

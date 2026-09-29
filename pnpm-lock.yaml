@@ -14,8 +14,8 @@ importers:
   packages/multi-tenant:
     devDependencies:
       '@dsh/environment-connector-internal':
-        specifier: file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz
-        version: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz
+        specifier: file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz
+        version: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
@@ -43,8 +43,8 @@ importers:
 
 packages:
 
-  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz':
-    resolution: {integrity: sha512-XwLOsWoJTqzJ1/WxEPjCZQeYJmplchz5BMKjR1Oo4zQ/iPpKMMCD8k8gEjLN8LGDNNSHpbRc0PxWXtiX7w8f1w==, tarball: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz}
+  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz':
+    resolution: {integrity: sha512-91yvF4rleoFOFcK+CCJwLDi/zeOOQPpcTr8ANb9dPsOnSgvMSUZjgxlblxlVCmQOGzkFz1jD9csTwI6fhWfLNA==, tarball: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz}
     version: 0.0.0-rc.2
     engines: {node: '>=24'}
 
@@ -910,7 +910,7 @@ packages:
 
 snapshots:
 
-  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz': {}
+  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz': {}
 
   '@esbuild/aix-ppc64@0.28.2':
     optional: true
