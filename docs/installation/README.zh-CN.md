@@ -1,9 +1,9 @@
 # RC2 单集群安装草稿
 
 本目录对应 [平台 #111](https://github.com/GuoMonth/dsh-multi-tenant/issues/111)。
-当前交付是经过离线验证的安装候选，不是已经通过真实安装的发行版。
+安装资产现已由 E 作为第二操作者在专用 kind 中实际安装；两处真实联动缺陷已修复，结果见 [联合验证](joint-validation-2026-09-29.md)。真实模型和外部工具授权未验收，G3 未通过，也未发行。
 平台与 workload 镜像尚未公开发布；fixture 的 `.invalid` 地址和重复字符 digest
-明确不可安装。G2 后由唯一集群负责人固定 B/C 实际提交、包和本地镜像再验证。
+明确不可安装。本地镜像、包与源码固定组合见联合验证版本表。
 DSH 固定 `0.2.0-rc.2` / `639ed015397290b3745d163aafe02ffee4aa3f84`。
 
 ## 前提
@@ -20,7 +20,7 @@ DSH 固定 `0.2.0-rc.2` / `639ed015397290b3745d163aafe02ffee4aa3f84`。
   TLS 证书覆盖平台和通配子域。平台 namespace 已存在，包含管理员供应的 TLS Secret
   `kubernetes.io/tls`（`tls.crt` / `tls.key`）与 OIDC Secret（默认 key `client-secret`）。
   Secret 内容不要写入 values、命令行、仓库或日志。
-- OIDC issuer 必须 HTTPS，网络和 CA 信任可用；注册平台 client，回调为
+- OIDC issuer 必须 HTTPS，网络和 CA 信任可用；私有 CA 可通过 `oidc.caSecretName` / `oidc.caSecretKey`（默认 `ca.crt`）引用同 namespace 的 PEM Secret，Chart 用只读挂载与原生 `NODE_EXTRA_CA_CERTS`。宿主安装器也需 `NODE_EXTRA_CA_CERTS=/private/issuer-ca.crt`，不关闭 TLS 验证。注册平台 client，回调为
   `https://<平台域名>/auth/callback`。members 显式映射 issuer/subject 到 tenantId/principalId；
   无需预建用户 namespace/PVC。
 - 使用 B/C 通过验证的真实平台和 workload digest，节点能够拉取或已经导入。
@@ -53,7 +53,7 @@ limits 为 2/2Gi。平台的 `controlStorageSize` 默认 1Gi，只存平台 SQLi
 # 离线渲染（fixture 只允许在此使用；不访问集群）
 node charts/install.mjs render --values integration/installation/fixture.values.json --namespace dsh-install-test
 
-# G2 完成真实制品 pin 后；使用私有实际 values 与明确集群目标
+# 使用联合验证的真实制品 pin、私有 values 与明确集群目标
 node charts/install.mjs preflight --values /private/install.values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context dsh-mvp-rc2
 node charts/install.mjs install --values /private/install.values.json --namespace dsh-platform --kubeconfig /private/kubeconfig --context dsh-mvp-rc2
 ```

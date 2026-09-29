@@ -11,3 +11,5 @@ Enter/create reserves one stable allocation. Unknown writes are durable barriers
 SIGHUP reloads membership only. Removed/remapped members, invalid reload, logout and expiry invalidate active HTTP/WS connections. Platform SIGINT/SIGTERM retains runtime resources and data. Native DSH payloads/protocols belong to DSH; the platform must not rewrite them.
 
 `pnpm release:check` checks local sources and packed consumer, not cluster/native E2E. Fixtures do not validate the production runtime. Publication, public images and Releases require the user's separate decision after final E2E; do not perform them as part of these commands.
+
+Joint local OIDC/native/lifecycle checks passed; real model and authorized external-tool execution remain unaccepted (G3 open). Use the hosted installation guides for chart CA Secret references; they are not additional runtime config fields. After platform restart, Inspect resolves the original binding before Open is available. No publication was performed.

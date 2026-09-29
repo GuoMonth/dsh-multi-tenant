@@ -148,6 +148,7 @@ test.each(["valid", "state", "nonce", "expired", "subject"] as const)(
           .find((c) => c.startsWith("__Host-dsh-platform="))!
           .split(";")[0]!;
         const home = await request("/", parent);
+        expect(home.headers.get("referrer-policy")).toEqual(["same-origin"]);
         expect(home.body).toContain("Stop");
         expect(home.body).toContain("Enter / create");
         expect(home.body).toContain("env-");

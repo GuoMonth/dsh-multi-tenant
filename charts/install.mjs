@@ -97,6 +97,12 @@ export async function main(args) {
   if (k('get', 'pvc', 'dsh-platform-state', '-n', namespace, '--ignore-not-found', '-o', 'name').trim()) throw new Error('Control PVC already exists; preserve it and inspect the original installation, do not adopt it as new state');
   const oidcSecret = get('secret', secret.secretName, '-n', namespace);
   if (!Buffer.from(oidcSecret.data?.[secret.items[0].key] ?? '', 'base64').toString('utf8').trim()) throw new Error('OIDC Secret/key missing or empty');
+  const caVolume = pod.volumes.find(v => v.name === 'oidc-ca');
+  if (caVolume) {
+    const ca = get('secret', caVolume.secret.secretName, '-n', namespace);
+    try { new X509Certificate(Buffer.from(ca.data?.[caVolume.secret.items[0].key] ?? '', 'base64')); }
+    catch { throw new Error('OIDC CA Secret/key missing or invalid PEM certificate'); }
+  }
   const tls = get('secret', ingress.spec.tls[0].secretName, '-n', namespace);
   if (tls.type !== 'kubernetes.io/tls' || !tls.data?.['tls.key']) throw new Error('TLS Secret requires tls.crt and tls.key');
   let cert;

@@ -46,7 +46,7 @@ test('config matches C and runtime options, private identity stays in platform',
   assert.equal(config.runtime.storage.size, '10Gi');
   assert.equal(config.runtime.domain, 'env.dsh.example.invalid');
   assert.deepEqual(config.runtime.resources, {requests:{cpu:'250m',memory:'512Mi'},limits:{cpu:'2',memory:'2Gi'}});
-  assert.equal(config.oidc.clientSecretFile, '/private/oidc-client-secret');
+  assert.equal(config.oidc.clientSecretFile, '/private/platform/oidc-client-secret');
   assert.equal(config.adminSocket, '/tmp/platform/admin.sock');
   assert.equal(config.stateFile, '/state/platform/state.sqlite');
   assert.equal(config.members.length, 2);
@@ -88,4 +88,18 @@ test('live installer refuses fixtures before reaching Kubernetes', () => {
   const result=spawnSync(process.execPath,[resolve(chart,'..','install.mjs'),'install','--values',fixture.pathname,'--namespace',namespace],{encoding:'utf8'});
   assert.notEqual(result.status,0);
   assert.match(result.stderr,/Fixture domain\/image/);
+});
+
+test('optional private issuer CA uses native Node trust and a read-only Secret', () => {
+  const directory=mkdtempSync(resolve(tmpdir(),'dsh-install-ca-'));
+  try {
+    const file=resolve(directory,'values.json');
+    writeFileSync(file,JSON.stringify({...values,oidc:{...values.oidc,caSecretName:'issuer-ca',caSecretKey:'issuer.pem'}}));
+    const {pod,config}=inspect(render(file,namespace));
+    assert.deepEqual(pod.containers[0].env,[{name:'NODE_EXTRA_CA_CERTS',value:'/oidc-ca/ca.crt'}]);
+    assert.deepEqual(pod.volumes.find(v=>v.name==='oidc-ca').secret,{secretName:'issuer-ca',defaultMode:288,items:[{key:'issuer.pem',path:'ca.crt'}]});
+    assert.equal(pod.containers[0].volumeMounts.find(v=>v.name==='oidc-ca').readOnly,true);
+    assert.equal(config.oidc.caSecretName,undefined);
+    assert.equal(inspect(output).pod.volumes.some(v=>v.name==='oidc-ca'),false);
+  } finally {rmSync(directory,{recursive:true,force:true});}
 });

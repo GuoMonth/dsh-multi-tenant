@@ -116,3 +116,9 @@ flowchart LR
 绑定保存完整 owner/allocationKey/Sandbox UID/单 PVC UID、创建/启停未知屏障及删除屏障；Ready 才发布访问，停止与撤权关闭连接，缺失或换 UID 拒绝，删除后查询缺失仍保留具体诊断而非声称停止/删除证据。CLI 提供平台 start 及环境 inspect/stop/resume/delete，容器 UID/GID 1000，GET /healthz 仅本地 readiness。
 
 本地类型、平台单元/真实 socket transport、OIDC 签名回调正负例、构建和干净 tarball consumer 已通过；具体命令/数量以 C PR 报告为准。生命周期测试使用明确契约 fixture，不能算联合验收；现固定 B 生产 Connector 来源 `286a68d3ae592fc1ab6193297b79f5fdc9964a3b`，vendor SHA256 `d2d22257c69f1f87e3ca982557530a1133cb7abfa7c94cc9719f84837222224c`，平台静态导入真实 factory 并执行包复验。E 仍负责真实集群、原生 DSH、两用户、模型和工具以及安装闭环；未 npm publish、未推公网镜像、未创建 Release。
+
+## E 联合验证状态（2026-09-29）
+
+B/C/D 已合并，E 作为 D 文档的第二操作者在专用 kind 实际安装并修复两处真实联动缺陷：非 root init 卷根目录 chmod EPERM，以及 HTML no-referrer 导致表单 Origin:null 被 CSRF 拒绝。新增的私有 CA 仅走 Secret 与 Node 原生 CA 信任。精确源码/制品、运行证据和边界见 [联合验证版本表](../installation/joint-validation-2026-09-29.md)。
+
+两个实际 Dex subject 的独立单卷、原生 HTTP/WS、跨 owner 拒绝、退出/成员撤权、显式启停与 Pod 重建持久化均通过；未改变的 runtime 缺卷/换 UID/未知停止负例明确引用 B 的真实证据。真实模型读写文件/执行命令和至少一条真正授权的外部工具链尚未验收；G3 未通过，不宣称可发行。没有发布 npm、推送公网产品镜像或创建 Release，最终由用户 E2E 后决定发布。

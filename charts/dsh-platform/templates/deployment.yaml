@@ -12,7 +12,7 @@
         "securityContext": {"runAsNonRoot": true, "runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000, "seccompProfile": {"type": "RuntimeDefault"}},
         "initContainers": [{
           "name": "private-files", "image": {{ .Values.platformImage | toJson }}, "imagePullPolicy": "IfNotPresent",
-          "command": ["node", "-e", "const f=require('node:fs');for(const d of ['/state/platform','/tmp/platform']){f.mkdirSync(d,{recursive:true,mode:0o700});f.chmodSync(d,0o700);}f.chmodSync('/private',0o700);f.copyFileSync('/oidc/client-secret','/private/oidc-client-secret');f.chmodSync('/private/oidc-client-secret',0o600);"],
+          "command": ["node", "-e", "const f=require('node:fs');for(const d of ['/state/platform','/tmp/platform','/private/platform']){f.mkdirSync(d,{recursive:true,mode:0o700});f.chmodSync(d,0o700);}f.copyFileSync('/oidc/client-secret','/private/platform/oidc-client-secret');f.chmodSync('/private/platform/oidc-client-secret',0o600);"],
           "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}},
           "resources": {"requests": {"cpu": "10m", "memory": "32Mi"}, "limits": {"cpu": "250m", "memory": "128Mi"}},
           "volumeMounts": [{"name": "state", "mountPath": "/state"}, {"name": "tmp", "mountPath": "/tmp"}, {"name": "private", "mountPath": "/private"}, {"name": "oidc", "mountPath": "/oidc", "readOnly": true}]
@@ -20,14 +20,20 @@
         "containers": [{
           "name": "platform", "image": {{ .Values.platformImage | toJson }}, "imagePullPolicy": "IfNotPresent",
           "args": ["start", "--config", "/config/config.json"],
+          {{- if .Values.oidc.caSecretName }}
+          "env": [{"name": "NODE_EXTRA_CA_CERTS", "value": "/oidc-ca/ca.crt"}],
+          {{- end }}
           "ports": [{"name": "http", "containerPort": 8080}],
           "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}},
           "resources": {"requests": {"cpu": "100m", "memory": "256Mi"}, "limits": {"cpu": "1", "memory": "1Gi"}},
           "startupProbe": {"httpGet": {"path": "/healthz", "port": "http"}, "periodSeconds": 3, "failureThreshold": 40},
           "readinessProbe": {"httpGet": {"path": "/healthz", "port": "http"}, "periodSeconds": 5},
-          "volumeMounts": [{"name": "state", "mountPath": "/state"}, {"name": "private", "mountPath": "/private", "readOnly": true}, {"name": "config", "mountPath": "/config", "readOnly": true}, {"name": "kubernetes", "mountPath": "/var/run/dsh-kubernetes", "readOnly": true}, {"name": "tmp", "mountPath": "/tmp"}]
+          "volumeMounts": [{"name": "state", "mountPath": "/state"}, {"name": "private", "mountPath": "/private", "readOnly": true}, {"name": "config", "mountPath": "/config", "readOnly": true}, {"name": "kubernetes", "mountPath": "/var/run/dsh-kubernetes", "readOnly": true}, {"name": "tmp", "mountPath": "/tmp"}{{ if .Values.oidc.caSecretName }}, {"name": "oidc-ca", "mountPath": "/oidc-ca", "readOnly": true}{{ end }}]
         }],
         "volumes": [
+          {{- if .Values.oidc.caSecretName }}
+          {"name": "oidc-ca", "secret": {"secretName": {{ .Values.oidc.caSecretName | toJson }}, "defaultMode": 288, "items": [{"key": {{ .Values.oidc.caSecretKey | toJson }}, "path": "ca.crt"}]}},
+          {{- end }}
           {"name": "state", "persistentVolumeClaim": {"claimName": "dsh-platform-state"}},
           {"name": "private", "emptyDir": {"medium": "Memory", "sizeLimit": "1Mi"}},
           {"name": "tmp", "emptyDir": {"sizeLimit": "64Mi"}},

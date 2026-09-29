@@ -4,6 +4,8 @@ An Alpha OIDC platform for one persistent DSH environment per authorized user. K
 
 This candidate targets **DSH 0.2.0-rc.2**, commit `639ed015397290b3745d163aafe02ffee4aa3f84`. It is under integration validation, not a published or production-ready release. There is no compatibility layer or migration from old Alpha state, Cell, Process or Docker backends. Use a fresh private platform state file for this format; do not erase existing data to bypass an error.
 
+Local joint validation passed real two-subject OIDC, native HTTP/WebSocket and retained-data lifecycle after installation fixes. **G3 remains open for real model execution and external-tool authorization.** Use the [installation guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/installation/README.md) and [exact candidate evidence](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/installation/joint-validation-2026-09-29.md); these local checks do not authorize publication.
+
 Each owner has one independently bound PVC mounted at `/var/lib/dsh/data`, with `workspace/`, `home/` and `dsh/`. CPU/memory use Kubernetes requests/limits; storage has one requested capacity, not a directory hard quota. Normal stop/start retains that volume. Logout, membership revocation and platform shutdown do not delete it.
 
 ## Candidate operation
