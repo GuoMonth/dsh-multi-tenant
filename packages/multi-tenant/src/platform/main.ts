@@ -5,11 +5,8 @@ import {
   type StartupStage,
 } from "./startup.js";
 import { readFile, stat } from "node:fs/promises";
-import * as connector from "@dsh/environment-connector-internal";
-import type {
-  AgentEnvironmentRuntime,
-  EnvironmentRuntimeOptions,
-} from "@dsh/environment-connector-internal";
+import { createAgentEnvironmentRuntime } from "@dsh/environment-connector-internal";
+import type { EnvironmentRuntimeOptions } from "@dsh/environment-connector-internal";
 import { createPlatformIngress } from "./ingress.js";
 import { createOIDCAuthentication, type OIDCOptions } from "./oidc.js";
 import { EnvironmentBindingStore } from "./bindings.js";
@@ -82,17 +79,7 @@ async function main() {
     !config.runtime.domain.endsWith("." + config.oidc.siteDomain)
   )
     throw new Error("Environment domain must use the configured OIDC site");
-  // A's contract-only artifact has no factory. Fail explicitly until B's exact artifact is installed.
-  const factory = (
-    connector as unknown as {
-      createAgentEnvironmentRuntime?: (
-        options: EnvironmentRuntimeOptions,
-      ) => AgentEnvironmentRuntime;
-    }
-  ).createAgentEnvironmentRuntime;
-  if (!factory)
-    throw new Error("Production environment runtime factory is unavailable");
-  const runtime = factory(config.runtime);
+  const runtime = createAgentEnvironmentRuntime(config.runtime);
   startupStage = "state";
   const store = new EnvironmentBindingStore(config.stateFile);
   const control = createEnvironmentControl(runtime, store);

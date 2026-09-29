@@ -1,6 +1,6 @@
 # DSH RC2 MVP 准备与执行计划
 
-2026-09-29。用户已明确启动全计划并授权检查通过后创建 PR、由协调者统一审查并直接合并；不授权 npm publish、公网产品镜像推送或对外 Release。A 阶段已完成契约/真实 RC 接入并合并，协调者接受 G1 后已派发 B/C/D；C 平台源码与本地检查已形成审查候选，B 生产包 pin 和 E 联合验收仍待收口，不代表 MVP 完成。需求与验收唯一主记录为 [平台 #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。协调者通过 Orca 派发和监督任务；用户最后执行 E2E 后决定发布。
+2026-09-29。用户已明确启动全计划并授权检查通过后创建 PR、由协调者统一审查并直接合并；不授权 npm publish、公网产品镜像推送或对外 Release。A 阶段已完成契约/真实 RC 接入并合并，协调者接受 G1 后已派发 B/C/D；C 平台源码与本地检查已形成审查候选，B 生产包已固定消费，E 联合验收仍待收口，不代表 MVP 完成。需求与验收唯一主记录为 [平台 #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104)。协调者通过 Orca 派发和监督任务；用户最后执行 E2E 后决定发布。
 
 ## 目标与冻结项
 
@@ -109,10 +109,10 @@ flowchart LR
 
 精确文件所有权：B 独占 runtime（含模板/RBAC/Connector/launcher/image）；C 独占平台 packages、scripts、vendor、根 package/lock 和非安装 integration；D 仅 charts、integration/installation、docs/installation。A 后的包/锁/pin 由各仓库实现 owner 独占；D 不复制 runtime 模板、不改包锁。集群唯一写入权按 A→B→E 转移。
 
-## C 平台实现候选（2026-09-29，尚待 B pin）
+## C 平台实现候选（2026-09-29，已消费 B 生产包）
 
 平台已将绑定/OIDC/会话/ingress/管理入口归入正式包，删除 RuntimeProvider/coordinator、多后端、Cell Connector、旧 SDK/体验入口和旧发布门禁。配置仅 runtime、stateFile、adminSocket、oidc、members、host、port；members 映射登录身份，平台自动按 owner 预留唯一环境，不再维护逐用户 environments 清单。
 
 绑定保存完整 owner/allocationKey/Sandbox UID/单 PVC UID、创建/启停未知屏障及删除屏障；Ready 才发布访问，停止与撤权关闭连接，缺失或换 UID 拒绝，删除后查询缺失仍保留具体诊断而非声称停止/删除证据。CLI 提供平台 start 及环境 inspect/stop/resume/delete，容器 UID/GID 1000，GET /healthz 仅本地 readiness。
 
-本地类型、平台单元/真实 socket transport、OIDC 签名回调正负例、构建和干净 tarball consumer 已通过；具体命令/数量以 C PR 报告为准。生命周期测试使用明确契约 fixture，尚未消费 B 最终生产制品，不能算联合验收；B pin 后须移除 A 缺失 factory 的临时启动拒绝并复验。E 仍负责真实集群、原生 DSH、两用户、模型和工具以及安装闭环；未 npm publish、未推公网镜像、未创建 Release。
+本地类型、平台单元/真实 socket transport、OIDC 签名回调正负例、构建和干净 tarball consumer 已通过；具体命令/数量以 C PR 报告为准。生命周期测试使用明确契约 fixture，不能算联合验收；现固定 B 生产 Connector 来源 `29530cbd2fec4da4b457efd8dfec64e239e7313d`，vendor SHA256 `3d25a33658824adf4ded3b38add48334bd23fa7871429742b14c658c1c3a1da0`，平台静态导入真实 factory 并执行包复验。E 仍负责真实集群、原生 DSH、两用户、模型和工具以及安装闭环；未 npm publish、未推公网镜像、未创建 Release。

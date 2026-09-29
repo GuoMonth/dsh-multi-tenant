@@ -14,8 +14,8 @@ importers:
   packages/multi-tenant:
     devDependencies:
       '@dsh/environment-connector-internal':
-        specifier: file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2.tgz
-        version: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2.tgz
+        specifier: file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz
+        version: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
@@ -43,8 +43,8 @@ importers:
 
 packages:
 
-  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2.tgz':
-    resolution: {integrity: sha512-x1NSGAztp6WYukvuC5fVxD7vK9TU/MHhz+dQWOLvIrYjiVJ9nk2sAaC/GwNvvSrnkHcdhOFIVlcGFCgEpISW5w==, tarball: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2.tgz}
+  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz':
+    resolution: {integrity: sha512-XwLOsWoJTqzJ1/WxEPjCZQeYJmplchz5BMKjR1Oo4zQ/iPpKMMCD8k8gEjLN8LGDNNSHpbRc0PxWXtiX7w8f1w==, tarball: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz}
     version: 0.0.0-rc.2
     engines: {node: '>=24'}
 
@@ -910,7 +910,7 @@ packages:
 
 snapshots:
 
-  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2.tgz': {}
+  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-29530cb.tgz': {}
 
   '@esbuild/aix-ppc64@0.28.2':
     optional: true

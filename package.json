@@ -7,7 +7,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "verify": "node scripts/verify-packages.mjs",
+    "verify": "node scripts/verify-packages.mjs && node integration/environment-contract/verify.mjs",
     "smoke": "node scripts/artifact-consumer-smoke.mjs",
     "release:check": "pnpm verify && pnpm typecheck && pnpm test && pnpm build && pnpm smoke"
   }

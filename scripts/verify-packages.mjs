@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -17,6 +18,15 @@ assert.equal(
   "sha512-" + createHash("sha512").update(archive).digest("base64"),
   pin.integrity,
 );
+const source = JSON.parse(
+  execFileSync(
+    "tar",
+    ["-xOf", "vendor/" + pin.artifact, "package/source.json"],
+    { encoding: "utf8" },
+  ),
+);
+assert.equal(source.repository, pin.repository);
+assert.equal(source.commit, pin.commit);
 assert.equal(
   pkg.devDependencies["@dsh/environment-connector-internal"],
   "file:../../vendor/" + pin.artifact,
