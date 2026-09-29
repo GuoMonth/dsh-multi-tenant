@@ -1,0 +1,183 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "platformImage",
+    "workloadImage",
+    "domain",
+    "ingressClassName",
+    "tlsSecretName",
+    "oidc",
+    "members",
+    "storageClassName",
+    "storageSize",
+    "controlStorageSize",
+    "namespacePrefix",
+    "resources"
+  ],
+  "properties": {
+    "platformImage": {
+      "type": "string",
+      "pattern": "^[^\\s]+@sha256:[a-f0-9]{64}$"
+    },
+    "workloadImage": {
+      "type": "string",
+      "pattern": "^[^\\s]+@sha256:[a-f0-9]{64}$"
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 180,
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+    },
+    "ingressClassName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+    },
+    "tlsSecretName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+    },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuer",
+        "clientId",
+        "secretName",
+        "secretKey"
+      ],
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "pattern": "^https://[^\\s]+$"
+        },
+        "clientId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secretName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+        },
+        "secretKey": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9._-]+$"
+        }
+      }
+    },
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issuer",
+          "subject",
+          "owner"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "pattern": "^https://[^\\s]+$"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "owner": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tenantId",
+              "principalId"
+            ],
+            "properties": {
+              "tenantId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "principalId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "storageClassName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+    },
+    "storageSize": {
+      "type": "string",
+      "pattern": "^([1-9][0-9]*(\\.[0-9]+)?|0\\.[0-9]*[1-9][0-9]*|\\.[0-9]*[1-9][0-9]*)([eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+    },
+    "controlStorageSize": {
+      "type": "string",
+      "pattern": "^([1-9][0-9]*(\\.[0-9]+)?|0\\.[0-9]*[1-9][0-9]*|\\.[0-9]*[1-9][0-9]*)([eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+    },
+    "namespacePrefix": {
+      "type": "string",
+      "maxLength": 24,
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requests",
+        "limits"
+      ],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "pattern": "^([1-9][0-9]*(\\.[0-9]+)?|0\\.[0-9]*[1-9][0-9]*|\\.[0-9]*[1-9][0-9]*)([eE][+-]?[0-9]+|m)?$"
+            },
+            "memory": {
+              "type": "string",
+              "pattern": "^([1-9][0-9]*(\\.[0-9]+)?|0\\.[0-9]*[1-9][0-9]*|\\.[0-9]*[1-9][0-9]*)([eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu",
+            "memory"
+          ],
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "pattern": "^([1-9][0-9]*(\\.[0-9]+)?|0\\.[0-9]*[1-9][0-9]*|\\.[0-9]*[1-9][0-9]*)([eE][+-]?[0-9]+|m)?$"
+            },
+            "memory": {
+              "type": "string",
+              "pattern": "^([1-9][0-9]*(\\.[0-9]+)?|0\\.[0-9]*[1-9][0-9]*|\\.[0-9]*[1-9][0-9]*)([eE][+-]?[0-9]+|[numkMGTPE]|[KMGTPE]i)?$"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

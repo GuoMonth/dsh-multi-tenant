@@ -1,0 +1,41 @@
+{
+  "apiVersion": "apps/v1", "kind": "Deployment",
+  "metadata": {"name": "dsh-platform", "namespace": {{ .Release.Namespace | toJson }}},
+  "spec": {
+    "replicas": 1, "strategy": {"type": "Recreate"},
+    "selector": {"matchLabels": {"app.kubernetes.io/name": "dsh-platform"}},
+    "template": {
+      "metadata": {"labels": {"app.kubernetes.io/name": "dsh-platform"}, "annotations": {"checksum/config": {{ include "dsh.config" . | sha256sum | toJson }}}},
+      "spec": {
+        "serviceAccountName": "dsh-platform", "automountServiceAccountToken": false, "enableServiceLinks": false,
+        "nodeSelector": {"kubernetes.io/os": "linux", "kubernetes.io/arch": "amd64"},
+        "securityContext": {"runAsNonRoot": true, "runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000, "seccompProfile": {"type": "RuntimeDefault"}},
+        "initContainers": [{
+          "name": "private-files", "image": {{ .Values.platformImage | toJson }}, "imagePullPolicy": "IfNotPresent",
+          "command": ["node", "-e", "const f=require('node:fs');f.mkdirSync('/state/platform',{recursive:true,mode:0o700});f.chmodSync('/state/platform',0o700);f.chmodSync('/private',0o700);f.copyFileSync('/oidc/client-secret','/private/oidc-client-secret');f.chmodSync('/private/oidc-client-secret',0o600);"],
+          "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}},
+          "resources": {"requests": {"cpu": "10m", "memory": "32Mi"}, "limits": {"cpu": "250m", "memory": "128Mi"}},
+          "volumeMounts": [{"name": "state", "mountPath": "/state"}, {"name": "private", "mountPath": "/private"}, {"name": "oidc", "mountPath": "/oidc", "readOnly": true}]
+        }],
+        "containers": [{
+          "name": "platform", "image": {{ .Values.platformImage | toJson }}, "imagePullPolicy": "IfNotPresent",
+          "args": ["start", "--config", "/config/config.json"],
+          "ports": [{"name": "http", "containerPort": 8080}],
+          "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}},
+          "resources": {"requests": {"cpu": "100m", "memory": "256Mi"}, "limits": {"cpu": "1", "memory": "1Gi"}},
+          "startupProbe": {"httpGet": {"path": "/healthz", "port": "http"}, "periodSeconds": 3, "failureThreshold": 40},
+          "readinessProbe": {"httpGet": {"path": "/healthz", "port": "http"}, "periodSeconds": 5},
+          "volumeMounts": [{"name": "state", "mountPath": "/state"}, {"name": "private", "mountPath": "/private", "readOnly": true}, {"name": "config", "mountPath": "/config", "readOnly": true}, {"name": "kubernetes", "mountPath": "/var/run/dsh-kubernetes", "readOnly": true}, {"name": "tmp", "mountPath": "/tmp"}]
+        }],
+        "volumes": [
+          {"name": "state", "persistentVolumeClaim": {"claimName": "dsh-platform-state"}},
+          {"name": "private", "emptyDir": {"medium": "Memory", "sizeLimit": "1Mi"}},
+          {"name": "tmp", "emptyDir": {"sizeLimit": "64Mi"}},
+          {"name": "config", "configMap": {"name": "dsh-platform-config"}},
+          {"name": "oidc", "secret": {"secretName": {{ .Values.oidc.secretName | toJson }}, "defaultMode": 288, "items": [{"key": {{ .Values.oidc.secretKey | toJson }}, "path": "client-secret"}]}},
+          {"name": "kubernetes", "projected": {"defaultMode": 288, "sources": [{"serviceAccountToken": {"path": "token", "expirationSeconds": 3600}}, {"configMap": {"name": "kube-root-ca.crt", "items": [{"key": "ca.crt", "path": "ca.crt"}]}}]}}
+        ]
+      }
+    }
+  }
+}

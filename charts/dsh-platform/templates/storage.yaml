@@ -1,0 +1,5 @@
+{
+  "apiVersion": "v1", "kind": "PersistentVolumeClaim",
+  "metadata": {"name": "dsh-platform-state", "namespace": {{ .Release.Namespace | toJson }}, "annotations": {"helm.sh/resource-policy": "keep"}},
+  "spec": {"accessModes": ["ReadWriteOnce"], "storageClassName": {{ .Values.storageClassName | toJson }}, "resources": {"requests": {"storage": {{ .Values.controlStorageSize | toJson }}}}}
+}

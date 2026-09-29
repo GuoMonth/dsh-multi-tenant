@@ -1,0 +1,18 @@
+{
+  "platformImage": "example.invalid/platform@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "workloadImage": "example.invalid/workload@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "domain": "dsh.example.invalid",
+  "ingressClassName": "nginx",
+  "tlsSecretName": "dsh-tls",
+  "oidc": {
+    "issuer": "https://id.example.invalid",
+    "clientId": "dsh",
+    "secretName": "dsh-oidc",
+    "secretKey": "client-secret"
+  },
+  "storageClassName": "local-path",
+  "members": [
+    {"issuer": "https://id.example.invalid", "subject": "alice", "owner": {"tenantId": "example", "principalId": "alice"}},
+    {"issuer": "https://id.example.invalid", "subject": "bob", "owner": {"tenantId": "example", "principalId": "bob"}}
+  ]
+}

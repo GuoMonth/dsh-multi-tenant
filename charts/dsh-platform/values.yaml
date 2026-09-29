@@ -1,0 +1,24 @@
+# No public platform/workload candidate has been published. Supply real digests.
+platformImage: ""
+workloadImage: ""
+domain: ""
+ingressClassName: ""
+tlsSecretName: ""
+oidc:
+  issuer: ""
+  clientId: ""
+  secretName: ""
+  secretKey: client-secret
+members: []
+storageClassName: ""
+storageSize: 10Gi
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+# Platform SQLite storage is administrative state, separate from user PVCs.
+controlStorageSize: 1Gi
+namespacePrefix: dsh-env

@@ -1,0 +1,8 @@
+{{- range .Values.members }}
+{{- if ne .issuer $.Values.oidc.issuer }}{{ fail "Every member issuer must match oidc.issuer" }}{{ end }}
+{{- end }}
+{
+  "apiVersion": "v1", "kind": "ConfigMap",
+  "metadata": {"name": "dsh-platform-config", "namespace": {{ .Release.Namespace | toJson }}},
+  "data": {"config.json": {{ include "dsh.config" . | toJson }}}
+}

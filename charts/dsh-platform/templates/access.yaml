@@ -1,0 +1,12 @@
+{
+  "apiVersion": "v1", "kind": "ServiceAccount",
+  "metadata": {"name": "dsh-platform", "namespace": {{ .Release.Namespace | toJson }}},
+  "automountServiceAccountToken": false
+}
+---
+{
+  "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRoleBinding",
+  "metadata": {"name": "dsh-platform-runtime"},
+  "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "dsh-environment-runtime"},
+  "subjects": [{"kind": "ServiceAccount", "name": "dsh-platform", "namespace": {{ .Release.Namespace | toJson }}}]
+}
