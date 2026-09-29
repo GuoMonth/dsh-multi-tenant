@@ -1,19 +1,15 @@
 # Repository instructions
 
-[CONSTITUTION.md](CONSTITUTION.md) owns product principles. The Kubernetes-only AgentEnvironment contract is tracked in [Issue #104](https://github.com/GuoMonth/dsh-multi-tenant/issues/104); implementation status and acceptance belong to the Issue, not this file.
+Product boundaries: [CONSTITUTION.md](CONSTITUTION.md). Interface and phase design: [AgentEnvironment](docs/design/agent-environment.zh-CN.md); its linked Issues own acceptance and progress. The design is not proof of implementation.
 
-## Task routing
+## Development
 
-- Environment design or breaking changes: [AgentEnvironment contract](docs/design/agent-environment.zh-CN.md). Current Cell implementation/ownership: [S0 architecture](docs/design/s0-runtime-architecture.zh-CN.md); current tested evidence: [regression report](docs/evidence/cell-regression-2026-09-20.md).
-- Current installation and pinned versions: [quickstart](docs/reference/quickstart.md) and [package AI guide](packages/multi-tenant/AI.md). Roadmap and task ownership: [POC roadmap](docs/roadmap.md).
-- Checks and contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
-- Publication: [release runbook](docs/reference/release.md). Publishing, deployment and data deletion require applicable user authorization; routine local edits/checks within the task can proceed.
-- Other docs: [index](docs/README.md). Archived plans and standalone/Docker SDK guides are historical evidence, not current installation instructions or requirements. The active path is Envoy TLS/routing → platform `openid-client` OIDC/admission → Node Connector → Go launcher; historical Envoy OIDC/authorizer and standalone flows are not active.
+- Private pnpm workspace; packages/multi-tenant is publishable. Manifests own engines, package manager and exports; scripts/dsh-target.mjs owns the DSH pin.
+- Follow nearby TypeScript ESM patterns. Check commands and validation selection: [CONTRIBUTING.md](CONTRIBUTING.md).
+- User-facing changes update root READMEs and their package copies; shipped links must work outside the checkout. Keep the bundled AI guide aligned with CLI behavior.
+- Preserve fail-closed admission/revocation and exact instance ownership. Platform identity, control storage and secrets remain outside user domains.
+- Public exports and tests define implemented behavior. Current Cell implementation: [S0 architecture](docs/design/s0-runtime-architecture.zh-CN.md). Historical standalone and Envoy OIDC/authorizer guides are not active-path requirements.
 
-## Repository-specific constraints
+## References
 
-- The root is a private pnpm workspace; `packages/multi-tenant` is publishable. Read package manifests for exports/engines/package manager and `scripts/dsh-target.mjs` for the DSH pin.
-- Platform identity/control storage/secrets remain outside user domains. DSH owns native Web, sessions, tools and persistence; do not copy its controllers or introduce shared-host per-root ACLs.
-- Preserve fail-closed admission/revocation and exact instance ownership. Unknown cleanup must not admit another writer to the same data.
-- User-facing changes update both root READMEs and their npm package copies; shipped links must work outside a checkout. Keep the bundled AI guide aligned with actual CLI behavior.
-- Follow nearby TypeScript ESM patterns. Current public exports and tests define implemented behavior; use the regression and delivery reports for evidence, not design prose.
+Installation: [quickstart](docs/reference/quickstart.md) and [package AI guide](packages/multi-tenant/AI.md). Publishing: [release runbook](docs/reference/release.md). Other documents: [index](docs/README.md). Load evidence and archived plans only for the behavior under review.
