@@ -1,0 +1,19 @@
+{
+  "apiVersion": "v1", "kind": "Service",
+  "metadata": {"name": "dsh-platform", "namespace": {{ .Release.Namespace | toJson }}},
+  "spec": {"selector": {"app.kubernetes.io/name": "dsh-platform"}, "ports": [{"name": "http", "port": 80, "targetPort": "http"}]}
+}
+---
+{
+  "apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+  "metadata": {"name": "dsh-platform", "namespace": {{ .Release.Namespace | toJson }}},
+  "spec": {
+    "ingressClassName": {{ .Values.ingressClassName | toJson }},
+    "tls": [{"secretName": {{ .Values.tlsSecretName | toJson }}, "hosts": [{{ .Values.domain | toJson }}, {{ printf "*.env.%s" .Values.domain | toJson }}]}],
+    "rules": [
+      {{- range $i, $host := list .Values.domain (printf "*.env.%s" .Values.domain) }}{{ if $i }},{{ end }}
+      {"host": {{ $host | toJson }}, "http": {"paths": [{"path": "/", "pathType": "Prefix", "backend": {"service": {"name": "dsh-platform", "port": {"name": "http"}}}}]}}
+      {{- end }}
+    ]
+  }
+}

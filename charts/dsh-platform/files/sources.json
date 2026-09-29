@@ -1,0 +1,18 @@
+{
+  "dsh": {"version": "0.2.0-rc.2", "commit": "639ed015397290b3745d163aafe02ffee4aa3f84"},
+  "core": {
+    "url": "https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.3/core.yaml",
+    "original": "agent-sandbox-v1.0.3.yaml",
+    "originalSha256": "725fafdabe6aac202a89dc57f1cfe0e2e92f3164c8c2bd343fffca52f7039d96",
+    "pinned": "agent-sandbox-v1.0.3-pinned.yaml",
+    "pinnedSha256": "e071569ce050ebcad0cafb00a7a04233883e375f2f0e86f55a7e24a2b34544e2",
+    "image": "registry.k8s.io/agent-sandbox/agent-sandbox-controller@sha256:b2160ee08dd4f2285b382d4b5073948891adfacbc9808a4ba9cf247766243c8c"
+  },
+  "runtimeRole": {
+    "repository": "https://github.com/GuoMonth/dsh-isolated-runtime",
+    "path": "config/runtime/cluster-role.yaml",
+    "commit": "29530cbd2fec4da4b457efd8dfec64e239e7313d",
+    "file": "runtime-cluster-role.yaml",
+    "sha256": "ccc79877cbca2e48da39b51252ee7de1e9157aa17641990acdc1fe6aae843723"
+  }
+}
