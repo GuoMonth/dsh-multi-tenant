@@ -10,5 +10,5 @@ docker run --rm --user "$(id -u):$(id -g)" --network kind \
   -v /usr/local/bin/kubectl:/usr/local/bin/kubectl:ro \
   -v /usr/local/bin/helm:/usr/local/bin/helm:ro \
   -e NODE_EXTRA_CA_CERTS=/private/ca.crt --entrypoint node "$E_PLATFORM_IMAGE" \
-  /work/charts/install.mjs "${1:-preflight}" --values /private/values.json \
-  --namespace "$E_NAMESPACE" --kubeconfig /private/container-kubeconfig --context kind-dsh-mvp-rc2
+  /app/node_modules/dsh-multi-tenant/dist/cli.mjs "${1:-preflight}" --values /private/values.json \
+  --namespace "$E_NAMESPACE" --kubeconfig /private/container-kubeconfig --context "kind-${E_CLUSTER:-dsh-mvp-rc2}"

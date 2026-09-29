@@ -15,8 +15,10 @@
     {
       "issuer": "https://id.company.example",
       "subject": "REPLACE_WITH_OIDC_SUBJECT",
-      "tenantId": "company",
-      "principalId": "employee-1"
+      "owner": {
+        "tenantId": "company",
+        "principalId": "employee-1"
+      }
     }
   ]
 }
