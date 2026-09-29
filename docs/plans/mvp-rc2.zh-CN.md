@@ -93,7 +93,7 @@ flowchart LR
 - 32 逻辑 CPU，约 60 GiB 内存（准备时可用约 53 GiB）、1.6 TiB 剩余磁盘，足够 1→3→1 本地开发和小规模验证。最多两项重型构建同时运行；集群安装/改 CRD 串行。
 - Docker 29.8.1、buildx 0.37.1、kind 0.32.0、kubectl 1.36.2、Helm 3.21.3、Node 24.21.0、Go 1.27.1（使用 `dev-run go=1.27 -- ...`）、仓库 pnpm 11.7.0 已核验。home 下 pnpm 默认 11.12.0，仓库按 packageManager 自动选择 11.7.0。
 - k9s 原缺失，已安装官方 v0.51.0 到用户目录并核对官方 SHA256；它是人工观察工具，不是执行依赖。
-- Playwright 按仓库锁定 1.58.2，匹配 Chromium Headless Shell 145.0.7632.6 已启动并验证页面；安装浏览器时使用 `PLAYWRIGHT_SKIP_BROWSER_GC=1`，避免清理其他项目共享缓存。集群预检结果记录在准备 PR。
+- Playwright 按仓库锁定 1.58.2，匹配 Chromium Headless Shell 145.0.7632.6 已启动并验证页面；安装浏览器时使用 `PLAYWRIGHT_SKIP_BROWSER_GC=1`，避免清理其他项目共享缓存。集群预检结果见 [准备记录](../evidence/mvp-preparation-2026-09-29.md)。
 - 专用 kind `dsh-mvp-rc2`、Kubernetes 1.37.0、Calico 3.32.2、local-path。Pod CIDR 10.244.0.0/16，避开本机 Docker kind 网段 192.168.64.0/20。只保证本机功能验证，不证明跨节点可用性或存储硬配额。
 - 集群资源登记为 `dsh-mvp-rc2-kind-control-plane`。私有 kubeconfig 在 `/home/aigs/projects/runtime/dsh-mvp-rc2/private/kubeconfig`；证据在相邻 `evidence/`，机密不进入仓库/PR。
 - 后续需要测试 OIDC 两账号、TLS/DNS、模型和外部工具授权。部署配置与临时测试身份由 A/D/E 构造；不将 fixture IdP 当真实企业 SSO 兼容证明。复用已有授权凭据时仅私有文件注入，不打印；若目标工具没有授权或需人工登录，明确提出具体缺项。准备阶段不以其替代真实业务验收。
