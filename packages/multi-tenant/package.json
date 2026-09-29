@@ -62,7 +62,8 @@
     "typescript": "^6.0.3",
     "vitest": "^4.1.8",
     "ws": "8.18.3",
-    "@types/ws": "8.18.1"
+    "@types/ws": "8.18.1",
+    "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2.tgz"
   },
   "scripts": {
     "build": "npm ci --ignore-scripts --prefix ../../integration/cell-platform && tsdown",
@@ -72,8 +73,8 @@
     "prepublishOnly": "node ../../scripts/verify-cell-publication.mjs"
   },
   "dshRuntime": {
-    "version": "0.1.5-rc.2",
-    "commit": "fb2c4b9e698e30edb738bca4cf0618587db7d203"
+    "version": "0.2.0-rc.2",
+    "commit": "639ed015397290b3745d163aafe02ffee4aa3f84"
   },
   "bin": {
     "dsh-multi-tenant": "dist/cli.mjs"
