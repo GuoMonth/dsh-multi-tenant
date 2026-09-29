@@ -8,10 +8,11 @@ DSH 固定 `0.2.0-rc.2` / `639ed015397290b3745d163aafe02ffee4aa3f84`。
 
 ## 前提
 
-- 已有 Linux/amd64 Kubernetes，支持 NetworkPolicy 的 CNI、动态供应的 StorageClass，
+- 已有 Linux/amd64 Kubernetes 1.37，支持 NetworkPolicy 的 CNI、动态供应的 StorageClass，
   已安装 Ingress controller。参考环境为 Kubernetes 1.37、Calico 3.32.2、local-path。
   不安装集群、CNI 或 Ingress controller。Ingress controller 必须透明保留 Host、
-  支持 HTTP/WebSocket，TLS 终止后转发到平台 8080；按管理员选定实现配置连接超时。
+  支持 HTTP/WebSocket，TLS 终止后转发到平台 8080，公网 HTTP 必须关闭或重定向到 HTTPS；
+  按管理员选定实现配置连接超时。
 - Node 24、Helm 3、kubectl，明确 kubeconfig 和 context；安装者有创建 upstream core
   CRD/controller/RBAC 与平台资源的权限。只允许一个平台安装，固定 release `dsh-platform`。
   这是全新安装路径，没有旧 Alpha 升级、导入或自动恢复。
@@ -57,14 +58,16 @@ node charts/install.mjs install --values /private/install.values.json --namespac
 ```
 
 入口先检查 schema、成员、制品校验和、namespace、Ready amd64 节点、StorageClass、IngressClass、
-Secret key、TLS 有效期与主机覆盖、安装机 DNS 和 OIDC discovery，然后安装固定 core、等待 CRD/
+Secret key、TLS 密钥匹配/有效期/主机覆盖、安装机 DNS 和 OIDC discovery，然后安装固定 core、等待 CRD/
 controller、安装唯一 runtime role，最后 `helm install --wait` 平台。平台健康探针是 C 的
 `GET /healthz`，无登录/模型请求。安装机预检不能证明 Pod 网络、证书信任、真实镜像或用户链路。
 不使用 `--atomic` 自动删除资源：失败会保留现场和存储，输出固定脱敏错误；管理员核对原资源
-后处理，不自动重装、换 allocationKey 或删卷。需要诊断模板时单独运行 `helm lint`，不打印 Secret。
+后处理，不自动重装、换 allocationKey 或删卷。已有平台绑定或控制 PVC 会拒绝全新安装，
+不跨 namespace 建第二套平台或冒领原控制状态。需要诊断模板时单独运行 `helm lint`，不打印 Secret。
 
 平台 UID/GID 1000；init container 只把已引用的 OIDC Secret 复制到内存卷的私有 0600 文件，
-主容器只读挂载，state/admin 目录0700。Secret 轮换后必须重建平台 Pod以刷新副本。
+主容器只读挂载，state/admin 目录0700。SQLite 位于控制 PVC，admin socket 位于 Pod 临时卷
+`/tmp/platform/admin.sock`，不会把套接字遗留到下一个 Pod。Secret 轮换后必须重建平台 Pod以刷新副本。
 平台 projected SA token 可轮换，只有平台容器挂载。用户首次进入触发 runtime 供应，文件位于
 `/var/lib/dsh/data/{workspace,home,dsh}`。用户在原生 DSH 页面配置模型/凭据及工具授权，
 保存到自己的单卷；安装不引入共享模型 Secret 或新的模型协议。

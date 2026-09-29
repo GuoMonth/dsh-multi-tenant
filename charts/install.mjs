@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One fixed installation path. No per-user templates or runtime implementation here.
 import { readFileSync } from 'node:fs';
-import { createHash, X509Certificate } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, X509Certificate } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -81,21 +81,33 @@ export async function main(args) {
   const common = ['--kubeconfig', resolve(options['--kubeconfig']), '--context', options['--context'], '--request-timeout=20s'];
   const k = (...argv) => run('kubectl', [...argv, ...common]);
   const namespace = options['--namespace'];
-  const get = (...argv) => JSON.parse(k('get', ...argv, '-o', 'json'));
+  const get = (...argv) => {
+    try { return JSON.parse(k('get', ...argv, '-o', 'json')); }
+    catch { throw new Error(`Cannot read ${argv[0]} ${argv[1] ?? ''}; check existence, cluster reachability and administrator permissions`); }
+  };
   const { config, pod, ingress, secret } = target;
   // All checks precede any write. Only fixed, redacted diagnostics leave this process.
   get('namespace', namespace);
+  const version = JSON.parse(k('version', '-o', 'json')).serverVersion;
+  if (version.major !== '1' || !/^37(?:\D|$)/.test(version.minor)) throw new Error('Reference installation requires Kubernetes 1.37; other versions are unverified');
   get('storageclass', config.runtime.storage.storageClassName);
   get('ingressclass', ingress.spec.ingressClassName);
   const nodes = get('nodes').items;
   if (!nodes.some(n => n.metadata.labels['kubernetes.io/arch'] === 'amd64' && n.metadata.labels['kubernetes.io/os'] === 'linux' && n.status.conditions.some(c => c.type === 'Ready' && c.status === 'True'))) throw new Error('No Ready Linux/amd64 node');
   if (k('get', 'deployment', 'dsh-platform', '-n', namespace, '--ignore-not-found', '-o', 'name').trim()) throw new Error('Platform already exists; this path is a fresh install, not an upgrade');
+  if (k('get', 'clusterrolebinding', 'dsh-platform-runtime', '--ignore-not-found', '-o', 'name').trim()) throw new Error('Platform role binding already exists; do not create a second installation or adopt partial state');
+  if (k('get', 'pvc', 'dsh-platform-state', '-n', namespace, '--ignore-not-found', '-o', 'name').trim()) throw new Error('Control PVC already exists; preserve it and inspect the original installation, do not adopt it as new state');
   const oidcSecret = get('secret', secret.secretName, '-n', namespace);
   if (!Buffer.from(oidcSecret.data?.[secret.items[0].key] ?? '', 'base64').toString('utf8').trim()) throw new Error('OIDC Secret/key missing or empty');
   const tls = get('secret', ingress.spec.tls[0].secretName, '-n', namespace);
   if (tls.type !== 'kubernetes.io/tls' || !tls.data?.['tls.key']) throw new Error('TLS Secret requires tls.crt and tls.key');
   let cert;
   try { cert = new X509Certificate(Buffer.from(tls.data['tls.crt'], 'base64')); } catch { throw new Error('TLS certificate invalid'); }
+  try {
+    const key = createPrivateKey(Buffer.from(tls.data['tls.key'], 'base64'));
+    const publicKey = createPublicKey(key).export({type:'spki',format:'der'});
+    if (!publicKey.equals(cert.publicKey.export({type:'spki',format:'der'}))) throw new Error();
+  } catch { throw new Error('TLS private key invalid or does not match certificate'); }
   const hosts = [config.oidc.siteDomain, `preflight.env.${config.oidc.siteDomain}`];
   if (Date.parse(cert.validFrom) > Date.now() || Date.parse(cert.validTo) <= Date.now() || hosts.some(h => !cert.checkHost(h))) throw new Error('TLS certificate expired/not yet valid or missing platform/wildcard coverage');
   try { await Promise.all(hosts.map(h => lookup(h))); } catch { throw new Error('Platform or wildcard DNS unresolved; configure DNS before install'); }

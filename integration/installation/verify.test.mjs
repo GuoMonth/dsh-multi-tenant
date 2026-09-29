@@ -47,6 +47,8 @@ test('config matches C and runtime options, private identity stays in platform',
   assert.equal(config.runtime.domain, 'env.dsh.example.invalid');
   assert.deepEqual(config.runtime.resources, {requests:{cpu:'250m',memory:'512Mi'},limits:{cpu:'2',memory:'2Gi'}});
   assert.equal(config.oidc.clientSecretFile, '/private/oidc-client-secret');
+  assert.equal(config.adminSocket, '/tmp/platform/admin.sock');
+  assert.equal(config.stateFile, '/state/platform/state.sqlite');
   assert.equal(config.members.length, 2);
   assert.equal(secret.secretName, 'dsh-oidc');
   assert.equal(pod.automountServiceAccountToken, false);

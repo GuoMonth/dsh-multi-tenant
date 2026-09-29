@@ -12,10 +12,10 @@
         "securityContext": {"runAsNonRoot": true, "runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000, "seccompProfile": {"type": "RuntimeDefault"}},
         "initContainers": [{
           "name": "private-files", "image": {{ .Values.platformImage | toJson }}, "imagePullPolicy": "IfNotPresent",
-          "command": ["node", "-e", "const f=require('node:fs');f.mkdirSync('/state/platform',{recursive:true,mode:0o700});f.chmodSync('/state/platform',0o700);f.chmodSync('/private',0o700);f.copyFileSync('/oidc/client-secret','/private/oidc-client-secret');f.chmodSync('/private/oidc-client-secret',0o600);"],
+          "command": ["node", "-e", "const f=require('node:fs');for(const d of ['/state/platform','/tmp/platform']){f.mkdirSync(d,{recursive:true,mode:0o700});f.chmodSync(d,0o700);}f.chmodSync('/private',0o700);f.copyFileSync('/oidc/client-secret','/private/oidc-client-secret');f.chmodSync('/private/oidc-client-secret',0o600);"],
           "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}},
           "resources": {"requests": {"cpu": "10m", "memory": "32Mi"}, "limits": {"cpu": "250m", "memory": "128Mi"}},
-          "volumeMounts": [{"name": "state", "mountPath": "/state"}, {"name": "private", "mountPath": "/private"}, {"name": "oidc", "mountPath": "/oidc", "readOnly": true}]
+          "volumeMounts": [{"name": "state", "mountPath": "/state"}, {"name": "tmp", "mountPath": "/tmp"}, {"name": "private", "mountPath": "/private"}, {"name": "oidc", "mountPath": "/oidc", "readOnly": true}]
         }],
         "containers": [{
           "name": "platform", "image": {{ .Values.platformImage | toJson }}, "imagePullPolicy": "IfNotPresent",
