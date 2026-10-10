@@ -26,6 +26,6 @@ OIDC `(issuer, subject)` 映射为 `(tenantId, principalId)`。平台为每个�
 - [DSH 版本](../../scripts/dsh-target.mjs)：精确 npm 版本和源码提交。
 - [Connector 来源](../../vendor/environment-connector.json)：源码提交和 tarball 完整性。
 - [安装资产来源](../../charts/dsh-platform/files/sources.json)：控制器与 runtime RBAC 版本。
-- [发行验证](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.10.0-alpha.1/validation.md)：实际镜像、双用户/模型/工具检查和限制。
+- [发行验证](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.10.0-rc.1/validation.md)：实际镜像、双用户/模型/工具检查和限制。
 
 共享边界见[产品原则](../../CONSTITUTION.zh-CN.md)。用户可见的数据与生命周期行为见[运维](operations.md)。
