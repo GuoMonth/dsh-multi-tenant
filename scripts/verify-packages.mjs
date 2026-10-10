@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { DSH_TARGET } from "./dsh-target.mjs";
+import { releasePolicy } from "./release-policy.mjs";
 const read = (p) => JSON.parse(readFileSync(p, "utf8"));
 const pkg = read("packages/multi-tenant/package.json"),
   pin = read("vendor/environment-connector.json");
+assert.equal(pkg.publishConfig.tag, releasePolicy(pkg.version).channel);
 assert.deepEqual(pkg.dshRuntime, {
   version: DSH_TARGET.version,
   commit: DSH_TARGET.commit,
