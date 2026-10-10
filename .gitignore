@@ -5,3 +5,6 @@ coverage/
 .DS_Store
 .dsh-multi-tenant/
 packages/multi-tenant/charts/
+packages/multi-tenant/README.md
+packages/multi-tenant/README.zh-CN.md
+packages/multi-tenant/AI.md

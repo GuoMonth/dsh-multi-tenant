@@ -1,7 +1,7 @@
-# 贡献指南
+# 参与开发
 
-产品原则见[项目宪法](CONSTITUTION.md)，技术边界见 [S0](docs/design/s0-runtime-architecture.zh-CN.md)，按任务找资料见[文档索引](docs/README.md)。
+[English](CONTRIBUTING.md)
 
-[英文贡献指南](CONTRIBUTING.md) 是检查命令的唯一维护源：文档检查链接，业务修改验证相关行为，原生入口修改需真实安装/浏览器证据，发行准备才运行完整发行检查。按改动风险选择检查；通过后只有新修改或未解决失败才重跑、扩大范围。
+环境准备与检查见[开发指南](docs/zh-CN/development.md)，组件分工见[架构](docs/zh-CN/architecture.md)，发行步骤见[发布指南](docs/zh-CN/releasing.md)。产品原则见 [CONSTITUTION.zh-CN.md](CONSTITUTION.zh-CN.md)。
 
-用户侧文档保持根目录与 npm 包副本一致。PR 写明提交、实际验证和未覆盖项；发布、部署和数据删除遵循已有授权。
+PR 写明行为变化、实际检查和未覆盖项。跨仓库修改关联双方 PR，记录受测提交和制品。

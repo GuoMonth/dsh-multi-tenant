@@ -68,7 +68,7 @@ const tags=await (await fetch(`https://registry.npmjs.org/-/package/${pkg.name}/
 assert.equal(tags.latest,pkg.version);
 if(!existingTag){run('git',['tag',tag,env.GITHUB_SHA]);run('git',['push','origin',tag]);}
 const releases=json('gh',['release','list','--limit','100','--json','tagName']);
-if(!releases.some(x=>x.tagName===tag))run('gh',['release','create',tag,'--verify-tag','--latest','--title',tag,'--notes-file',`docs/releases/${tag}.md`,artifact,'publication/release.json','publication/SHA256SUMS']);
+if(!releases.some(x=>x.tagName===tag))run('gh',['release','create',tag,'--verify-tag','--latest','--title',tag,'--notes-file','docs/en/release-notes.md',artifact,'publication/release.json','publication/SHA256SUMS']);
 else{
  const assets=json('gh',['release','view',tag,'--json','assets']).assets;
  const names=new Set(assets.map(x=>x.name));

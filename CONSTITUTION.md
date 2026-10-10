@@ -1,37 +1,14 @@
-# DSH 平台与运行时产品原则
+# Product principles
 
-适用于 dsh-multi-tenant 与 dsh-isolated-runtime，共享原则只在本文件维护。接口与阶段方案见 [AgentEnvironment 设计](docs/design/agent-environment.zh-CN.md)，实施状态与验收见其关联 Issue；技术执行见各仓库 AGENTS.md。用户明确的产品决定可以调整这些原则。
+[简体中文](CONSTITUTION.zh-CN.md)
 
-## 产品与职责
+These principles apply to dsh-multi-tenant and dsh-isolated-runtime.
 
-定位为开源 Alpha 阶段的企业内网持久 AI 工作环境，先完成可安装、可持续使用的双用户 MVP。5 万成员/5000 在线是后续目标，不是首版门槛。员工侧少概念、管理员侧少配置，数据保障和可理解的运维优先于极限性能；秒级进入可接受。目标人群、成熟组件复用、数据恢复和容量验收见 [企业定位](docs/design/enterprise-positioning.zh-CN.md)。
+- Provide trusted organization members with persistent AI work environments using native DSH. Kubernetes is the execution backend; upstream Agent Sandbox core manages Pods and Services.
+- The platform owns identity, authorization and environment bindings. Runtime owns exact resource identity and lifecycle. DSH owns conversations, models, tools and application protocols.
+- Each owner has at most one environment and one data PVC. Platform secrets and control state stay outside user environments.
+- Verify owner and resource UIDs before access or mutation. An unknown stop cannot authorize another writer; a missing volume cannot be replaced as recovery.
+- Normal stop/start and Pod recreation retain data. Logout, revocation and default deletion retain user volumes. Backup, supported upgrades, HA and cross-node recovery require separate work.
+- Alpha may change interfaces and configuration without migration support. Release and deployment use immutable source and artifact identities. Check the actual combination before claiming support.
 
-提供经 OIDC 授权的独立 AgentEnvironment，使用原生 DSH，验证跨用户访问隔离、撤权、持久数据和失败行为。优先完成真实核心链路，按实际需求扩展。
-
-- multi-tenant 负责身份、成员映射、授权、访问会话、环境分配与精确绑定，以及访问准入。
-- isolated-runtime 负责环境资源聚合、执行和存储生命周期、真实状态及受限应用通道；Kubernetes 控制器负责资源调谐。平台不复制 Kubernetes 运行状态。
-- DSH 负责原生 Web、对话、工具、文件和应用协议；平台透明转发，不重写应用协议。
-
-Kubernetes 是唯一产品执行后端，删除 Process／Docker 产品后端及多后端抽象。Pod 内子进程、镜像构建和 kind 的 Docker 底座不属于产品后端。保持内部职责接口，不建设独立 runtime 服务、公共线协议或插件兼容层。
-
-每租户每用户最多一个环境，可容纳多个共享文件和凭据的 DSH 对话；环境身份和存储独立于 Pod 生命周期。登出／撤权不隐式停止或删除环境。每用户一个独立 PVC；namespace 是受限管理路径按批准模板供应的基础设施范围，平台是用户归属与授权的唯一权威。
-
-## 边界与失败行为
-
-普通 Pod／容器是当前执行边界，保留用户访问隔离、独立存储、基本网络隔离和资源限制，不授予宿主权限或集群控制凭据。受控成员 POC 不承诺面向敌对租户的强沙箱保证；不额外建设逐工具二级沙箱。
-
-身份、配置或版本不符合前提时尽早失败。等待有界，错误可诊断且不泄漏凭据；区分未提交、已接受、失败与结果未知。未知写入先核对原身份，不自动另建实例；超时、取消或对象消失不能证明执行停止。
-
-按精确资源身份操作，不能串用户、误操作外来实例或静默删除数据。旧 writer 停止未经证实时不复用其数据；超出已验证故障模型交管理员处理，不自建 fencing 或无限恢复编排。去重不承诺无限期历史重放，不建设永久 tombstone 或通用操作日志引擎。
-
-## 演进与证据
-
-Alpha 允许直接破坏性变更：删除旧接口、后端、配置和状态格式，不维护兼容层、历史迁移或旧版本升级路径；使用全新环境验证新组合。无需为旧 Alpha 增加保全/导出产品能力，不因历史设计保留无用抽象。已发布制品与历史证据不改写；此原则不自动清理已有用户数据或其他任务资源。
-
-验证固定双仓库提交、DSH 版本及镜像身份；发行与部署固定实际制品 digest，已发布制品和历史证据保持不可变。发行渠道细节见 [发布流程](docs/reference/release.md)。
-
-首版保证单卷中的文件、会话与必要配置在正常启停和 Pod 重建后保留；退出、撤权和卸载不默认删用户卷。完整备份/恢复、受支持升级和 RPO/RTO 后置，不阻塞 MVP，也不宣称已经具备。后续复用成熟工具，不自研备份引擎。
-
-不提前建设多集群、自动 idle、热池、内存快照或通用 Sandbox 平台。可用性与资源扩容按参考部署和实测决定，复用 Kubernetes 与企业现有设施，不建设第二调度器。
-
-按实际风险验证真实链路；mock、设计和源码存在不代表部署可用，正常 Pod 重建不代表灾难恢复。发布、部署、合并和数据删除遵循用户已有授权。
+See [architecture](docs/en/architecture.md) and the linked runtime contract for technical details.

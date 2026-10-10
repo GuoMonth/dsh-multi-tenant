@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant",
   "version": "0.10.0-alpha.1",
-  "description": "OIDC platform for persistent DSH Kubernetes environments",
+  "description": "Self-hosted multi-user DeepSeek Harness on Kubernetes with OIDC and persistent AI work environments",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
   "repository": {
@@ -40,9 +40,12 @@
     "deepseek-harness",
     "dsh",
     "multi-tenant",
-    "principal-isolation",
+    "kubernetes",
+    "oidc",
+    "self-hosted",
+    "persistent-storage",
     "runtime",
-    "saas"
+    "ai-agents"
   ],
   "engines": {
     "node": ">=24"

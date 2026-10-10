@@ -23,6 +23,12 @@ try {
     readdirSync(dir).find((n) => n.endsWith(".tgz")),
   );
   const files = run("tar", ["-tzf", archive]);
+  const sourceCommit = run("git", ["rev-parse", "HEAD"], process.cwd()).trim();
+  for (const name of ["README.md", "README.zh-CN.md", "AI.md"]) {
+    const documentation = run("tar", ["-xOf", archive, `package/${name}`]);
+    assert.ok(documentation.includes(`/blob/${sourceCommit}/`));
+    assert.ok(!documentation.includes("https://github.com/GuoMonth/dsh-multi-tenant/blob/main/"));
+  }
   assert.doesNotMatch(
     files,
     /cell-platform|cell-admin|runtime\/|src\/native|experience\/|examples\//,
