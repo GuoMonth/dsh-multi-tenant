@@ -31,12 +31,8 @@ assert.equal(
   pkg.devDependencies["@dsh/environment-connector-internal"],
   "file:../../vendor/" + pin.artifact,
 );
-for (const name of ["README.md", "README.zh-CN.md"])
-  assert.equal(
-    readFileSync(name, "utf8"),
-    readFileSync("packages/multi-tenant/" + name, "utf8"),
-  );
+assert.ok(readFileSync("docs/en/release-notes.md", "utf8").startsWith(`# ${pkg.version}\n`));
 assert.ok(!readdirSync("vendor").some((n) => n.includes("cell")));
 console.log(
-  "Exact DSH/connector pin, public exports and README copies verified",
+  "Exact DSH/connector pin, public exports and release-note version verified",
 );

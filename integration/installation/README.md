@@ -1,6 +1,6 @@
-# Installation checks
+# Installation checks (English)
 
-Run from the repository root with Node 24 and Helm 3:
+From the repository root with Node 24 and Helm 3:
 
 ```sh
 node --test integration/installation/verify.test.mjs
@@ -8,12 +8,6 @@ helm lint charts/dsh-platform --values integration/installation/fixture.values.j
 node charts/install.mjs render --values integration/installation/fixture.values.json --namespace dsh-install-fixture
 ```
 
-The fixture is deliberately nondeployable. Tests render the real Helm chart and check
-configuration, secret references, retained control storage, fixed asset hashes, approved
-runtime RBAC, and invalid inputs; they do not launch the platform or fake a Kubernetes runtime.
-The installer rejects fixture values before any Kubernetes call. No package manifest changes
-or additional dependencies are required.
+Tests render the real chart and check configuration, Secret references, retained control storage, asset hashes, runtime RBAC and invalid inputs. Fixture values are deliberately rejected by live installation.
 
-See [the installation draft](../../docs/installation/README.zh-CN.md) for actual prerequisites,
-one installation entry and the remaining G2/E acceptance. C owns root/package documentation;
-E links this path from the final user guides when the actual candidate is verified.
+For deployment, use [installation](../../docs/en/installation.md) ([简体中文](../../docs/zh-CN/installation.md)). Real cluster tests use [integration/e2e](../e2e/README.md).

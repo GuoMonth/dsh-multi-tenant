@@ -3,6 +3,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {pinDocumentation} from './package-docs.mjs';
 const run=(cmd,args)=>execFileSync(cmd,args,{encoding:'utf8',stdio:['ignore','pipe','inherit']}).trim();
 const json=(cmd,args)=>JSON.parse(run(cmd,args));
 const read=p=>JSON.parse(readFileSync(p,'utf8'));
@@ -46,6 +47,7 @@ if(existingTag)assert.equal(existingTag.split(/\s/)[0],env.GITHUB_SHA,'Never mov
 const sha256=createHash('sha256').update(bytes).digest('hex');
 const release={version:pkg.version,tag,platform:p,runtime:{...r,tag:env.RUNTIME_TAG,release:`https://github.com/${runtimeRepo}/releases/tag/${env.RUNTIME_TAG}`},controller:read('charts/dsh-platform/files/sources.json').core.image,package:{name:pkg.name,version:pkg.version,integrity,sha256},validation:'Local exact-image two-user and model/tool acceptance required before dispatch; see release validation attachment.'};
 writeFileSync('publication/release.json',JSON.stringify(release,null,2)+'\n');
+writeFileSync('publication/release-notes.md',pinDocumentation(readFileSync('docs/en/release-notes.md','utf8'),env.GITHUB_SHA));
 writeFileSync('publication/SHA256SUMS',`${sha256}  ${p.package.filename}\n${createHash('sha256').update(readFileSync('publication/release.json')).digest('hex')}  release.json\n`);
 const registry=`https://registry.npmjs.org/${pkg.name}/${pkg.version}`;
 async function metadata(){const res=await fetch(`${registry}?release-check=${Date.now()}`,{signal:AbortSignal.timeout(20000)});if(res.status===404)return null;if(!res.ok)throw Error('Registry metadata HTTP '+res.status);return res.json();}
@@ -68,7 +70,7 @@ const tags=await (await fetch(`https://registry.npmjs.org/-/package/${pkg.name}/
 assert.equal(tags.latest,pkg.version);
 if(!existingTag){run('git',['tag',tag,env.GITHUB_SHA]);run('git',['push','origin',tag]);}
 const releases=json('gh',['release','list','--limit','100','--json','tagName']);
-if(!releases.some(x=>x.tagName===tag))run('gh',['release','create',tag,'--verify-tag','--latest','--title',tag,'--notes-file',`docs/releases/${tag}.md`,artifact,'publication/release.json','publication/SHA256SUMS']);
+if(!releases.some(x=>x.tagName===tag))run('gh',['release','create',tag,'--verify-tag','--latest','--title',tag,'--notes-file','publication/release-notes.md',artifact,'publication/release.json','publication/SHA256SUMS']);
 else{
  const assets=json('gh',['release','view',tag,'--json','assets']).assets;
  const names=new Set(assets.map(x=>x.name));
