@@ -28,8 +28,15 @@ jobs:
           install: false
           cache: true
       - run: pnpm install --frozen-lockfile
-      # Heavy acceptance (build, clean install, smoke, Helm) runs locally
-      # before merge/release; pull-request CI stays light on free runners.
       - run: pnpm verify
       - run: pnpm typecheck
       - run: pnpm test
+      # Keep the pre-merge security assertions: package smoke and Helm
+      # installation run once on Node 24. The full release acceptance,
+      # including the clean installed-package consumer, stays local.
+      - if: matrix.node == '24'
+        run: |
+          bash scripts/install-ci-helm.sh
+          pnpm build
+          pnpm smoke
+          node --test integration/installation/verify.test.mjs

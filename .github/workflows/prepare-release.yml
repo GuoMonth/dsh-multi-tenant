@@ -22,14 +22,12 @@ jobs:
           install: false
           cache: true
       - run: test "$GITHUB_REF" = refs/heads/main
+      - run: bash scripts/install-ci-helm.sh
       - run: pnpm install --frozen-lockfile
-      # The full `pnpm release:check`, including Helm installation and a clean
-      # installed-package smoke, is run and recorded locally before dispatch.
-      # This job only rechecks the light gates and rebuilds the exact candidate.
-      - run: pnpm verify
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
+      # Manual release gate: re-run the full acceptance before packing and
+      # pushing the exact candidate. Pull-request CI stays light; the local
+      # release:check remains the primary acceptance record.
+      - run: pnpm release:check
       - name: Pack and build exact candidate
         env:
           GH_TOKEN: ${{ github.token }}
