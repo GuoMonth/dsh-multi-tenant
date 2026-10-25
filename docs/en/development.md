@@ -13,7 +13,7 @@ pnpm build
 pnpm smoke
 ```
 
-`pnpm verify` checks DSH/Connector identities and the environment contract. `pnpm release:check` runs those checks plus documentation, types, tests, build, a clean installed-package consumer and installation checks. Choose the affected checks while editing; run the full command for package/release changes.
+`pnpm verify` checks DSH/Connector identities and the environment contract. `pnpm release:check` runs those checks plus documentation, types, tests, build, a clean installed-package consumer and installation checks. Choose the affected checks while editing; run the full command locally for package/release changes. GitHub pull-request CI runs only `pnpm verify`, `pnpm typecheck` and `pnpm test` on Node 24 and 26; it does not repeat the heavy acceptance on free runners.
 
 Root README files and AI.md are the editable sources. Build generates their npm copies, pinning hosted links to the source commit. Keep English and Chinese guides paired; update facts, commands and links in the same PR. `docs:check` checks paths, anchors, language pairs and command/version agreement. For cross-repository checks, set `DSH_PLATFORM_DOCS` and `DSH_RUNTIME_DOCS` to the paired checkouts.
 
