@@ -2,7 +2,7 @@
 
 [简体中文](../zh-CN/development.md) · [Guides](index.md)
 
-Use Node 24+ and the pnpm version in [package.json](../../package.json). Installation tests also need Helm 3.
+Use Node 24 or 26 as declared by [.node-version](../../.node-version) and `engines`. Corepack resolves the pnpm version from `packageManager` in [package.json](../../package.json). Installation tests also need Helm 3.
 
 ```sh
 pnpm install --frozen-lockfile

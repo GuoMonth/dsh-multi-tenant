@@ -1,6 +1,9 @@
 packages:
   - packages/*
 
+# Reject installs on Node versions outside the declared engines range.
+engineStrict: true
+
 # The platform has no DSH dependencies; native fixtures have their own frozen policy.
 allowBuilds:
   esbuild: false

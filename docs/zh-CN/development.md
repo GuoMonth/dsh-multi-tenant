@@ -2,7 +2,7 @@
 
 [English](../en/development.md) · [文档目录](index.md)
 
-使用 Node 24+ 和 [package.json](../../package.json) 固定的 pnpm 版本。安装测试另需 Helm 3。
+使用 [.node-version](../../.node-version) 和 `engines` 声明的 Node 24 或 26；pnpm 版本由 [package.json](../../package.json) 的 `packageManager` 固定，并通过 Corepack 解析。安装测试另需 Helm 3。
 
 ```sh
 pnpm install --frozen-lockfile
