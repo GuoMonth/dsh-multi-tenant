@@ -4,16 +4,18 @@ import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { chart, sources, verifyAssets, documents, render, inspect, rejectFixture } from '../../charts/install.mjs';
 
 const fixture = new URL('./fixture.values.json', import.meta.url);
+const fixturePath = fileURLToPath(fixture);
 const values = JSON.parse(readFileSync(fixture, 'utf8'));
 const namespace = 'dsh-install-fixture';
-const output = render(fixture.pathname, namespace);
+const output = render(fixturePath, namespace);
 const objects = documents(output);
 
 test('Helm lint passes for explicitly nondeployable fixture', () => {
-  const result = spawnSync('helm', ['lint', chart, '--values', fixture.pathname, '--strict'], {encoding:'utf8'});
+  const result = spawnSync('helm', ['lint', chart, '--values', fixturePath, '--strict'], {encoding:'utf8'});
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.doesNotMatch(result.stderr, /Fail:/);
 });
@@ -85,7 +87,7 @@ test('fail early for missing prerequisites, floating digests and accidental lega
   } finally {rmSync(directory,{recursive:true,force:true});}
 });
 test('live installer refuses fixtures before reaching Kubernetes', () => {
-  const result=spawnSync(process.execPath,[resolve(chart,'..','install.mjs'),'install','--values',fixture.pathname,'--namespace',namespace],{encoding:'utf8'});
+  const result=spawnSync(process.execPath,[resolve(chart,'..','install.mjs'),'install','--values',fixturePath,'--namespace',namespace],{encoding:'utf8'});
   assert.notEqual(result.status,0);
   assert.match(result.stderr,/Fixture domain\/image/);
 });

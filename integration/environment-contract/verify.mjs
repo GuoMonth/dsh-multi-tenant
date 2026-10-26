@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 const root=new URL('../../',import.meta.url);
 const pin=JSON.parse(readFileSync(new URL('vendor/environment-connector.json',root)));
@@ -10,5 +11,5 @@ assert.equal('sha512-'+createHash('sha512').update(archive).digest('base64'),pin
 assert.equal(createHash('sha256').update(archive).digest('hex'),pin.sha256);
 const require=createRequire(new URL('packages/multi-tenant/package.json',root));
 execFileSync(process.execPath,['--input-type=module','-e',"import {environmentTemplate,EnvironmentError,createAgentEnvironmentRuntime} from '@dsh/environment-connector-internal';\nimport assert from 'node:assert/strict';\nconst template=environmentTemplate({image:`local/dsh@sha256:${'a'.repeat(64)}`,authority:'alice.example.test',dataClaim:'data',serviceAccount:'workload',resources:{requests:{cpu:'100m',memory:'256Mi'},limits:{cpu:'1',memory:'1Gi'}}});\nassert.equal(template.spec.volumes.filter(v=>v.persistentVolumeClaim).length,1);\nassert.equal(template.spec.automountServiceAccountToken,false);\nassert.equal(typeof EnvironmentError,'function');\nassert.equal(typeof createAgentEnvironmentRuntime,'function');\n"],{cwd:new URL('packages/multi-tenant/',root),stdio:'inherit'});
-execFileSync(process.execPath,[require.resolve('typescript/bin/tsc'),'--noEmit','--strict','--skipLibCheck','--module','NodeNext','--moduleResolution','NodeNext','--target','ES2024',new URL('consumer.ts',import.meta.url).pathname],{stdio:'inherit'});
+execFileSync(process.execPath,[require.resolve('typescript/bin/tsc'),'--noEmit','--strict','--skipLibCheck','--module','NodeNext','--moduleResolution','NodeNext','--target','ES2024',fileURLToPath(new URL('consumer.ts',import.meta.url))],{stdio:'inherit'});
 console.log('Exact RC2 contract tarball integrity, imports, single-PVC template and consumer typecheck passed');

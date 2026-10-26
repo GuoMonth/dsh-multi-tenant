@@ -20,9 +20,13 @@ jobs:
       - uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
         with:
           install: false
+          cache: true
       - run: test "$GITHUB_REF" = refs/heads/main
       - run: bash scripts/install-ci-helm.sh
       - run: pnpm install --frozen-lockfile
+      # Manual release gate: re-run the full acceptance before packing and
+      # pushing the exact candidate. Pull-request CI stays light; the local
+      # release:check remains the primary acceptance record.
       - run: pnpm release:check
       - name: Pack and build exact candidate
         env:
