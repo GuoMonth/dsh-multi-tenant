@@ -79,7 +79,7 @@ options.storage.size satisfies string;
   const exports = run(process.execPath, [
     "--input-type=module",
     "-e",
-    `import * as sdk from 'dsh-multi-tenant'; import assert from 'node:assert/strict'; assert.equal(sdk.DSH_RUNTIME_VERSION,'0.2.0-rc.2'); assert.equal(typeof sdk.EnvironmentBindingStore,'function'); assert.ok(!('DockerRuntimeProvider' in sdk)); assert.ok(!('DomainRuntimeCoordinator' in sdk)); console.log(Object.keys(sdk).join(','));`,
+    `import * as sdk from 'dsh-multi-tenant'; import assert from 'node:assert/strict'; assert.equal(sdk.DSH_RUNTIME_VERSION,'0.2.1-rc.3'); assert.equal(typeof sdk.EnvironmentBindingStore,'function'); assert.ok(!('DockerRuntimeProvider' in sdk)); assert.ok(!('DomainRuntimeCoordinator' in sdk)); console.log(Object.keys(sdk).join(','));`,
   ]);
   const cli = join(dir, "node_modules/dsh-multi-tenant/dist/cli.mjs");
   assert.match(run(process.execPath, [cli, "--help"]), /resume/);
