@@ -4,17 +4,17 @@
 
 Self-hosted, multi-user [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) on Kubernetes. Members sign in with OpenID Connect (OIDC) and use the native DSH interface in their own persistent AI work environment.
 
-**Release candidate:** Linux/amd64, one node and one platform replica, for trusted organization members and fresh installations. The RC combination is platform **0.10.0-rc.1**, runtime **0.4.0-rc.1**, DSH **0.2.0-rc.2**.
+**Release candidate:** Linux/amd64, one node and one platform replica, for trusted organization members and fresh installations. The RC combination is platform **0.11.0-rc.1**, runtime **0.5.0-rc.1**, DSH **0.2.1-rc.3**. No compatibility guarantee; pin the exact versions and artifacts you deploy.
 
 ## Install
 
 Use an existing Kubernetes cluster with network policy enforcement, dynamic storage, HTTPS ingress and an OIDC provider. The installation machine needs Node 24+, Helm 3 and kubectl.
 
 ```sh
-npm install --global dsh-multi-tenant@0.10.0-rc.1
+npm install --global dsh-multi-tenant@0.11.0-rc.1
 ```
 
-Follow the [installation guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/installation.md) to prepare configuration and run preflight/install. Images come from the [matching release manifest](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.10.0-rc.1). For an AI assistant, use [AI.md](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/AI.md).
+Follow the [installation guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/installation.md) to prepare configuration and run preflight/install. Images come from the [matching release manifest](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.11.0-rc.1). For an AI assistant, use [AI.md](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/AI.md).
 
 ## Use
 

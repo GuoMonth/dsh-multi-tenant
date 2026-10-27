@@ -51,4 +51,4 @@ dsh-multi-tenant start --config /private/config.json
 | PVC 或环境持续 Pending | StorageClass 供应、存储容量、CNI 和 Pod 事件 |
 | 卷缺失、UID 变化或 StopUnverified | 原绑定、卷身份及原 Pod 是否终止；保留数据和控制状态 |
 
-参考验证范围为单 Linux/amd64 节点、平台单副本、可信成员。高可用、节点分区恢复、受支持升级和备份另行建设，详见[验证报告](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.10.0-rc.1/validation.md)。
+参考验证范围为单 Linux/amd64 节点、平台单副本、可信成员。高可用、节点分区恢复、受支持升级和备份另行建设，详见[验证报告](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.11.0-rc.1/validation.md)。

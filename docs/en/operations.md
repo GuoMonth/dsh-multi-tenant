@@ -51,4 +51,4 @@ Use the [config example](../../integration/distribution/config.example.json). Th
 | PVC or environment remains Pending | StorageClass provisioning, storage capacity, CNI and Pod events |
 | Missing volume, changed UID or StopUnverified | Original binding, volume identity and previous Pod termination; preserve data and control state |
 
-Supported reference: one Linux/amd64 node, one platform replica and trusted members. HA, node-partition recovery, supported upgrades and backups remain separate work; see [validation](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.10.0-rc.1/validation.md).
+Supported reference: one Linux/amd64 node, one platform replica and trusted members. HA, node-partition recovery, supported upgrades and backups remain separate work; see [validation](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.11.0-rc.1/validation.md).
