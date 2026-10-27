@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-const help = `dsh-multi-tenant — OIDC + Kubernetes environment alpha
+const help = `dsh-multi-tenant — OIDC + Kubernetes environment
   render --values FILE --namespace NAME
   preflight | install --values FILE --namespace NAME --kubeconfig FILE --context NAME
   start --config /absolute/private/config.json
