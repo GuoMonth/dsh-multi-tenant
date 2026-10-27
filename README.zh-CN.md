@@ -4,17 +4,17 @@
 
 在 Kubernetes 上自托管的多用户 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。成员通过 OpenID Connect（OIDC）登录，在各自的持久 AI 工作环境中使用 DSH 原生界面。
 
-**候选版（RC）：** Linux/amd64、单节点、平台单副本，面向可信组织成员，仅支持全新安装。RC 组合为平台 **0.10.0-rc.1**、runtime **0.4.0-rc.1**、DSH **0.2.0-rc.2**。
+**候选版（RC）：** Linux/amd64、单节点、平台单副本，面向可信组织成员，仅支持全新安装。RC 组合为平台 **0.11.0-rc.1**、runtime **0.5.0-rc.1**、DSH **0.2.1-rc.3**。不做兼容性承诺，部署时固定精确版本和制品。
 
 ## 安装
 
 准备已有 Kubernetes 集群、支持网络策略的 CNI、动态存储、HTTPS 入口和 OIDC 身份提供方。安装机需要 Node 24+、Helm 3 和 kubectl。
 
 ```sh
-npm install --global dsh-multi-tenant@0.10.0-rc.1
+npm install --global dsh-multi-tenant@0.11.0-rc.1
 ```
 
-按[安装指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/installation.md)准备配置，运行预检和安装。镜像使用[同版本发布清单](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.10.0-rc.1)中的版本。让 AI 助手操作时，可提供 [AI.md（英文）](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/AI.md)。
+按[安装指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/installation.md)准备配置，运行预检和安装。镜像使用[同版本发布清单](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.11.0-rc.1)中的版本。让 AI 助手操作时，可提供 [AI.md（英文）](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/AI.md)。
 
 ## 使用
 

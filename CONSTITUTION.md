@@ -9,6 +9,6 @@ These principles apply to dsh-multi-tenant and dsh-isolated-runtime.
 - Each owner has at most one environment and one data PVC. Platform secrets and control state stay outside user environments.
 - Verify owner and resource UIDs before access or mutation. An unknown stop cannot authorize another writer; a missing volume cannot be replaced as recovery.
 - Normal stop/start and Pod recreation retain data. Logout, revocation and default deletion retain user volumes. Backup, supported upgrades, HA and cross-node recovery require separate work.
-- RC freezes public interfaces, configuration, CLI and data semantics; subsequent candidates focus on fixes. Alpha-to-RC migration is not supported. Release and deployment use immutable source and artifact identities, with acceptance for the actual combination.
+- Releases pin exact source and artifact identities. There is no compatibility guarantee across releases; validate the exact combination you deploy.
 
 See [architecture](docs/en/architecture.md) and the linked runtime contract for technical details.
