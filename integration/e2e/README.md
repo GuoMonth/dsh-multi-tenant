@@ -2,7 +2,7 @@
 
 These are explicit, destructive test-environment operations, not a second installer or product service. Run only as the dedicated cluster owner. They use actual Dex, Traefik, the installed platform and native DSH. The fixture IdP does not prove enterprise SSO compatibility. The model/tool probe uses explicit private credentials after authorization.
 
-Start with [installation](../../docs/en/installation.md) ([简体中文](../../docs/zh-CN/installation.md)). The fixture helpers supply DNS/TLS/IdP/Ingress prerequisites for the dedicated test cluster. Previous release results and product image identities are in [validation.md](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.10.0-alpha.1/validation.md).
+Start with [installation](../../docs/en/installation.md) ([简体中文](../../docs/zh-CN/installation.md)). The fixture helpers supply DNS/TLS/IdP/Ingress prerequisites for the dedicated test cluster. Release validation and product image identities are in [validation.md](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.11.0-rc.1/validation.md).
 
 Prerequisites are the dedicated `kind-dsh-mvp-rc2` cluster/container, an imported pinned platform/workload image and the pinned Dex/Traefik images below. Node 24, Helm, kubectl, Docker and Playwright 1.58.2 are required. If installing its browser, use `PLAYWRIGHT_SKIP_BROWSER_GC=1`. Record the exact product image digests for this test. Fixture images are Traefik 3.7.13 (`sha256:3429c14149401de2ac82fc72ddc6a92642332b90deb3012301ff211b9d2d0f18`) and Dex 2.45.1 (`sha256:f5f9fb373188b0f701b80edd68b3f4745ced69306c9d382999f11b7774335a98`).
 
