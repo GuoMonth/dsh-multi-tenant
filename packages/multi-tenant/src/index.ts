@@ -15,4 +15,4 @@ export type {
 export { createOIDCAuthentication } from "./platform/oidc.js";
 export type { OIDCOptions } from "./platform/oidc.js";
 export type { Member } from "./platform/sessions.js";
-export const DSH_RUNTIME_VERSION = "0.2.0-rc.2";
+export const DSH_RUNTIME_VERSION = "0.2.1-rc.3";
