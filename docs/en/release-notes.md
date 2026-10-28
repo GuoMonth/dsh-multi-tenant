@@ -2,7 +2,7 @@
 
 [简体中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/release-notes.md)
 
-Released **2026-10-27** to npm `next` and GitHub prerelease. Paired runtime: **0.5.0-rc.1**; DSH: **0.2.1-rc.3**.
+Released **2026-10-27** to npm `latest` and `next`, and as the GitHub latest release. Paired runtime: **0.5.0-rc.1**; DSH: **0.2.1-rc.3**.
 
 - Kubernetes environments with one persistent PVC per user, on DSH 0.2.1-rc.3.
 - DSH 0.2.1 native authenticated-browser settings persistence; the runtime no longer patches the settings client.

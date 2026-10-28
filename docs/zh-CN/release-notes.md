@@ -2,7 +2,7 @@
 
 [English](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/release-notes.md)
 
-**2026-10-27 已发布**，使用 npm `next` 和 GitHub 预发布。配套 runtime **0.5.0-rc.1**，DSH **0.2.1-rc.3**。
+**2026-10-27 已发布**，npm `latest` 与 `next` 均指向本版本，并设为 GitHub latest Release。配套 runtime **0.5.0-rc.1**，DSH **0.2.1-rc.3**。
 
 - Kubernetes 用户环境，每用户一个持久 PVC，使用 DSH 0.2.1-rc.3。
 - DSH 0.2.1 原生持久化 authenticated browser 设置，runtime 不再 patch settings client。
