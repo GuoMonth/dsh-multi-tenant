@@ -2,5 +2,7 @@ apiVersion: v2
 name: dsh-platform
 description: Fixed single-replica platform; environments are provisioned by runtime
 type: application
+# Chart revision. Not the platform npm version and not the DSH pin.
 version: 0.1.0
-appVersion: 0.2.1-rc.3
+# DSH pin. Must match scripts/dsh-target.mjs; verify and publish compare it.
+appVersion: 0.2.1-rc.5

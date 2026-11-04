@@ -2,7 +2,7 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const users=JSON.parse(fs.readFileSync(process.env.E_PRIVATE+'/users.json'));
-const base='https://dsh-mvp-rc2.test';
+const base='https://dsh-environment.test';
 async function waitNative(page){
  await page.waitForTimeout(800);
  for(let step=0;step<6;step++){
@@ -16,12 +16,12 @@ async function waitNative(page){
  await page.getByRole('button',{name:'Account menu',exact:true}).waitFor({timeout:30000});
 }
 (async()=>{
- const browser=await chromium.launch({headless:true,args:[`--host-resolver-rules=MAP *.dsh-mvp-rc2.test ${process.env.E_NODE_ADDRESS}, MAP dsh-mvp-rc2.test ${process.env.E_NODE_ADDRESS}`,'--no-proxy-server']});
+ const browser=await chromium.launch({headless:true,args:[`--host-resolver-rules=MAP *.dsh-environment.test ${process.env.E_NODE_ADDRESS}, MAP dsh-environment.test ${process.env.E_NODE_ADDRESS}`,'--no-proxy-server']});
  const result={fixtureIdP:'Dex v2.45.1',model:'not tested: credentials unavailable',externalTool:'not tested: authorization unavailable',users:[]};
  try{
   for(const user of users){
    const context=await browser.newContext({ignoreHTTPSErrors:true,locale:'en-US'}),page=await context.newPage();
-   page.on('request',r=>{if(r.method()==='POST'&&new URL(r.url()).host==='dsh-mvp-rc2.test')console.log(JSON.stringify({postPath:new URL(r.url()).pathname,origin:r.headers().origin,fetchSite:r.headers()['sec-fetch-site']}));});
+   page.on('request',r=>{if(r.method()==='POST'&&new URL(r.url()).host==='dsh-environment.test')console.log(JSON.stringify({postPath:new URL(r.url()).pathname,origin:r.headers().origin,fetchSite:r.headers()['sec-fetch-site']}));});
    await page.goto(base+'/auth/login');
    if(await page.getByText('Log in with Email').count())await page.getByText('Log in with Email').click();
    await page.locator('input[name="login"]').fill(user.email);

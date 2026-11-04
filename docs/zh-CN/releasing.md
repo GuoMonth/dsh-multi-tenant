@@ -4,7 +4,7 @@
 
 平台 npm 包和 GitHub Release 共用版本及轻量 `vVERSION` 标签；runtime 使用自己的版本，双方发行相互链接。获得发布授权后，发布已在本地验收的制品。RC/beta 使用 npm `next`，alpha 使用 `alpha`，正式版使用 `latest`。GitHub 预发布使用 `--prerelease --latest=false`，保留默认安装和最新发行入口。
 
-1. 更新包版本和[发行说明](release-notes.md)。运行 `pnpm release:check`；配套 runtime 运行 `make verify`、`make verify-dsh`。
+1. 更新平台版本、[dsh-target.mjs](../../scripts/dsh-target.mjs) 中的 DSH 针，以及[发行说明](release-notes.md)。运行 `pnpm release:check`；配套 runtime 运行 `make verify`、`make verify-dsh`。本候选配对 runtime 0.5.0-rc.2，且必须嵌入同一个 DSH 针。
 2. 合并审核通过的源码，在两仓库 main 上运行手动 `prepare-release.yml`。流程在打包和推送精确候选前重跑完整的 `pnpm release:check`；PR CI 保持轻量，本地第 1 步仍是主要验收记录。下载精确候选：镜像 digest/源码信息及平台 npm 归档。
 3. 验证包完整性和匿名镜像拉取。用该组合验证安装、双用户访问、真实模型/工具、数据保留和相关失败场景，保存脱敏报告。
 4. 在受测源码提交上发布 [runtime 版本](https://github.com/GuoMonth/dsh-isolated-runtime)，附上清单与验证报告。
