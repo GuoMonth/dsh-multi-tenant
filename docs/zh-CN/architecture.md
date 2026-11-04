@@ -23,9 +23,10 @@ OIDC `(issuer, subject)` 映射为 `(tenantId, principalId)`。平台为每个�
 
 ## 来源与验证
 
-- [DSH 版本](../../scripts/dsh-target.mjs)：精确 npm 版本和源码提交。
+- [DSH 版本](../../scripts/dsh-target.mjs)：唯一的 DSH npm 版本和源码提交。
+- Helm Chart [Chart.yaml](../../charts/dsh-platform/Chart.yaml)：`version` 是 Chart 修订号。`appVersion` 是该 DSH 针，不是平台 npm 版本。
 - [Connector 来源](../../vendor/environment-connector.json)：源码提交和 tarball 完整性。
-- [安装资产来源](../../charts/dsh-platform/files/sources.json)：控制器与 runtime RBAC 版本。
+- [安装资产来源](../../charts/dsh-platform/files/sources.json)：控制器、runtime RBAC 和复制的 DSH 针。
 - [发行验证](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.11.0-rc.1/validation.md)：实际镜像、双用户/模型/工具检查和限制。
 
 共享边界见[产品原则](../../CONSTITUTION.zh-CN.md)。用户可见的数据与生命周期行为见[运维](operations.md)。

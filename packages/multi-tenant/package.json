@@ -1,6 +1,6 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.11.0-rc.1",
+  "version": "0.12.0-rc.1",
   "description": "Self-hosted multi-user DeepSeek Harness on Kubernetes with OIDC and persistent AI work environments",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
@@ -67,8 +67,8 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dshRuntime": {
-    "version": "0.2.1-rc.3",
-    "commit": "1f81c047fc48fa190a683e469daa699857e9afe8"
+    "version": "0.2.1-rc.5",
+    "commit": "b830ec950faba0a46dda564be3e2d854afed94f1"
   },
   "bin": {
     "dsh-multi-tenant": "dist/cli.mjs"

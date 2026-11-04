@@ -1,13 +1,13 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const fs=require('node:fs'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
-const root=process.env.E_PRIVATE,evidence=process.env.E_EVIDENCE,base='https://dsh-mvp-rc2.test';
+const root=process.env.E_PRIVATE,evidence=process.env.E_EVIDENCE,base='https://dsh-environment.test';
 const records=JSON.parse(fs.readFileSync(evidence+'/browser.json')).users;
 const k=args=>execFileSync('kubectl',['--kubeconfig',process.env.KUBECONFIG,...args],{encoding:'utf8',stdio:['pipe','pipe','pipe']});
 const rpc=(page,method,args)=>page.evaluate(async({method,args})=>{const r=await fetch('/api/'+method,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'client-request',rpcId:'e-'+Date.now(),method,payload:{args}})});const b=await r.json();if(!r.ok||!b.result?.ok)throw Error(method+': '+JSON.stringify(b.result?.error));return b.result.value;},{method,args});
 const follow=(page,sessionId)=>page.evaluate(sessionId=>new Promise((resolve,reject)=>{const s=new WebSocket('wss://'+location.host+'/api/remote.mux');window.eSocket=s;window.eSocketClosed=false;s.onclose=()=>{window.eSocketClosed=true;};const timer=setTimeout(()=>reject(Error('snapshot timeout')),15000);s.onopen=()=>s.send(JSON.stringify({type:'open',streamId:'e',endpoint:'session/follow',payload:{args:{request:{address:{kind:'session',sessionId}}}}}));s.onmessage=e=>{const f=JSON.parse(e.data);if(f.streamId==='e'&&f.type==='item'&&f.value?.type==='snapshot'){clearTimeout(timer);resolve(true);}};s.onerror=()=>{clearTimeout(timer);reject(Error('WS rejected'));};}),sessionId);
 const waitNative=async page=>{await page.waitForTimeout(800);for(let step=0;step<6;step++){if(await page.getByRole('button',{name:'Continue',exact:true}).count()){await page.getByRole('button',{name:'Continue',exact:true}).first().click();await page.waitForTimeout(600);continue;}if(await page.getByRole('button',{name:'Add API Key',exact:true}).count()){await page.getByRole('button',{name:'Add API Key',exact:true}).click();await page.waitForTimeout(600);if(await page.getByRole('button',{name:'Configure later',exact:true}).count()){await page.getByRole('button',{name:'Configure later',exact:true}).click();await page.waitForTimeout(600);continue;}}break;}await page.getByRole('button',{name:'Account menu',exact:true}).waitFor({timeout:30000});};
 (async()=>{
- const browser=await chromium.launch({headless:true,args:[`--host-resolver-rules=MAP *.dsh-mvp-rc2.test ${process.env.E_NODE_ADDRESS}, MAP dsh-mvp-rc2.test ${process.env.E_NODE_ADDRESS}`,'--no-proxy-server']});
+ const browser=await chromium.launch({headless:true,args:[`--host-resolver-rules=MAP *.dsh-environment.test ${process.env.E_NODE_ADDRESS}, MAP dsh-environment.test ${process.env.E_NODE_ADDRESS}`,'--no-proxy-server']});
  const result={users:[],negative:{},model:'not tested',externalTool:'not tested'};
  const save=()=>fs.writeFileSync(evidence+'/lifecycle.json',JSON.stringify(result,null,2));
  try{

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
+import { DSH_TARGET } from "./dsh-target.mjs";
 const dir = mkdtempSync(join(tmpdir(), "dsh-platform-consumer-"));
 const run = (cmd, args, cwd = dir) =>
   execFileSync(cmd, args, {
@@ -79,7 +80,7 @@ options.storage.size satisfies string;
   const exports = run(process.execPath, [
     "--input-type=module",
     "-e",
-    `import * as sdk from 'dsh-multi-tenant'; import assert from 'node:assert/strict'; assert.equal(sdk.DSH_RUNTIME_VERSION,'0.2.1-rc.3'); assert.equal(typeof sdk.EnvironmentBindingStore,'function'); assert.ok(!('DockerRuntimeProvider' in sdk)); assert.ok(!('DomainRuntimeCoordinator' in sdk)); console.log(Object.keys(sdk).join(','));`,
+    `import * as sdk from 'dsh-multi-tenant'; import assert from 'node:assert/strict'; assert.equal(sdk.DSH_RUNTIME_VERSION,${JSON.stringify(DSH_TARGET.version)}); assert.equal(typeof sdk.EnvironmentBindingStore,'function'); assert.ok(!('DockerRuntimeProvider' in sdk)); assert.ok(!('DomainRuntimeCoordinator' in sdk)); console.log(Object.keys(sdk).join(','));`,
   ]);
   const cli = join(dir, "node_modules/dsh-multi-tenant/dist/cli.mjs");
   assert.match(run(process.execPath, [cli, "--help"]), /resume/);

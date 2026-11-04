@@ -4,7 +4,7 @@ const root=process.env.E_PRIVATE,evidence=process.env.E_EVIDENCE,namespace='dsh-
 const k=(args,input)=>execFileSync('kubectl',['--kubeconfig',process.env.KUBECONFIG,...args],{input,encoding:'utf8',stdio:['pipe','pipe','pipe']});
 const bob=JSON.parse(fs.readFileSync(evidence+'/browser.json')).users[1],session=JSON.parse(fs.readFileSync(evidence+'/lifecycle.json')).users[1].sessionId;
 (async()=>{
- const browser=await chromium.launch({headless:true,args:[`--host-resolver-rules=MAP *.dsh-mvp-rc2.test ${process.env.E_NODE_ADDRESS}, MAP dsh-mvp-rc2.test ${process.env.E_NODE_ADDRESS}`,'--no-proxy-server']});
+ const browser=await chromium.launch({headless:true,args:[`--host-resolver-rules=MAP *.dsh-environment.test ${process.env.E_NODE_ADDRESS}, MAP dsh-environment.test ${process.env.E_NODE_ADDRESS}`,'--no-proxy-server']});
  const original=JSON.parse(k(['get','configmap','dsh-platform-config','-n',namespace,'-o','json'])).data;
  fs.writeFileSync(root+'/platform-config-before.json',JSON.stringify(original),{mode:0o600});
  async function reload(data,count){k(['patch','configmap','dsh-platform-config','-n',namespace,'--type=merge','-p',JSON.stringify({data})]);let ready=false;for(let i=0;i<120;i++){const n=k(['exec','-n',namespace,'deployment/dsh-platform','-c','platform','--','node','-e',"console.log(JSON.parse(require('node:fs').readFileSync('/config/config.json')).members.length)"]).trim();if(Number(n)===count){ready=true;break;}await new Promise(r=>setTimeout(r,1000));}assert.ok(ready,'projected config update timeout');k(['exec','-n',namespace,'deployment/dsh-platform','-c','platform','--','node','-e',"process.kill(1,'SIGHUP')"]);}

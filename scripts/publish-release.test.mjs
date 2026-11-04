@@ -6,6 +6,8 @@ import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DSH_TARGET } from "./dsh-target.mjs";
+import { DSH_SMOKE_ASSERT } from "./verify-packages.mjs";
 
 const publisher = fileURLToPath(new URL("./publish-release.mjs", import.meta.url));
 function fixture(wrongImage = false) {
@@ -16,7 +18,7 @@ function fixture(wrongImage = false) {
   };
   const save = (path, data) => write(path, JSON.stringify(data));
   const commit = "a".repeat(40), runtimeCommit = "b".repeat(40);
-  const dsh = { version: "0.2.0-rc.2", commit: "c".repeat(40) };
+  const dsh = { version: DSH_TARGET.version, commit: DSH_TARGET.commit };
   const connector = { repository: "GuoMonth/dsh-isolated-runtime", commit: "d".repeat(40), artifact: "connector.tgz", sha256: "e".repeat(64), integrity: "sha512-connector" };
   const bytes = Buffer.from("accepted archive fixture");
   const integrity = "sha512-" + createHash("sha512").update(bytes).digest("base64");
@@ -31,7 +33,10 @@ function fixture(wrongImage = false) {
   save("publication/platform/candidate.json", platform);
   save("publication/runtime/candidate.json", runtime);
   write("publication/platform/" + platform.package.filename, bytes);
-  save("charts/dsh-platform/files/sources.json", { core: { image: "controller@sha256:proof" } });
+  save("charts/dsh-platform/files/sources.json", { dsh, core: { image: "controller@sha256:proof" } });
+  write("charts/dsh-platform/Chart.yaml", `apiVersion: v2\nname: dsh-platform\nversion: 0.1.0\nappVersion: ${dsh.version}\n`);
+  write("packages/multi-tenant/src/index.ts", `export const DSH_RUNTIME_VERSION = "${dsh.version}";\n`);
+  write("scripts/artifact-consumer-smoke.mjs", `import { DSH_TARGET } from "./dsh-target.mjs";\n${DSH_SMOKE_ASSERT};\n`);
   write("docs/en/release-notes.md", "# 0.10.0-rc.1\n[Guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/index.md)\n");
   save("runtime-manifest.json", manifest);
   write("runtime-validation.md", [commit, runtimeCommit, integrity, platformImage, workloadImage].join("\n") + "\n");
