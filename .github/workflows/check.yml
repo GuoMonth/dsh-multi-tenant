@@ -25,15 +25,33 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: ${{ matrix.node }}
+          node-version: ${{ matrix.node == '24.9' && '24' || matrix.node }}
           package-manager-cache: false
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           run_install: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
+        if: matrix.node != '24.9'
       - run: pnpm typecheck
+        if: matrix.node != '24.9'
       - run: pnpm test
+        if: matrix.node != '24.9'
+      - name: Build the published artifact for the supported floor
+        if: matrix.node == '24.9'
+        run: |
+          bash scripts/install-ci-helm.sh
+          pnpm build
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        if: matrix.node == '24.9'
+        with:
+          node-version: '24.9'
+          package-manager-cache: false
+      - name: Consume the installed package at the supported floor
+        if: matrix.node == '24.9'
+        env:
+          npm_config_engine_strict: 'true'
+        run: node scripts/artifact-consumer-smoke.mjs
       # Keep the pre-merge security assertions: package smoke and Helm
       # installation run once on Node 24. The full release acceptance,
       # including the clean installed-package consumer, stays local.
