@@ -1,5 +1,7 @@
 # 0.12.0-rc.2
 
+SDK dependencies now use openid-client 6.9.0, ws 8.23.0 and Zod 4.6.7, with refreshed Connector provenance. The paired launcher uses Go 1.27.4, drains process output before completion and joins management/proxy cleanup. Verification includes dependency security scans and native/owner-based goroutine leak checks.
+
 [简体中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/release-notes.md)
 
 Prepared **2026-11-17** for npm `next` and a GitHub prerelease. Paired runtime: **0.5.0-rc.3**; DSH: **0.2.2-rc.3** (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). Published platform **0.12.0-rc.1** with runtime **0.5.0-rc.2** and DSH **0.2.1-rc.5** remains the historical release.

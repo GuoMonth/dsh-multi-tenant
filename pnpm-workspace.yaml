@@ -13,3 +13,6 @@ minimumReleaseAge: 1440
 overrides:
   tsdown>rolldown: 1.1.1
   vite>rolldown: 1.2.7
+  # Security fixes within the current Vite/PostCSS dependency lines.
+  vite: 8.2.6
+  source-map-js: 1.2.2

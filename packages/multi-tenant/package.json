@@ -51,11 +51,11 @@
     "node": "^24.9.0 || ^26.0.0"
   },
   "devDependencies": {
-    "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.3-7890b83.tgz",
-    "@types/ws": "8.18.1",
-    "openid-client": "6.8.8",
-    "ws": "8.18.3",
-    "zod": "4.6.6"
+    "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.3-6de541a.tgz",
+    "@types/ws": "8.18.2",
+    "openid-client": "6.9.0",
+    "ws": "8.23.0",
+    "zod": "4.6.7"
   },
   "scripts": {
     "build": "tsdown && node ../../scripts/package-installation.mjs",

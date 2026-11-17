@@ -34,3 +34,5 @@ owner、allocation、environment、资源 UID 和修订号使用不同类型。S
 关闭流程幂等：停止准入并取消连接，等待启动、成员重载以及实际在途认证/runtime/admin 操作结束，再释放会话和 SQLite。发出取消不等于完成。部分启动失败也执行相同清理；清理失败只输出固定诊断，不暴露依赖原文。SIGHUP 只解析成员；运行中的重载失败会撤销会话，已取消的重载不能在关闭后重新写入成员权限。
 
 Connector fixture 覆盖平台控制与授权。真实集群和原生应用检查使用 [integration/e2e](../../integration/e2e/README.md)，固定平台/runtime 镜像并使用私有测试输入，在 PR 中记录受测组合。职责见[架构](architecture.md)，发布见[发行流程](releasing.md)。
+
+SDK 依赖评审将 openid-client 升至 6.9.0、ws 升至 8.23.0、Zod 升至 4.6.7；Connector 按已提交源码重新打包。Vitest 4.1.12 与 Vite 8.2.6/source-map-js 1.2.2 安全版本针修复审计命中的开发依赖闭包，同时保留官方 DSH 的 TypeScript/lint 工具链。`pnpm security` 在验证门禁中运行 `pnpm audit`，检查本 workspace 闭包，官方原生 DSH 发行物仍由 runtime 单独锁定。

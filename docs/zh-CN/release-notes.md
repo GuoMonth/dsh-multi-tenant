@@ -1,5 +1,7 @@
 # 0.12.0-rc.2
 
+SDK 依赖升级至 openid-client 6.9.0、ws 8.23.0、Zod 4.6.7，并更新 Connector 来源身份。配套 launcher 使用 Go 1.27.4，在公布进程结束前读完输出，并等待管理服务和代理清理完成。验证增加依赖安全扫描、原生 goroutine 泄漏检测和 goroutine 归属检查。
+
 [English](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/release-notes.md)
 
 **2026-11-17 准备**，面向 npm `next` 和 GitHub 预发布。配套 runtime：**0.5.0-rc.3**；DSH：**0.2.2-rc.3**（`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`）。已发布的平台 **0.12.0-rc.1**、runtime **0.5.0-rc.2**、DSH **0.2.1-rc.5** 仍是历史版本。
