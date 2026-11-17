@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import assert from 'node:assert/strict'
 import { DSH_TARGET } from './dsh-target.mjs'
+import { verifyPlatformShutdown } from './platform-process-smoke.mjs'
 const dir = mkdtempSync(join(tmpdir(), 'dsh-platform-consumer-'))
 const run = (cmd, args, cwd = dir) => execFileSync(cmd, args, {
   cwd,
@@ -87,6 +88,7 @@ options.storage.size satisfies string;
     assert.match(e.stderr, /CLIStartupFailed/)
   }
   assert.ok(rejected)
+  await verifyPlatformShutdown(cli, dir)
   console.log('Clean installed tarball import, bundled dependencies, CLI and deleted-backend rejection passed: ' +
         exports.trim())
 }

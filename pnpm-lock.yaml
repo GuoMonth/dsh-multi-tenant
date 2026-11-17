@@ -40,8 +40,8 @@ importers:
   packages/multi-tenant:
     devDependencies:
       '@dsh/environment-connector-internal':
-        specifier: file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz
-        version: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz
+        specifier: file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.3-a1b9cb1.tgz
+        version: file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-a1b9cb1.tgz
       '@types/ws':
         specifier: 8.18.1
         version: 8.18.1
@@ -51,6 +51,9 @@ importers:
       ws:
         specifier: 8.18.3
         version: 8.18.3
+      zod:
+        specifier: 4.6.6
+        version: 4.6.6
 
 packages:
 
@@ -90,10 +93,10 @@ packages:
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
 
-  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz':
-    resolution: {integrity: sha512-91yvF4rleoFOFcK+CCJwLDi/zeOOQPpcTr8ANb9dPsOnSgvMSUZjgxlblxlVCmQOGzkFz1jD9csTwI6fhWfLNA==, tarball: file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz}
-    version: 0.0.0-rc.2
-    engines: {node: '>=24'}
+  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-a1b9cb1.tgz':
+    resolution: {integrity: sha512-ukvLk9Mb5z/Q+yGkItFpipkwAei69cnWuj4QEP5WKmLC/q5r/cE6KvSt2zPVjQ9IX+gt60tXq+wKdNCY/45G+w==, tarball: file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-a1b9cb1.tgz}
+    version: 0.0.0-rc.3
+    engines: {node: ^24.9.0 || ^26.0.0}
 
   '@emnapi/core@1.11.0':
     resolution: {integrity: sha512-l9Oo58x0HOP5znGzVhYW9U3e5wVuA4LAZU2AGezTmkhO1CgQRFDhDg4nneHsu/t3WniXg9QrG2nIXL/ZS8ln8Q==}
@@ -1445,6 +1448,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod@4.6.6:
+    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
+
 snapshots:
 
   '@babel/generator@8.0.0-rc.6':
@@ -1487,7 +1493,9 @@ snapshots:
       hashery: 1.5.1
       keyv: 5.6.0
 
-  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz': {}
+  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-a1b9cb1.tgz':
+    dependencies:
+      zod: 4.6.6
 
   '@emnapi/core@1.11.0':
     dependencies:
@@ -2524,3 +2532,5 @@ snapshots:
   ws@8.18.3: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.6.6: {}

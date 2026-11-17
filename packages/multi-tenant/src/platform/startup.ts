@@ -1,3 +1,4 @@
+import { parseEnvironmentRuntimeOptions } from '@dsh/environment-connector-internal'
 /** Fixed diagnostics only: dependency errors can contain URLs, tokens or file contents. */
 const actions = {
   configuration:
@@ -15,20 +16,8 @@ const actions = {
 } as const
 export type StartupStage = keyof typeof actions
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 export function validateEnvironmentConfiguration(runtime: unknown): void {
-  if (
-    !isRecord(runtime) ||
-    typeof runtime.image !== 'string' ||
-    !runtime.image.includes('@sha256:') ||
-    !isRecord(runtime.kubernetes) ||
-    !isRecord(runtime.storage) ||
-    !isRecord(runtime.resources)
-  )
-    throw new Error('Invalid runtime configuration')
+  parseEnvironmentRuntimeOptions(runtime)
 }
 
 export function startupDiagnostic(stage: StartupStage, correlationId: string) {

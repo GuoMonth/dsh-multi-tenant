@@ -1,3 +1,4 @@
+import type { EnvironmentId } from './identity.ts'
 import { createHash, randomBytes } from 'node:crypto'
 import type { Environment, AuthorizedSession } from './ingress.ts'
 
@@ -20,7 +21,7 @@ interface Parent {
 interface Child {
   key: string
   parentKey: string
-  environmentId: string
+  environmentId: EnvironmentId
   expiresAt: number
   abort: AbortController
   timer?: ReturnType<typeof setTimeout>
@@ -46,7 +47,7 @@ export class Sessions {
     )
       throw new Error('Invalid session lifetime')
     this.updateMembers(members)
-    this.timer = setInterval(() => this.sweep(), 10000)
+    this.timer = setInterval(() => { this.sweep() }, 10000)
     this.timer.unref()
   }
   updateMembers(input: readonly Member[]) {
@@ -55,7 +56,7 @@ export class Sessions {
       if (
         !raw.issuer ||
         !raw.subject ||
-        !raw.owner?.tenantId ||
+        !raw.owner.tenantId ||
         !raw.owner.principalId
       )
         throw new Error('Invalid member mapping')
@@ -87,7 +88,7 @@ export class Sessions {
       abort: new AbortController(),
       children: new Set(),
     }
-    parent.timer = setTimeout(() => this.revoke(key), this.lifetimeMs)
+    parent.timer = setTimeout(() => { this.revoke(key) }, this.lifetimeMs)
     parent.timer.unref()
     this.parents.set(key, parent)
     return { token, parent }
@@ -119,7 +120,7 @@ export class Sessions {
       abort: new AbortController(),
     }
     child.timer = setTimeout(
-      () => this.removeChild(key),
+      () => { this.removeChild(key) },
       Math.max(0, child.expiresAt - Date.now()),
     )
     child.timer.unref()
@@ -152,11 +153,11 @@ export class Sessions {
     }
   }
   logoutChild(token: string | undefined, environment: Environment) {
-    if (!this.child(token, environment)) return
-    const child = this.children.get(digest(token!))!
-    this.revoke(child.parentKey)
+    if (!token || !this.child(token, environment)) return
+    const child = this.children.get(digest(token))
+    if (child) this.revoke(child.parentKey)
   }
-  revokeEnvironment(environmentId: string) {
+  revokeEnvironment(environmentId: EnvironmentId) {
     for (const child of this.children.values())
       if (child.environmentId === environmentId) this.removeChild(child.key)
   }

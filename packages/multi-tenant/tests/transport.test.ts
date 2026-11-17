@@ -1,3 +1,5 @@
+import { identities, parseEnvironmentOwner } from '@dsh/environment-connector-internal'
+import { environmentId } from '../src/platform/identity.ts'
 import { test, expect } from 'vitest'
 import { get, type IncomingMessage } from 'node:http'
 import { once } from 'node:events'
@@ -9,18 +11,18 @@ import type {
 } from '../src/environment-contract.ts'
 import { createPlatformIngress } from '../src/platform/ingress.ts'
 import { Sessions } from '../src/platform/sessions.ts'
-const owner = { tenantId: 't', principalId: 'alice' }
+const owner = parseEnvironmentOwner({ tenantId: 't', principalId: identities.principalId('alice') })
 const ref: EnvironmentRef = {
   owner,
-  allocationKey: 'k',
-  namespace: 'ns',
-  sandbox: { name: 'env', uid: 's' },
-  data: { name: 'data', uid: 'd' },
+  allocationKey: identities.allocationKey('k'),
+  namespace: identities.namespace('ns'),
+  sandbox: { name: 'env', uid: identities.sandboxUID('s') },
+  data: { name: 'data', uid: identities.pvcUID('d') },
 }
 test('real HTTP stream and WebSocket close when membership revokes authority', async () => {
   const member = { issuer: 'https://issuer.example', subject: 'alice', owner }
   const sessions = new Sessions([member])
-  const environment = { id: 'alice', owner, instance: ref }
+  const environment = { id: environmentId('alice'), owner, instance: ref }
   const parent = sessions.issueParent(member.issuer, member.subject),
     child = sessions.issueChild(parent.parent.key, environment)
   const wsServer = new WebSocketServer({ noServer: true })
@@ -53,7 +55,7 @@ test('real HTTP stream and WebSocket close when membership revokes authority', a
         return sessions.child(child.token, environment)
       },
     },
-    new Map([['alice', environment]]),
+    new Map([[environment.id, environment]]),
   )
   app.server.listen(0, '127.0.0.1')
   await once(app.server, 'listening')
@@ -105,10 +107,10 @@ test('revocation during pending runtime admission never forwards', async () => {
     runtime,
     {
       async authenticate() {
-        return { environmentId: 'alice', owner, signal: invalidation.signal }
+        return { environmentId: environmentId('alice'), owner, signal: invalidation.signal }
       },
     },
-    new Map([['alice', { id: 'alice', owner, instance: ref }]]),
+    new Map([[environmentId('alice'), { id: environmentId('alice'), owner, instance: ref }]]),
   )
   app.server.listen(0, '127.0.0.1')
   await once(app.server, 'listening')

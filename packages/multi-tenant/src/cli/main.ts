@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { z } from 'zod'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -43,11 +44,8 @@ async function main() {
     return
   }
   if (values.version) {
-    console.log(
-      JSON.parse(
-        readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-      ).version,
-    )
+    const value: unknown = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+    console.log(z.object({ version: z.string().min(1) }).parse(value).version)
     return
   }
   const allowed: Record<string, string[]> = {
@@ -60,8 +58,9 @@ async function main() {
     resume: ['socket', 'environment', 'allocation-key', 'identity'],
     delete: ['socket', 'environment', 'allocation-key', 'identity'],
   }
-  const required = allowed[command!]
+  const required = command ? allowed[command] : undefined
   if (
+    !command ||
     !required ||
     extra.length ||
     required.some(key => !values[key as keyof typeof values]) ||
@@ -70,30 +69,28 @@ async function main() {
     throw new Error('Invalid arguments')
   if (values.environment && !/^[A-Za-z0-9_-]{1,80}$/.test(values.environment))
     throw new Error('Invalid environment')
-  const argv =
-    ['render', 'preflight', 'install'].includes(command!)
-      ? ['../charts/install.mjs', command!, ...required.flatMap(key => ['--' + key, String(values[key as keyof typeof values])])]
+  const options: Record<string, string | boolean | undefined> = values
+  const argument = (name: string): string => {
+    const value = options[name]
+    if (typeof value !== 'string' || !value) throw new Error('Missing argument')
+    return value
+  }
+  const argv: [string, ...string[]] =
+    ['render', 'preflight', 'install'].includes(command)
+      ? ['../charts/install.mjs', command, ...required.flatMap(key => ['--' + key, argument(key)])]
       : command === 'start'
-        ? ['platform.mjs', resolve(values.config!)]
-        : [
-          'admin.mjs',
-          resolve(values.socket!),
-          command === 'resume' ? 'start' : command!,
-          values.environment!,
-          ...(command !== 'inspect'
-            ? [values['allocation-key']!, values.identity!]
-            : []),
-        ]
+        ? ['platform.mjs', resolve(argument('config'))]
+        : ['admin.mjs', resolve(argument('socket')), command === 'resume' ? 'start' : command,
+          argument('environment'), ...(command !== 'inspect' ? [argument('allocation-key'), argument('identity')] : [])]
   const child = spawn(
     process.execPath,
-    [fileURLToPath(new URL(argv[0]!, import.meta.url)), ...argv.slice(1)],
+    [fileURLToPath(new URL(argv[0], import.meta.url)), ...argv.slice(1)],
     { stdio: 'inherit' },
   )
-  const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const
-  const handlers = signals.map(signal => () => {
-    child.kill(signal)
-  })
-  signals.forEach((signal, i) => process.on(signal, handlers[i]!))
+  const handlers = (['SIGINT', 'SIGTERM', 'SIGHUP'] as const).map(signal => ({
+    signal, forward: () => { child.kill(signal) },
+  }))
+  for (const { signal, forward } of handlers) process.on(signal, forward)
   try {
     await new Promise<void>((accept, reject) => {
       child.once('error', reject)
@@ -104,7 +101,7 @@ async function main() {
       })
     })
   } finally {
-    signals.forEach((signal, i) => process.off(signal, handlers[i]!))
+    for (const { signal, forward } of handlers) process.off(signal, forward)
   }
 }
 main().catch(() => {

@@ -27,4 +27,8 @@ GitHub PR CI 在当前 Node 24 和 Node 26 上执行验证、类型检查和测�
 
 根 README 和 AI.md 是可编辑源文件，构建生成带源码提交链接的 npm 副本。中英文指南成对维护，同时更新事实、命令和链接。`pnpm docs:check` 检查路径、锚点、语言配对及命令和版本一致性。跨仓检查可用 `DSH_PLATFORM_DOCS` 和 `DSH_RUNTIME_DOCS` 指定配套 checkout。
 
+owner、allocation、environment、资源 UID 和修订号使用不同类型。SDK 提供外部值的身份解析器，保留精确字符串及 owner 到 environment 的哈希。配置与持久化绑定经 schema 校验，涵盖 owner/ref 一致性和变更屏障。损坏绑定会阻断后续写入，直到检查私有状态；不会授权创建替代 allocation。Connector 的 Kubernetes 解析保留未知字段供模板拒绝。
+
+关闭流程幂等：停止准入并取消连接，等待启动、成员重载以及实际在途认证/runtime/admin 操作结束，再释放会话和 SQLite。发出取消不等于完成。部分启动失败也执行相同清理；清理失败只输出固定诊断，不暴露依赖原文。SIGHUP 只解析成员；运行中的重载失败会撤销会话，已取消的重载不能在关闭后重新写入成员权限。
+
 Connector fixture 覆盖平台控制与授权。真实集群和原生应用检查使用 [integration/e2e](../../integration/e2e/README.md)，固定平台/runtime 镜像并使用私有测试输入，在 PR 中记录受测组合。职责见[架构](architecture.md)，发布见[发行流程](releasing.md)。

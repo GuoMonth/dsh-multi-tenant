@@ -1,3 +1,4 @@
+import { parseEnvironmentOwner } from '@dsh/environment-connector-internal'
 import { test, expect, vi } from 'vitest'
 import { generateKeyPairSync, sign } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -13,7 +14,7 @@ const issuer = 'https://issuer.example',
 const member = {
   issuer,
   subject: 'alice',
-  owner: { tenantId: 't', principalId: 'alice' },
+  owner: parseEnvironmentOwner({ tenantId: 't', principalId: 'alice' }),
 }
 const { privateKey, publicKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,

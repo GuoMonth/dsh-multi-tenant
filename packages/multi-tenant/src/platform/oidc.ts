@@ -1,3 +1,4 @@
+import type { EnvironmentId } from './identity.ts'
 import { PlatformError } from './errors.ts'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import * as oidc from 'openid-client'
@@ -19,10 +20,10 @@ export interface OIDCOptions {
   clientId: string
   platformOrigin: string
   siteDomain: string
-  sessionLifetimeMs?: number
+  sessionLifetimeMs?: number | undefined
 }
 interface Entry {
-  environmentId: string
+  environmentId: EnvironmentId
   nonceHash: string
 }
 interface Transaction {
@@ -45,7 +46,7 @@ function cookie(request: IncomingMessage, name: string) {
     .map(x => x.trim())
     .filter(x => x.startsWith(name + '='))
     .map(x => x.slice(name.length + 1))
-  return values.length === 1 && /^[A-Za-z0-9_-]{43}$/.test(values[0]!)
+  return values.length === 1 && values[0] && /^[A-Za-z0-9_-]{43}$/.test(values[0])
     ? values[0]
     : undefined
 }
@@ -85,14 +86,14 @@ const escape = (value: string) =>
     c =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[
         c
-      ]!,
+      ] ?? c,
   )
 
 export async function createOIDCAuthentication(
   options: OIDCOptions,
   secret: string | undefined,
-  environments: ReadonlyMap<string, Environment>,
-  origins: ReadonlyMap<string, string>,
+  environments: ReadonlyMap<EnvironmentId, Environment>,
+  origins: ReadonlyMap<EnvironmentId, string>,
   members: readonly Member[],
   shutdown: AbortSignal,
   control: ReturnType<typeof createEnvironmentControl>,
@@ -144,8 +145,9 @@ export async function createOIDCAuthentication(
     secret ? oidc.ClientSecretBasic(secret) : oidc.None(),
     {
       timeout: 10,
-      [oidc.customFetch]: (url, init) =>
-        fetch(url, {
+      [oidc.customFetch]: (url, init) => {
+        const scope = requestScope.getStore()
+        return fetch(url, {
           ...init,
           body:
             init.body instanceof Uint8Array
@@ -154,16 +156,22 @@ export async function createOIDCAuthentication(
           redirect: 'error',
           signal: AbortSignal.any([
             shutdown,
-            ...(init?.signal ? [init.signal] : []),
-            ...(requestScope.getStore() ? [requestScope.getStore()!] : []),
+            ...(init.signal ? [init.signal] : []),
+            ...(scope ? [scope] : []),
             AbortSignal.timeout(10000),
           ]),
-        }),
+        })
+      },
     },
   )
   oidc.enableNonRepudiationChecks(config)
   const sessions = new Sessions(members, options.sessionLifetimeMs)
-  control.setRevoker(id => sessions.revokeEnvironment(id))
+  try {
+    control.setRevoker((id) => { sessions.revokeEnvironment(id) })
+  } catch (cause) {
+    sessions.close()
+    throw cause
+  }
   const entries = new Once<Entry>(),
     transactions = new Once<Transaction>(),
     tickets = new Once<Ticket>()
@@ -182,17 +190,19 @@ export async function createOIDCAuthentication(
     )
       throw new Error('EnvironmentForbidden')
     const ticket = tickets.put({ entry, parentKey }, 30000)
-    const destination = new URL('/auth/complete', origins.get(environment.id)!)
+    const origin = origins.get(environment.id)
+    if (!origin) throw new Error('EnvironmentForbidden')
+    const destination = new URL('/auth/complete', origin)
     destination.searchParams.set('ticket', ticket)
     return destination.href
   }
   const authenticator: PlatformAuthenticator = {
-    async authenticate(request, signal) {
+    authenticate(request, signal) {
       signal.throwIfAborted()
       const environment = environmentForHost(request.headers.host ?? '')
-      return environment
+      return Promise.resolve(environment
         ? sessions.child(cookie(request, childCookie), environment)
-        : undefined
+        : undefined)
     },
     async handle(request, response, signal) {
       const host = request.headers.host ?? '',
@@ -203,8 +213,9 @@ export async function createOIDCAuthentication(
         return true
       }
       const origin = environment
-        ? origins.get(environment.id)!
+        ? origins.get(environment.id)
         : platform.origin
+      if (!origin) throw new Error('EnvironmentForbidden')
       if (
         !request.url?.startsWith('/') ||
         request.url.startsWith('//') ||
@@ -460,7 +471,7 @@ export async function createOIDCAuthentication(
   }
   return {
     authenticator,
-    updateMembers: (next: readonly Member[]) => sessions.updateMembers(next),
+    updateMembers: (next: readonly Member[]) => { sessions.updateMembers(next) },
     close() {
       entries.clear()
       transactions.clear()

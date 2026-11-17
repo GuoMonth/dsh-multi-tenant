@@ -1,8 +1,13 @@
+import { z } from 'zod'
+import { refSchema } from '@dsh/environment-connector-internal'
+import { environmentId, type EnvironmentId } from './identity.ts'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type {
   AgentEnvironmentRuntime,
   EnvironmentContext,
   EnvironmentView,
+  AllocationKey,
+  SandboxUID,
 } from '@dsh/environment-connector-internal'
 import {
   EnvironmentBindingStore,
@@ -13,15 +18,17 @@ import { PlatformError, diagnostic } from './errors.ts'
 import type { Environment } from './ingress.ts'
 import type { Member } from './sessions.ts'
 type Operation = 'inspect' | 'enter' | 'start' | 'stop' | 'delete'
+const deletionSchema = z.strictObject({ ref: refSchema, dataRetained: z.literal(true),
+  effect: z.enum(['accepted', 'not-submitted']), state: z.enum(['Deleting', 'Deleted']) })
 export function createEnvironmentControl(
   runtime: AgentEnvironmentRuntime,
   store: EnvironmentBindingStore,
 ) {
-  const active = new Set<string>()
-  const environments = new Map<string, Environment>(),
-    origins = new Map<string, string>()
-  let revoke: ((id: string) => void) | undefined
-  function withdraw(id: string) {
+  const active = new Set<EnvironmentId>()
+  const environments = new Map<EnvironmentId, Environment>(),
+    origins = new Map<EnvironmentId, string>()
+  let revoke: ((id: EnvironmentId) => void) | undefined
+  function withdraw(id: EnvironmentId) {
     environments.delete(id)
     origins.delete(id)
     revoke?.(id)
@@ -64,7 +71,7 @@ export function createEnvironmentControl(
     } else withdraw(record.id)
   }
   async function operate(
-    id: string,
+    id: EnvironmentId,
     operation: Operation,
     ctx: EnvironmentContext,
   ) {
@@ -160,10 +167,9 @@ export function createEnvironmentControl(
         }
         try {
           if (operation === 'delete') {
-            const result = await runtime.delete(view.ref, view.revision, ctx)
+            const result = deletionSchema.parse(await runtime.delete(view.ref, view.revision, ctx))
             if (
-              !sameRef(record.ref!, result.ref) ||
-              result.dataRetained !== true
+              !sameRef(view.ref, result.ref)
             )
               throw new Error('Invalid deletion identity')
             return { id, phase: record.phase, ...result }
@@ -209,14 +215,14 @@ export function createEnvironmentControl(
   return {
     environments,
     origins,
-    setRevoker(fn: (id: string) => void) {
+    setRevoker(fn: (id: EnvironmentId) => void) {
       if (revoke) throw new Error('Revoker already set')
       revoke = fn
     },
     async administer(
-      id: string,
+      id: EnvironmentId,
       operation: Operation,
-      expected: { allocationKey: string; identity: string } | undefined,
+      expected: { allocationKey: AllocationKey; identity: SandboxUID } | undefined,
       ctx: EnvironmentContext,
     ) {
       const r = store.get(id)
@@ -241,15 +247,16 @@ export function createEnvironmentControl(
       member: Member,
       ctx: EnvironmentContext,
     ) {
-      const url = new URL(request.url!, 'https://platform.invalid')
+      const url = new URL(request.url ?? '', 'https://platform.invalid')
       const match =
         /^\/api\/environments\/([A-Za-z0-9_-]{1,80})(?:\/(enter|stop|start))?$/.exec(
           url.pathname,
         )
       response.setHeader('content-type', 'application/json')
       response.setHeader('cache-control', 'no-store')
-      const record = match && store.get(match[1]!)
+      const record = match && store.get(environmentId(match[1]))
       if (
+        !match ||
         !record ||
         record.owner.tenantId !== member.owner.tenantId ||
         record.owner.principalId !== member.owner.principalId
@@ -259,9 +266,9 @@ export function createEnvironmentControl(
         return
       }
       if (
-        match![2]
+        match[2]
           ? request.method !== 'POST'
-          : !['GET', 'POST'].includes(request.method!)
+          : !['GET', 'POST'].includes(request.method ?? '')
       ) {
         response.writeHead(405)
         response.end()
@@ -277,8 +284,8 @@ export function createEnvironmentControl(
         return
       }
       try {
-        const operation = (match![2] ??
-          (request.method === 'POST' ? 'enter' : 'inspect')) as Operation
+        const operation = match[2] ? z.enum(['enter', 'stop', 'start']).parse(match[2]) :
+          (request.method === 'POST' ? 'enter' : 'inspect')
         const result = await operate(record.id, operation, ctx)
         ctx.signal.throwIfAborted()
         response.writeHead(

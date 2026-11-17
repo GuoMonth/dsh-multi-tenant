@@ -1,3 +1,5 @@
+import { identities, parseEnvironmentOwner } from '@dsh/environment-connector-internal'
+import { environmentId } from '../src/platform/identity.ts'
 import { test, expect, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -8,11 +10,12 @@ import {
   type AgentEnvironmentRuntime,
   type EnvironmentView,
   type EnvironmentIntent,
+  type EnvironmentRef,
 } from '../src/environment-contract.ts'
 import { EnvironmentBindingStore } from '../src/platform/bindings.ts'
 import { createEnvironmentControl } from '../src/platform/control.ts'
 import { Sessions } from '../src/platform/sessions.ts'
-const owner = { tenantId: 'tenant', principalId: 'alice' }
+const owner = parseEnvironmentOwner({ tenantId: 'tenant', principalId: identities.principalId('alice') })
 const member = { issuer: 'https://id.example', subject: 'alice', owner }
 const ctx = () => ({
   signal: new AbortController().signal,
@@ -31,11 +34,11 @@ function view(
     ref: {
       allocationKey: intent.allocationKey,
       owner: intent.owner,
-      namespace: 'ns',
-      sandbox: { name: 'env', uid: 'sandbox-uid' },
-      data: { name: 'data', uid: 'pvc-uid' },
+      namespace: identities.namespace('ns'),
+      sandbox: { name: 'env', uid: identities.sandboxUID('sandbox-uid') },
+      data: { name: 'data', uid: identities.pvcUID('pvc-uid') },
     },
-    revision: 'r1',
+    revision: identities.revision('r1'),
     state,
     origin: 'https://env.example.test',
   }
@@ -52,7 +55,7 @@ function failure(
     effect: 'unknown',
     observedState: 'unverified',
     retry: 'read-first',
-    allocationKey: 'original',
+    allocationKey: identities.allocationKey('original'),
     correlationId: 'test',
     nextAction: 'Inspect original',
   })
@@ -135,7 +138,7 @@ async function api(
 test('one stable reservation per owner, persistence and exact binding across restart', async () => {
   const f = fixture()
   expect(f.store.reserve(owner)).toEqual(f.record)
-  expect(f.store.reserve({ ...owner, principalId: 'bob' }).id).not.toBe(
+  expect(f.store.reserve({ ...owner, principalId: identities.principalId('bob') }).id).not.toBe(
     f.record.id,
   )
   await api(f)
@@ -190,7 +193,7 @@ test('cross-owner API rejects before runtime, including mutations', async () => 
       (
         await api(f, 'POST', suffix, {
           ...member,
-          owner: { ...owner, principalId: 'bob' },
+          owner: { ...owner, principalId: identities.principalId('bob') },
         })
       ).status,
     ).toBe(403)
@@ -228,9 +231,10 @@ test('stop revokes before runtime mutation, persists unknown barrier and require
   f.runtime.inspectAllocation = vi.fn(async i => view(i, 'Stopped'))
   expect((await api(f, 'GET')).status).toBe(200)
   expect(f.store.get(f.record.id)?.pending).toBeUndefined()
+  const start = vi.spyOn(f.runtime, 'start')
   expect((await api(f, 'POST', '/start')).status).toBe(200)
-  expect(f.runtime.start).toHaveBeenCalledWith(
-    expect.objectContaining({ data: { name: 'data', uid: 'pvc-uid' } }),
+  expect(start).toHaveBeenCalledWith(
+    expect.objectContaining({ data: { name: 'data', uid: identities.pvcUID('pvc-uid') } }),
     'r1',
     expect.anything(),
   )
@@ -255,13 +259,13 @@ test('delete checks local identity, requires Stopped and never automatically rec
   await api(f)
   const expected = {
     allocationKey: f.record.allocationKey,
-    identity: 'sandbox-uid',
+    identity: identities.sandboxUID('sandbox-uid'),
   }
   await expect(
     f.control.administer(
       f.record.id,
       'delete',
-      { ...expected, identity: 'wrong' },
+      { ...expected, identity: identities.sandboxUID('wrong') },
       ctx(),
     ),
   ).rejects.toThrow('StaleInstance')
@@ -282,9 +286,9 @@ test('membership removal, owner remap, logout and expiration abort child session
   const s = new Sessions([member], 60000)
   cleanups.push(() => s.close())
   const env = {
-    id: 'alice',
+    id: environmentId('alice'),
     owner,
-    instance: view({ owner, allocationKey: 'k' }).ref,
+    instance: view({ owner, allocationKey: identities.allocationKey('k') }).ref,
   }
   const issue = () => {
     const p = s.issueParent(member.issuer, member.subject)
@@ -297,7 +301,7 @@ test('membership removal, owner remap, logout and expiration abort child session
   expect(s.parent(a.p.token)).toBeUndefined()
   s.updateMembers([member])
   const b = issue()
-  s.updateMembers([{ ...member, owner: { ...owner, principalId: 'changed' } }])
+  s.updateMembers([{ ...member, owner: { ...owner, principalId: identities.principalId('changed') } }])
   expect(b.signal.aborted).toBe(true)
   s.updateMembers([member])
   const c = issue()
@@ -324,7 +328,7 @@ test('deleted-resource inspect preserves StaleInstance and durable deletion barr
   await f.control.administer(
     f.record.id,
     'delete',
-    { allocationKey: f.record.allocationKey, identity: 'sandbox-uid' },
+    { allocationKey: f.record.allocationKey, identity: identities.sandboxUID('sandbox-uid') },
     ctx(),
   )
   f.runtime.inspectAllocation = vi.fn(async () => {
@@ -357,4 +361,21 @@ test('exclusive state writer rejects a second process/store owner', () => {
     store.close()
     rmSync(dir, { recursive: true })
   }
+})
+
+
+test('invalid deletion retention proof preserves the durable deletion barrier', async () => {
+  const f = fixture()
+  await api(f)
+  f.runtime.inspectAllocation = vi.fn(async (i: EnvironmentIntent) => view(i, 'Stopped'))
+  f.runtime.delete = vi.fn(async (ref: EnvironmentRef) => {
+    const result = { ref, effect: 'accepted' as const, state: 'Deleted' as const, dataRetained: true as const }
+    Reflect.set(result, 'dataRetained', false)
+    return result
+  })
+  await expect(f.control.administer(f.record.id, 'delete', {
+    allocationKey: f.record.allocationKey, identity: identities.sandboxUID('sandbox-uid'),
+  }, ctx())).rejects.toThrow()
+  expect(f.store.get(f.record.id)?.phase).toBe('delete-requested')
+  expect(f.control.environments.size).toBe(0)
 })

@@ -1,3 +1,7 @@
+import { z } from 'zod'
+import { PendingWork, closeServer, settleCleanup, listenServer } from './work.ts'
+import { environmentId } from './identity.ts'
+import { identities } from '@dsh/environment-connector-internal'
 import { diagnostic } from './errors.ts'
 import { createServer, type ServerResponse } from 'node:http'
 import { chmod, lstat } from 'node:fs/promises'
@@ -25,9 +29,12 @@ export async function listenAdmin(
     await lstat(path)
     throw new Error('Admin socket path already exists')
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
   }
   shutdown.throwIfAborted()
+  const work = new PendingWork()
+  let closing = false
+  let closingPromise: Promise<void> | undefined
   const pending = new Set<AbortController>()
   const send = (response: ServerResponse, status: number, value: unknown) => {
     if (!response.destroyed) {
@@ -40,7 +47,7 @@ export async function listenAdmin(
   }
   const server = createServer((request, response) => {
     const correlationId = randomUUID()
-    if (pending.size >= 32 || shutdown.aborted) {
+    if (closing || pending.size >= 32 || shutdown.aborted) {
       send(response, 503, { code: 'AdminUnavailable', correlationId })
       return
     }
@@ -58,17 +65,17 @@ export async function listenAdmin(
     }
     const controller = new AbortController()
     pending.add(controller)
-    response.once('close', () => controller.abort())
+    response.once('close', () => { controller.abort() })
     const allocationKey = request.headers['x-allocation-key'],
       identity = request.headers['x-instance-identity']
     const expected =
       typeof allocationKey === 'string' && typeof identity === 'string'
-        ? { allocationKey, identity }
+        ? { allocationKey: identities.allocationKey(allocationKey), identity: identities.sandboxUID(identity) }
         : undefined
-    void control
+    void work.track(control
       .administer(
-        match[2]!,
-        match[1] as 'inspect' | 'delete' | 'stop' | 'start',
+        environmentId(match[2]),
+        z.enum(['inspect', 'delete', 'stop', 'start']).parse(match[1]),
         expected,
         {
           correlationId,
@@ -79,8 +86,8 @@ export async function listenAdmin(
           ]),
         },
       )
-      .then(result => send(response, 200, result))
-      .catch((error) => {
+      .then((result) => { send(response, 200, result) })
+      .catch((error: unknown) => {
         const failure = diagnostic(error, correlationId)
         send(
           response,
@@ -92,27 +99,19 @@ export async function listenAdmin(
           failure,
         )
       })
-      .finally(() => pending.delete(controller))
+      .finally(() => pending.delete(controller)))
   })
   server.requestTimeout = 15000
   server.headersTimeout = 10000
-  const close = async () => {
+  const close = () => {
+    if (closingPromise) return closingPromise
+    closing = true
     for (const controller of pending) controller.abort()
-    server.closeAllConnections()
-    await new Promise<void>((resolve, reject) =>
-      server.close(error =>
-        error &&
-        (error as NodeJS.ErrnoException).code !== 'ERR_SERVER_NOT_RUNNING'
-          ? reject(error)
-          : resolve(),
-      ),
-    )
+    closingPromise = settleCleanup([closeServer(server), work.drain()])
+    return closingPromise
   }
   try {
-    await new Promise<void>((resolve, reject) => {
-      server.once('error', reject)
-      server.listen(path, resolve)
-    })
+    await listenServer(server, { path, signal: shutdown })
     await chmod(path, 0o600)
     shutdown.throwIfAborted()
   } catch (error) {
