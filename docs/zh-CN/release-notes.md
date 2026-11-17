@@ -1,5 +1,7 @@
 # 0.12.0-rc.2
 
+修复平台传入绑定记录时的环境创建与只读分配恢复：控制元数据不再混入严格资源引用，owner 与资源 UID 校验继续生效。
+
 SDK 依赖升级至 openid-client 6.9.0、ws 8.23.0、Zod 4.6.7，并更新 Connector 来源身份。配套 launcher 使用 Go 1.27.4，在公布进程结束前读完输出，并等待管理服务和代理清理完成。验证增加依赖安全扫描、原生 goroutine 泄漏检测和 goroutine 归属检查。
 
 [English](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/release-notes.md)

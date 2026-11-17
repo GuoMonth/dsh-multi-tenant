@@ -1,5 +1,7 @@
 # 0.12.0-rc.2
 
+Fixed environment creation and read-only allocation recovery when the platform supplies a binding record: control metadata no longer contaminates strict resource references. Owner and resource UID checks remain enforced.
+
 SDK dependencies now use openid-client 6.9.0, ws 8.23.0 and Zod 4.6.7, with refreshed Connector provenance. The paired launcher uses Go 1.27.4, drains process output before completion and joins management/proxy cleanup. Verification includes dependency security scans and native/owner-based goroutine leak checks.
 
 [简体中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/release-notes.md)
