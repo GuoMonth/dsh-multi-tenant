@@ -1,0 +1,509 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "file": "packages/multi-tenant/src/cli/main.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "5136a0fd8b30119698dce513409be7afa422c06c81f40fd1f2238bb83854d8a3",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/cli/main.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "a5944104cf5ce91bea199d8af93e5eeeb957a0178d6daecb312b1d4e9016a72e",
+      "count": 8
+    },
+    {
+      "file": "packages/multi-tenant/src/cli/main.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "ae2b3994e22bfbcd00130c50af99f0db8ec7e48a520d87f94f95d71fe5859ff0",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/cli/main.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "da181d2f991c22d368ed8e4b3c51d24c3cb0fc82998e8f667bd543ea4db69db9",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/cli/main.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "e314d94f47913dc6336d43cb95c4b4279023bf9362ac440d5b7e735b1fe085ae",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/cli/main.ts",
+      "code": "typescript(no-unsafe-member-access)",
+      "hash": "5b587da0625aa0e5dac39a73aa2bc1ef1b7c6d50cee436140767e48293dae561",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/admin-cli.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "7f4fad3b61ec109087e58a6941cb0e2a1375965084f8db8c8a8ada95e1f64c1f",
+      "count": 2
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/admin.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "065dba0ed4048eb3c62bf173f646489e3a28fdda6d7f5e8bf9039a24e5aaa27b",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/admin.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "6c634c5d1c33f1ebb40d2f9c2987977878bccc93c306fe6da27c307c720253f5",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/admin.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "d57ffa397df31709d2a81630f7b57a6b2e5872176d039714a641d82ca8f148e8",
+      "count": 2
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/admin.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "065dba0ed4048eb3c62bf173f646489e3a28fdda6d7f5e8bf9039a24e5aaa27b",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/admin.ts",
+      "code": "typescript(use-unknown-in-catch-callback-variable)",
+      "hash": "3c9376f363466d3bc9d32b0ecd8abe34b2d5cb5fde8e6e052e9edb09797f5688",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/bindings.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "8e1f2da0a5a50b51565ef4453085a7982178801dc437319a8e5de61a86aa7bd2",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/bindings.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "e37a81fb854dec62a82621486d1602d6c4ea760a097690f438c22a0262a30874",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/bindings.ts",
+      "code": "typescript(no-unnecessary-condition)",
+      "hash": "0a7d64d853259e7f1790b7ddd71b93832d17cfc5f558a72e6fbe03236eaeae91",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/control.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "099f00090eb2357f1563906484ccc05ce895c7f8813f1a1240443f4411c626d4",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/control.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "2dd00563e97e42594376cb48473bdff6c031d152f11924abc97931aa1ecbb612",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/control.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "842c244a36e3d29b32a5eba269187fd18917482ad2ef7fc1c7ecd14ea545a474",
+      "count": 2
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/control.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "a5e2fb4eadd2f959ef09225b5e4cf186443edf2b43b2da3e35d65a6a39ed88a4",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/control.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "c6049d76aeeea781c96cd57470a6bb99fa08cb430516f3431f199a887f53aa05",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/control.ts",
+      "code": "typescript(no-unnecessary-boolean-literal-compare)",
+      "hash": "a5e2fb4eadd2f959ef09225b5e4cf186443edf2b43b2da3e35d65a6a39ed88a4",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/control.ts",
+      "code": "typescript(no-unnecessary-condition)",
+      "hash": "a5e2fb4eadd2f959ef09225b5e4cf186443edf2b43b2da3e35d65a6a39ed88a4",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/control.ts",
+      "code": "typescript(no-unnecessary-type-assertion)",
+      "hash": "842c244a36e3d29b32a5eba269187fd18917482ad2ef7fc1c7ecd14ea545a474",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/control.ts",
+      "code": "typescript(no-unnecessary-type-assertion)",
+      "hash": "c6049d76aeeea781c96cd57470a6bb99fa08cb430516f3431f199a887f53aa05",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/ingress.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "47c4303791177c7b91dfa4f66b8426712ac50df34168a1a2c2080129f609421e",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/ingress.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "78716946b6f44a684ac13a0934bb11ce14941a92d9e3e3ef8cd125c02ab83c6c",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/ingress.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "8860021e0941f0fca15e8017a0fb54e15e8585b3123adc95c85a266cfa1d691b",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/ingress.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "ddb8db3b62c0847003532ff72667b01a77153d5694d7eeff07feae07b6bafc51",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/ingress.ts",
+      "code": "typescript(no-unnecessary-condition)",
+      "hash": "0b14b3c735a820f71f1acef82ee2ee344e88547dfa64194a5e9be38e15bbc5a2",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/ingress.ts",
+      "code": "typescript(prefer-promise-reject-errors)",
+      "hash": "ddb8db3b62c0847003532ff72667b01a77153d5694d7eeff07feae07b6bafc51",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/ingress.ts",
+      "code": "typescript(use-unknown-in-catch-callback-variable)",
+      "hash": "85885a2b057f158a9e7cc7188f6a6fc4ddfce16a60ede5833cdf95c68719ff72",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/main.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "051efafe71b5108e73bc135debb4627d849b79916b17b7641ac3b9a12eaba2d1",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/main.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "9c7e1464488891af3f7aaa5fd30ae9cf2b67e12e61fe7fbfeb3e49cc21382f4f",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/main.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "a4f35d86db297ac8e6e1065047b64ba96bdd8984a5ef4f952649a935b8729199",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/main.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "cca4651f7f725df95713f8ad84bdc1d7b216e600f7d16cf83c452756929a1a01",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/main.ts",
+      "code": "typescript(no-unnecessary-condition)",
+      "hash": "ef778d1b7b12e4be97c4f62a351393c05557dc0ccc010269264a5d36257f2a4c",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "3c4b46befa7ad0338fb498703f0edcd83417736e04502ac3f3eba15b955b6071",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "7ee677b1c9ddf2ce6d1af5a400b3ba6f7410a07fe5902afea35f01358fddec36",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "41f3235d1f336855bc3319eb521d90201907bd80c9423221ab57c52ca35d101c",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "6b3e124dadcaf204ec8ca38061a88e33369e074e6b633f922a9e566f149505f0",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "81edabf0928a9254140d0b405eecc98a8a20c20eb3098ec7e18b8ae25a703f68",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "89345b980722f66751e2c409877ddc4c43f9df7d6834236a5f0e2fe6e22dc864",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "f58f108051ad85a2fce2fb8e4c221c21e26104e2fba16b88cd091f819e1a7c16",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(no-unnecessary-condition)",
+      "hash": "89345b980722f66751e2c409877ddc4c43f9df7d6834236a5f0e2fe6e22dc864",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(no-unnecessary-type-assertion)",
+      "hash": "41f3235d1f336855bc3319eb521d90201907bd80c9423221ab57c52ca35d101c",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/oidc.ts",
+      "code": "typescript(require-await)",
+      "hash": "8ceb55141c67f06a457d79fd5efdd0e0a7ec62b1be588e6155aa7b6e13e68068",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/sessions.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "224c84a5722579e45c0acaf4bf7724bfd83b4414f410ef6bfdff6a798816a05b",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/sessions.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "76b67d91561b3016d39cb2cdf699d287e3b5ba38cb9144188416904591b3e027",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/sessions.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "c47af1852f79f0d2123119593939932c1143a15da8aa7d89b187a4a5733fb635",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/sessions.ts",
+      "code": "typescript(no-non-null-assertion)",
+      "hash": "abb3484e3578df325b614def731434f86b4bec510bc912e9ff26e4b80b77bc28",
+      "count": 2
+    },
+    {
+      "file": "packages/multi-tenant/src/platform/sessions.ts",
+      "code": "typescript(no-unnecessary-condition)",
+      "hash": "dbc6c60d6d93cd8422b28d646f95229342a24aacb5d30c3ac78d772f4fabcada",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "2e6fd6323413e494559e781e33f09666ff9e1e21d91c34c9b445a611c8fb05ed",
+      "count": 2
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-explicit-any)",
+      "hash": "a68553ce93513c0347339bdac442a5a77207e124b6498519a5358f052ec5b48e",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-argument)",
+      "hash": "4930eb70a9bd2f5729caa14e7ac4ac2cf0ec1475d7db002404ad99f8c1fd6f75",
+      "count": 5
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-argument)",
+      "hash": "d39ee1b027bf3c5702b2670966d855808dbcc84948ab4bd252b383b472403691",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-argument)",
+      "hash": "e0ab9d7461cb16bcc5efa89b417ecac563fa111e71eb5fce2f0d1ef353b9850f",
+      "count": 4
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-assignment)",
+      "hash": "2ddd2260d8b92d7681b83fd25902c6147f7ca4bfede24e6fcac5ccebf3abb592",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-assignment)",
+      "hash": "4930eb70a9bd2f5729caa14e7ac4ac2cf0ec1475d7db002404ad99f8c1fd6f75",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-assignment)",
+      "hash": "f8d2f2e1a5c6999cdd2ce8e647bc09d48410faf01ff0d53b18453df9d164f279",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-member-access)",
+      "hash": "06eef7334f0a3c814493168abea87afb7190766a99faf303ca717e257e50e1c3",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-member-access)",
+      "hash": "182a9f06e902e1932f4aab7bdbee2174b14c2453410e98a79c25fc0db891ac2d",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-member-access)",
+      "hash": "aae593c1d5e0ca39db34e58eaa9c0cea269a57c5f6f0dcdcd85ccba09878f39d",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(no-unsafe-member-access)",
+      "hash": "adb7b93e34a2cacd86d1fb17d3176beb869a1602f027a99f591093c772f1889f",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(unbound-method)",
+      "hash": "1238b73dffd4cffa002b9eb4099a1441265f0f1e598bb5a518aaa0caf43b565e",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(unbound-method)",
+      "hash": "3ea0ab8655b67c85d2351b0c63668487e6d20ae8509606860d59be13c21fc212",
+      "count": 2
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(unbound-method)",
+      "hash": "545d3d913eead7231e89bdd707fe4608f6d15106455956d7be2111fd00d9d726",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(unbound-method)",
+      "hash": "a1761ee1ec96aa1465665717117b0949f3cb0cc515a5fb431897e3d977288c7c",
+      "count": 2
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(unbound-method)",
+      "hash": "ca260d8fcbcc455fad608003136d418aa4c9dcdbf7f4cc2d99df492fad7d8f74",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/environment.test.ts",
+      "code": "typescript(unbound-method)",
+      "hash": "e77cb2191cb09406fc30ae8988b37a209f80bffd93e28ce7fc02bafc16fb5af8",
+      "count": 4
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "5c3c3e59e561ea96dde754ea64ecbe53501727db0acb9683f4b19b0a15343185",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-confusing-void-expression)",
+      "hash": "8b43dc33a0cd8218e2df6eb279fe78834cf00ce38639cdcabb9037cb8e42fa26",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-explicit-any)",
+      "hash": "05b7ef0e71391fa28aee67d2659f717f448b11be56c1c4d6c592e50252df8f70",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-explicit-any)",
+      "hash": "2ca74f16cf1461a668aaf30a6fd628c8d37e689da9c59d858743b7f684a3777c",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-explicit-any)",
+      "hash": "50984e06077dfb1e61c002e0e987d203d339c0a50554cbf4b3c185058769f537",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-explicit-any)",
+      "hash": "e31d85bceda0f2c960d534043f2ede6e05b738bd3f1940376b722b5965afdc00",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-unsafe-argument)",
+      "hash": "8ac6c756e93953398043a73cb90d078cac63429c1d2886a7063a5e32d5da90f3",
+      "count": 3
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-unsafe-call)",
+      "hash": "0ba3d7bdaae3ac344773852a20dd7141c205331f6a48287bd86470fd3a547c92",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-unsafe-call)",
+      "hash": "5d60b574fa721e4c03e519f34d6b68b844f42d442c6e2038cc23856d53965d52",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-unsafe-call)",
+      "hash": "8d3c36b7de356cfb251bd8f345846e232e37182c8c3db32359e82fc9ae88a3d2",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-unsafe-call)",
+      "hash": "f66e46e995cda0d27818c64722e6f827e747bfab56148f16763f78b164f648bd",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-unsafe-member-access)",
+      "hash": "0ba3d7bdaae3ac344773852a20dd7141c205331f6a48287bd86470fd3a547c92",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-unsafe-member-access)",
+      "hash": "5d60b574fa721e4c03e519f34d6b68b844f42d442c6e2038cc23856d53965d52",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-unsafe-member-access)",
+      "hash": "8d3c36b7de356cfb251bd8f345846e232e37182c8c3db32359e82fc9ae88a3d2",
+      "count": 1
+    },
+    {
+      "file": "packages/multi-tenant/tests/transport.test.ts",
+      "code": "typescript(no-unsafe-member-access)",
+      "hash": "f66e46e995cda0d27818c64722e6f827e747bfab56148f16763f78b164f648bd",
+      "count": 1
+    }
+  ]
+}

@@ -17,10 +17,9 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
-          install: false
-          cache: true
+          run_install: false
       - run: test "$GITHUB_REF" = refs/heads/main
       - run: bash scripts/install-ci-helm.sh
       - run: pnpm install --frozen-lockfile

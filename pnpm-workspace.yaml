@@ -8,5 +8,8 @@ engineStrict: true
 allowBuilds:
   esbuild: false
 minimumReleaseAge: 1440
+
+# RC.3's lockfile qualifies different Rolldown lines for its two build consumers.
 overrides:
-  rolldown: 1.2.6
+  tsdown>rolldown: 1.1.1
+  vite>rolldown: 1.2.7
