@@ -27,6 +27,8 @@ GitHub PR CI 在当前 Node 24 和 Node 26 上执行验证、类型检查和测�
 
 根 README 和 AI.md 是可编辑源文件，构建生成带源码提交链接的 npm 副本。中英文指南成对维护，同时更新事实、命令和链接。`pnpm docs:check` 检查路径、锚点、语言配对及命令和版本一致性。跨仓检查可用 `DSH_PLATFORM_DOCS` 和 `DSH_RUNTIME_DOCS` 指定配套 checkout。
 
+应用针现已消费官方 DSH 0.2.2-rc.3。它的 web profile 负责 UI、Session/设置存储、插件组合、worktree 和 Agent 能力；平台保留组织身份、访问撤权和 Kubernetes 环境绑定。优先使用受支持的 profile 与 patch，不另建平行应用。runtime 的[兼容取舍](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/compat/dsh/README.zh-CN.md)说明了已删除的私有 Node 参数和仍保留的 OIDC cookie、部署适配。全新安装和相同版本重启检查不等于旧数据迁移验收。
+
 owner、allocation、environment、资源 UID 和修订号使用不同类型。SDK 提供外部值的身份解析器，保留精确字符串及 owner 到 environment 的哈希。配置与持久化绑定经 schema 校验，涵盖 owner/ref 一致性和变更屏障。损坏绑定会阻断后续写入，直到检查私有状态；不会授权创建替代 allocation。Connector 的 Kubernetes 解析保留未知字段供模板拒绝。
 
 关闭流程幂等：停止准入并取消连接，等待启动、成员重载以及实际在途认证/runtime/admin 操作结束，再释放会话和 SQLite。发出取消不等于完成。部分启动失败也执行相同清理；清理失败只输出固定诊断，不暴露依赖原文。SIGHUP 只解析成员；运行中的重载失败会撤销会话，已取消的重载不能在关闭后重新写入成员权限。
