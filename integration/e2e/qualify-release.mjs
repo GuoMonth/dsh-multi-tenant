@@ -183,6 +183,10 @@ catch (error) {
 }
 finally {
   if (cluster) {
+    if (failure) {
+      try { run('node', ['integration/e2e/cluster-state.mjs']) }
+      catch { checks.push({ name: 'failure-resource-projection', status: 'failed' }) }
+    }
     try { run('kind', ['export', 'logs', resolve(privateRoot, 'cluster-logs'), '--name', 'dsh-environment']) }
     catch { checks.push({ name: 'private-diagnostics', status: 'failed' }) }
     try { run('kind', ['delete', 'cluster', '--name', 'dsh-environment', '--kubeconfig', env.KUBECONFIG]); checks.push({ name: 'cluster-cleanup', status: 'passed' }) }
@@ -193,7 +197,7 @@ finally {
     if (existsSync(resolve(privateRoot, name))) secrets.push(readFileSync(resolve(privateRoot, name), 'utf8').trim())
   if (existsSync(resolve(privateRoot, 'users.json')))
     secrets.push(...json(resolve(privateRoot, 'users.json')).flatMap(u => [u.password, u.hash]))
-  const allowed = new Set(['images.json', 'reference-network.json', 'browser.json', 'lifecycle.json', 'revocation.json', 'performance.json', 'runtime-events.json', 'background.json', 'rebuild-final.json', 'network.json', 'aged-writer.json', 'volume-identity.json'])
+  const allowed = new Set(['images.json', 'reference-network.json', 'browser.json', 'lifecycle.json', 'revocation.json', 'performance.json', 'runtime-events.json', 'background.json', 'rebuild-final.json', 'network.json', 'aged-writer.json', 'volume-identity.json', 'failure-resources.json'])
   // Child scripts write only to private staging. Failed safety checks leave
   // their output private even though the workflow uploads evidence on failure.
   for (const name of readdirSync(draft)) {
