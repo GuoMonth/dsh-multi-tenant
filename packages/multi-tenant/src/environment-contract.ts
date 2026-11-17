@@ -1,5 +1,6 @@
-/** RC2 narrow dependency. C implements platform bindings against these exact types. */
+/** Exact Connector contract; identity admission preserves wire strings. */
 export type {
+  TenantId, PrincipalId, AllocationKey, EnvironmentNamespace, SandboxUID, PVCUID, PodUID, ResourceVersion,
   AgentEnvironmentRuntime,
   EnvironmentRuntimeOptions,
   EnvironmentOwner,
@@ -14,3 +15,5 @@ export type {
   EnvironmentFailure,
 } from '@dsh/environment-connector-internal'
 export { EnvironmentError } from '@dsh/environment-connector-internal'
+
+export { identities, parseEnvironmentOwner, parseEnvironmentIntent, parseEnvironmentRef, parseEnvironmentRuntimeOptions } from '@dsh/environment-connector-internal'

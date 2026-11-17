@@ -23,10 +23,10 @@ if (
       method: operation !== 'inspect' ? 'POST' : 'GET',
       signal: AbortSignal.timeout(20000),
       headers:
-        operation !== 'inspect'
+        allocationKey && identity
           ? {
-            'x-allocation-key': allocationKey!,
-            'x-instance-identity': identity!,
+            'x-allocation-key': allocationKey,
+            'x-instance-identity': identity,
           }
           : {},
     },

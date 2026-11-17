@@ -1,3 +1,5 @@
+import { PendingWork, closeServer, settleCleanup } from './work.ts'
+import type { EnvironmentId } from './identity.ts'
 import { PlatformError, diagnostic } from './errors.ts'
 import {
   createServer,
@@ -8,15 +10,16 @@ import { randomUUID } from 'node:crypto'
 import {
   type AgentEnvironmentRuntime,
   type EnvironmentRef,
+  type EnvironmentOwner,
 } from '@dsh/environment-connector-internal'
 
 export interface Environment {
-  readonly id: string
-  readonly owner: { readonly tenantId: string; readonly principalId: string }
+  readonly id: EnvironmentId
+  readonly owner: EnvironmentOwner
   readonly instance: EnvironmentRef
 }
 export interface AuthorizedSession {
-  readonly environmentId: string
+  readonly environmentId: EnvironmentId
   readonly owner: Environment['owner']
   readonly signal: AbortSignal
 }
@@ -38,7 +41,7 @@ async function until<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
     return await Promise.race([
       promise,
       new Promise<never>((_resolve, reject) => {
-        stop = () => reject(signal.reason)
+        stop = () => { reject(new Error('Operation cancelled', { cause: signal.reason as unknown })) }
         signal.addEventListener('abort', stop, { once: true })
         if (signal.aborted) stop()
       }),
@@ -51,8 +54,10 @@ async function until<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 export function createPlatformIngress(
   runtime: AgentEnvironmentRuntime,
   authenticator: PlatformAuthenticator,
-  environments: ReadonlyMap<string, Environment>,
+  environments: ReadonlyMap<EnvironmentId, Environment>,
 ) {
+  const work = new PendingWork()
+  let closingPromise: Promise<void> | undefined
   const active = new Set<AbortController>()
   let closing = false
   async function admit(
@@ -65,7 +70,7 @@ export function createPlatformIngress(
       AbortSignal.timeout(5000),
     ])
     const session = await until(
-      authenticator.authenticate(request, authSignal),
+      work.track(authenticator.authenticate(request, authSignal)),
       authSignal,
     )
     const environment = session && environments.get(session.environmentId)
@@ -82,20 +87,19 @@ export function createPlatformIngress(
         'Authenticate with an authorized environment session',
       )
     // Register parent invalidation before asynchronous runtime admission starts.
-    const cancel = () => controller.abort()
+    const cancel = () => { controller.abort() }
     session.signal.addEventListener('abort', cancel, { once: true })
     controller.signal.addEventListener(
       'abort',
-      () => session.signal.removeEventListener('abort', cancel),
+      () => { session.signal.removeEventListener('abort', cancel) },
       { once: true },
     )
-    if (session.signal.aborted) controller.abort()
     const context = { signal: controller.signal, correlationId }
-    const deadline = setTimeout(() => controller.abort(), 15000)
+    const deadline = setTimeout(() => { controller.abort() }, 15000)
     let handle
     try {
       handle = await until(
-        runtime.connect(environment.instance, context),
+        work.track(runtime.connect(environment.instance, context)),
         controller.signal,
       )
     } finally {
@@ -134,12 +138,12 @@ export function createPlatformIngress(
       controller.abort()
       active.delete(controller)
     })
-    void (async () => {
+    void work.track((async () => {
       if (await authenticator.handle?.(request, response, controller.signal))
         return
       const handle = await admit(request, controller, correlationId)
       await handle.forward(request, response)
-    })().catch((error) => {
+    })().catch((error: unknown) => {
       if (!response.destroyed) {
         const failure = diagnostic(error, correlationId)
         console.warn(JSON.stringify({ code: failure.code, correlationId }))
@@ -159,7 +163,7 @@ export function createPlatformIngress(
           response.end(JSON.stringify(failure))
         }
       }
-    })
+    }))
   })
   server.on('upgrade', (request, socket, head) => {
     socket.on('error', () => socket.destroy())
@@ -176,30 +180,23 @@ export function createPlatformIngress(
       controller.abort()
       active.delete(controller)
     })
-    void admit(request, controller, correlationId)
+    void work.track(admit(request, controller, correlationId)
       .then(handle => handle.upgrade(request, socket, head))
       .catch(() => {
         if (!socket.destroyed)
           socket.end(
             'HTTP/1.1 403 Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
           )
-      })
+      }))
   })
   return {
     server,
-    async close() {
+    close() {
+      if (closingPromise) return closingPromise
       closing = true
       for (const controller of active) controller.abort()
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => {
-          if (
-            error &&
-            (error as NodeJS.ErrnoException).code !== 'ERR_SERVER_NOT_RUNNING'
-          )
-            reject(error)
-          else resolve()
-        }),
-      )
+      closingPromise = settleCleanup([closeServer(server), work.drain()])
+      return closingPromise
     },
   }
 }

@@ -1,20 +1,26 @@
 import {
   EnvironmentError,
   type EnvironmentFailure,
+  type AllocationKey,
 } from '@dsh/environment-connector-internal'
 /** Platform state errors are separate from the runtime's fixed error vocabulary. */
+export type PlatformErrorCode =
+  | 'StateUnavailable' | 'Forbidden' | 'AccessRejected' | 'StaleInstance'
+  | 'RecordMissing' | 'AllocationUnresolved' | 'StartRejected' | 'DeleteRejected'
 export class PlatformError extends Error {
   constructor(
-    readonly code: string,
+    readonly code: PlatformErrorCode,
     readonly correlationId: string,
     readonly nextAction: string,
-    readonly target: { allocationKey?: string } = {},
+    readonly target: { allocationKey?: AllocationKey } = {},
     readonly detail: {
-      stage?: string
+      stage?: EnvironmentFailure['stage'] | 'state'
       effect?: 'unknown' | 'accepted' | 'not-submitted'
     } = {},
+    options?: ErrorOptions,
   ) {
-    super(code)
+    super(code, options)
+    this.name = 'PlatformError'
   }
   toJSON() {
     return {

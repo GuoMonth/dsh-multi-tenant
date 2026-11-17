@@ -11,5 +11,9 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   outDir: 'dist',
-  deps: { alwaysBundle: [/^@dsh\//, 'openid-client', 'oauth4webapi', 'jose'] },
+  deps: {
+    alwaysBundle: [/^@dsh\//, 'openid-client', 'oauth4webapi', 'jose', /^zod(?:\/|$)/],
+    // Validation stays internal: the installed-package type smoke rejects leaked schema dependencies.
+    dts: { alwaysBundle: [/^@dsh\//, 'openid-client', 'oauth4webapi', 'jose'], neverBundle: [/^zod(?:\/|$)/] },
+  },
 })

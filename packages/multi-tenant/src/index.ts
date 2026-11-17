@@ -16,3 +16,6 @@ export { createOIDCAuthentication } from './platform/oidc.ts'
 export type { OIDCOptions } from './platform/oidc.ts'
 export type { Member } from './platform/sessions.ts'
 export const DSH_RUNTIME_VERSION = '0.2.1-rc.5'
+
+export { environmentId } from './platform/identity.ts'
+export type { EnvironmentId } from './platform/identity.ts'
