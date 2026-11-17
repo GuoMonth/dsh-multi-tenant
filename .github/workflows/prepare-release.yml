@@ -60,7 +60,7 @@ jobs:
           retention-days: 30
   qualify:
     if: ${{ inputs.qualify }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     permissions:
       contents: read
@@ -80,6 +80,15 @@ jobs:
         with:
           run_install: false
       - run: pnpm install --frozen-lockfile
+      - name: Initialize qualification evidence
+        run: |
+          mkdir -p "$QUALIFICATION_ROOT/evidence"
+          node --input-type=module <<'JS'
+          import { writeFileSync } from 'node:fs'
+          const report = { stage: 'fixture-tool-setup', status: 'pending', node: process.version, arch: process.arch,
+            platformRun: process.env.PLATFORM_RUN, runtimeRun: process.env.RUNTIME_RUN }
+          writeFileSync(process.env.QUALIFICATION_ROOT + '/evidence/setup.json', JSON.stringify(report, null, 2) + '\n')
+          JS
       - name: Install isolated fixture tools
         run: |
           set -euo pipefail

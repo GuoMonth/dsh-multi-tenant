@@ -25,7 +25,12 @@ const run = (command, args, options = {}) => {
   }
 }
 const json = path => JSON.parse(readFileSync(path, 'utf8'))
-const write = (name, value) => writeFileSync(resolve(evidence, name), JSON.stringify(value, null, 2) + '\n')
+const write = (name, value) => {
+  const path = resolve(evidence, name), text = JSON.stringify(value, null, 2) + '\n'
+  if (existsSync(path)) assert.equal(readFileSync(path, 'utf8'), text, 'Use a fresh qualification root; evidence is immutable')
+  else writeFileSync(path, text)
+}
+assert.ok(!existsSync(resolve(evidence, 'qualification.json')), 'Choose a new root for each qualification attempt')
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
 const runIDs = { platform: process.env.PLATFORM_RUN, runtime: process.env.RUNTIME_RUN }
 for (const value of Object.values(runIDs))
