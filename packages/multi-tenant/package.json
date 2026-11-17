@@ -48,14 +48,9 @@
     "ai-agents"
   ],
   "engines": {
-    "node": "^24.0.0 || ^26.0.0"
+    "node": "^24.9.0 || ^26.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.20.0",
-    "tsdown": "^0.22.2",
-    "tsx": "^4.22.4",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.8",
     "ws": "8.18.3",
     "@types/ws": "8.18.1",
     "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.2-286a68d.tgz",

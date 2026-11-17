@@ -13,20 +13,23 @@ jobs:
     name: check (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      LINT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
     strategy:
       fail-fast: false
       matrix:
-        node: ['24', '26']
+        node: ['24.9', '24', '26']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: ${{ matrix.node }}
           package-manager-cache: false
-      - uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
-          install: false
-          cache: true
+          run_install: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
       - run: pnpm typecheck
