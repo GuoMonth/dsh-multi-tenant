@@ -27,6 +27,7 @@ const rpc = (p, method, args) => p.evaluate(async ({ method, args }) => {
   try {
     const c = await b.newContext({
         ignoreHTTPSErrors: true, storageState: root + '/release-alice-browser.json',
+        proxy: { server: 'http://127.0.0.1:9', bypass: 'dsh-environment.test,*.dsh-environment.test' },
       }), p = await c.newPage()
     await p.goto(JSON.parse(fs.readFileSync(process.env.E_EVIDENCE + '/browser.json')).users.find(u => u.name === 'alice').origin)
     await p.getByRole('button', {

@@ -4,9 +4,28 @@ These are explicit, destructive test-environment operations, not a second instal
 
 Start with [installation](../../docs/en/installation.md) ([简体中文](../../docs/zh-CN/installation.md)). The fixture helpers supply DNS/TLS/IdP/Ingress prerequisites for the dedicated test cluster. Release validation and product image identities are in [validation.md](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.11.0-rc.1/validation.md).
 
+## Frozen-candidate Kubernetes qualification
+
+The manual `prepare-release.yml` also accepts `qualify=true`, `platform_run` and `runtime_run`. Its read-only qualification job runs on native Linux/amd64, downloads successful main preparation artifacts, verifies their source/DSH/Connector identities and archive integrity, and consumes those exact images and package. The qualification checkout is a separate harness identity; it does not rebuild or publish product artifacts.
+
+The job creates a dedicated kind cluster with Calico, local-path storage, Dex and Traefik. It runs the real installed-package preflight/install, two-user browser/lifecycle/revocation checks, and runtime UID, network, volume, unknown-stop and actual expired-watch checks. Pinned fixture binaries and checksums live in [fixture-tools.json](fixture-tools.json). Private generated credentials, raw browser state and cluster logs are excluded from the artifact; explicit report files are screened before leaving private staging. The cluster is removed after success or failure.
+
+The resulting artifact records technical qualification and keeps `releaseReady=false` until separate real-model and authorized-tool evidence exists. This job makes no paid provider calls. Its timing samples are regression measurements on a shared runner, not production capacity results.
+
+For a read-only local identity check of already downloaded candidates:
+
+```sh
+QUALIFICATION_ROOT=/private/new-verification \
+CANDIDATE_ROOT=/private/downloaded-candidates \
+PLATFORM_RUN=123 RUNTIME_RUN=456 \
+node integration/e2e/qualify-release.mjs --verify-only
+```
+
 Prerequisites are the dedicated `kind-dsh-environment` cluster/container, an imported pinned platform/workload image and the pinned Dex/Traefik images below. Node 24, Helm, kubectl, Docker and Playwright 1.58.2 are required. If installing its browser, use `PLAYWRIGHT_SKIP_BROWSER_GC=1`. Record the exact product image digests for this test. Fixture images are Traefik 3.7.13 (`sha256:3429c14149401de2ac82fc72ddc6a92642332b90deb3012301ff211b9d2d0f18`) and Dex 2.45.1 (`sha256:f5f9fb373188b0f701b80edd68b3f4745ced69306c9d382999f11b7774335a98`).
 
 Set private directories outside the repository (mode 0700): `E_PRIVATE`, `E_EVIDENCE`, and explicit `KUBECONFIG`. Private input consists of `ca.crt`, `tls.crt`, `tls.key`, `client-secret` and `users.json`; the latter holds two generated local identities `{name,email,password,hash,userID}`, with names alice/bob, IDs e-alice/e-bob and bcrypt password hashes. The local certificate covers `dsh-environment.test`, `*.env.dsh-environment.test` and `idp.dsh-environment.test`. Keep every credential file mode 0600. `E_EVIDENCE/images.json` contains the `platform`, `dex`, `traefik` sha256 manifest digests selected for this test. Do not rerun credential generation over an existing installation.
+
+`install-reference.sh` requires `E_LINUX_TOOLS`, a directory of verified executable Linux/amd64 `kubectl` and Helm 3 binaries. Host macOS binaries cannot be mounted into the Linux installer. Browser contexts explicitly bypass host proxies only for fixture domains, without changing host DNS, proxy or trust settings. ARM-hosted Docker can exercise the workload image, but a cross-architecture kind runtime that cannot enforce `RuntimeDefault` seccomp is unsuitable for full Kubernetes qualification.
 
 ```sh
 node integration/e2e/reference-infra.mjs

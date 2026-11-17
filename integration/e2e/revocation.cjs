@@ -32,6 +32,7 @@ const bob = JSON.parse(fs.readFileSync(evidence + '/browser.json')).users[1], se
   try {
     const context = await browser.newContext({
         ignoreHTTPSErrors: true, storageState: root + '/bob-browser.json',
+        proxy: { server: 'http://127.0.0.1:9', bypass: 'dsh-environment.test,*.dsh-environment.test' },
       }), page = await context.newPage()
     await page.goto(bob.origin)
     await page.getByRole('button', {

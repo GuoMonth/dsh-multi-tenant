@@ -1,6 +1,18 @@
 name: Prepare release candidate
+run-name: ${{ inputs.qualify && 'Qualify frozen release candidates' || 'Prepare release candidate' }}
 on:
   workflow_dispatch:
+    inputs:
+      qualify:
+        description: Run isolated AMD64 Kubernetes acceptance without rebuilding or publishing
+        type: boolean
+        default: false
+      platform_run:
+        description: Successful main platform prepare-release run to qualify
+        type: string
+      runtime_run:
+        description: Successful main runtime prepare-release run to qualify
+        type: string
 permissions:
   contents: read
   packages: write
@@ -9,6 +21,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare:
+    if: ${{ !inputs.qualify }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -45,3 +58,43 @@ jobs:
           name: platform-candidate
           path: candidate/
           retention-days: 30
+  qualify:
+    if: ${{ inputs.qualify }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PLATFORM_RUN: ${{ inputs.platform_run }}
+      RUNTIME_RUN: ${{ inputs.runtime_run }}
+      QUALIFICATION_ROOT: ${{ runner.temp }}/dsh-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        with:
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Install isolated fixture tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends apache2-utils
+          mkdir -p "$QUALIFICATION_ROOT/browser"
+          npm install --prefix "$QUALIFICATION_ROOT/browser" --ignore-scripts --no-audit --no-fund playwright@1.58.2
+          node "$QUALIFICATION_ROOT/browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Qualify the exact candidates
+        run: node integration/e2e/qualify-release.mjs
+      - name: Upload redacted qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-qualification
+          path: ${{ env.QUALIFICATION_ROOT }}/evidence/
+          retention-days: 30
+          if-no-files-found: error
