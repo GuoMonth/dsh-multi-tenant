@@ -65,7 +65,8 @@ const files = {
   '/tmp/connector/package.json': JSON.stringify({ type: 'module' }),
   '/tmp/options.json': JSON.stringify(options),
   '/tmp/fault.key': readFileSync(resolve(privateRoot, 'tls.key')),
-  '/tmp/fault.crt': readFileSync(resolve(privateRoot, 'tls.crt')),
+  // The fault client trusts this bundle too; the signed leaf needs its private root.
+  '/tmp/fault.crt': Buffer.concat([readFileSync(resolve(privateRoot, 'tls.crt')), readFileSync(resolve(privateRoot, 'ca.crt'))]),
 }
 for (const name of ['lifecycle', 'scenarios', 'access', 'action'])
   files[`/tmp/${name}.mjs`] = readFileSync(resolve(source, `test/environment/${name}.mjs`))
