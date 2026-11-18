@@ -44,4 +44,4 @@ GitHub Actions 使用 Node 24/npm >=11.5.1、`id-token: write`、`release.yml` �
 
 ## 已接受的已知安全问题
 
-2026-11-18，发行负责人授权将 picomatch 4.0.7 的 GHSA-fc5q-39xc-vjpf 作为本次发行的已知问题；ReDoS 风险没有修复，接受期限截至 2026-12-02。两个准备工作流均设置 `accept_picomatch=true`。普通本地/PR 审计保持严格，接受后的准备任务在 candidate/audit 中保留原始报告和非零风险评估，其他公告、版本变化、扫描错误和例外过期仍阻断。双方 Release 及验证报告必须披露该问题。
+2026-11-18，发行负责人授权将 picomatch 4.0.7 的 GHSA-fc5q-39xc-vjpf 作为本次发行的已知问题；ReDoS 风险没有修复，接受期限截至 2026-12-02。两个准备工作流均设置 `accept_picomatch=true`。默认本地审计保持严格，CI 显式携带该项授权并强制检查期限；接受后的准备任务在 candidate/audit 中保留原始报告和非零风险评估，其他公告、版本变化、扫描错误和例外过期仍阻断。双方 Release 及验证报告必须披露该问题。
