@@ -1,5 +1,7 @@
 # 0.12.0-rc.2
 
+Kubernetes wire parsing now derives missing Pod/EndpointSlice item type metadata from a validated typed-list envelope, while retaining owner/UID checks, unknown fields and pagination rejection.
+
 Known security issue: picomatch 4.0.7 remains affected by GHSA-fc5q-39xc-vjpf (repeated-extglob ReDoS). The release owner accepted this issue on 2026-11-18 until 2026-12-02; it is not fixed. Raw scans and the accepted scope accompany validation.
 
 Fixed environment creation and read-only allocation recovery when the platform supplies a binding record: control metadata no longer contaminates strict resource references. Owner and resource UID checks remain enforced.
