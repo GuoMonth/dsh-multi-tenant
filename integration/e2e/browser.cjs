@@ -3,6 +3,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const fs = require('node:fs'), assert = require('node:assert/strict')
 const users = JSON.parse(fs.readFileSync(process.env.E_PRIVATE + '/users.json'))
 const base = 'https://dsh-environment.test'
+let activePage, phase = 'launch'
+const failures = []
 async function waitNative(page) {
   await page.waitForTimeout(800)
   for (let step = 0; step < 6; step++) {
@@ -53,6 +55,14 @@ async function waitNative(page) {
           ignoreHTTPSErrors: true, locale: 'en-US',
           proxy: { server: 'http://127.0.0.1:9', bypass: 'dsh-environment.test,*.dsh-environment.test' },
         }), page = await context.newPage()
+      activePage = page
+      phase = 'oidc-login'
+      page.on('response', (response) => {
+        if (response.status() < 400) return
+        const url = new URL(response.url())
+        failures.push({ status: response.status(), location: url.origin + url.pathname })
+        if (failures.length > 20) failures.shift()
+      })
       page.on('request', (r) => {
         if (r.method() === 'POST' && new URL(r.url()).host === 'dsh-environment.test')
           console.log(JSON.stringify({
@@ -68,6 +78,7 @@ async function waitNative(page) {
       await page.getByRole('heading', {
         name: 'Your environments',
       }).waitFor()
+      phase = 'environment-create'
       const action = await page.locator('form[action^="/api/environments/"]').first().getAttribute('action')
       const started = Date.now()
       const invoke = async (method) => {
@@ -96,6 +107,7 @@ async function waitNative(page) {
       await page.getByRole('link', {
         name: 'Open environment', exact: true,
       }).click()
+      phase = 'native-ui'
       await waitNative(page)
       record.nativeHttp = true
       record.origin = new URL(page.url()).origin
@@ -109,7 +121,17 @@ async function waitNative(page) {
         user: user.name, oidc: true, environment: record.id, nativeHttp: true, coldReadyMs: record.coldReadyMs,
       }))
       await context.close()
+      activePage = undefined
     }
+  }
+  catch (error) {
+    // Private child log only; qualify-release screens fixture secrets before publication.
+    if (activePage && !activePage.isClosed()) {
+      const url = new URL(activePage.url())
+      console.error(JSON.stringify({ phase, location: url.origin + url.pathname, failures,
+        body: (await activePage.locator('body').innerText({ timeout: 3000 }).catch(() => 'Unavailable')).slice(0, 5000) }))
+    }
+    throw error
   }
   finally {
     await browser.close()

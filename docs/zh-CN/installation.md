@@ -2,7 +2,7 @@
 
 [English](../en/installation.md) · [文档目录](index.md)
 
-部署平台 0.12.0-rc.2、runtime 0.5.0-rc.3、DSH 0.2.2-rc.3（`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`）。CLI 安装自带的 Helm Chart、上游 Agent Sandbox core v1.0.3 和 runtime RBAC。仅支持全新安装。已发布的平台 0.12.0-rc.1、runtime 0.5.0-rc.2、DSH 0.2.1-rc.5 仍是历史版本。
+部署平台 0.12.0-rc.2、runtime 0.5.0-rc.3、DSH 0.2.2-rc.3（`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`）。CLI 安装自带的 Helm Chart、上游 Agent Sandbox core v1.0.3 和 runtime RBAC。仅支持全新安装。
 
 ## 准备
 
@@ -33,4 +33,4 @@ dsh-multi-tenant install --values /private/values.json --namespace dsh-platform 
 
 用两个 OIDC 用户登录，创建并进入不同环境。配置真实模型，读写一次性测试文件、执行命令，并调用已授权的 CLI 或 MCP。停止/启动、重建测试 Pod 后，核对 PVC UID、文件、会话和凭据仍保留。确认跨用户访问被拒绝，登出和移除成员会关闭访问。
 
-排障和卸载行为见[运维](operations.md)。[历史验证报告](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.1/validation.md)记录已发布的 0.12.0-rc.1 组合及其限制。本候选在发布前不替代该版本。
+排障和卸载行为见[运维](operations.md)。[验证报告](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.2/validation.md)记录精确已发布组合、已接受的 Picomatch 问题及模型/工具未测边界。

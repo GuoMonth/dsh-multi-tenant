@@ -4,7 +4,7 @@
 
 在 Kubernetes 上自托管的多用户 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。成员通过 OpenID Connect（OIDC）登录，在各自的持久 AI 工作环境中使用 DSH 原生界面。
 
-**候选版（RC）：** Linux/amd64、单节点、平台单副本，面向可信组织成员，仅支持全新安装。当前候选为平台 **0.12.0-rc.2**、runtime **0.5.0-rc.3**、DSH **0.2.2-rc.3**（`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`）。已发布的平台 **0.12.0-rc.1** 仍是 runtime **0.5.0-rc.2**、DSH **0.2.1-rc.5** 的历史版本。不做兼容性承诺，部署时固定精确版本和制品。
+**候选版（RC）：** Linux/amd64、单节点、平台单副本，面向可信组织成员，仅支持全新安装。已发布 RC 组合为平台 **0.12.0-rc.2**、runtime **0.5.0-rc.3**、DSH **0.2.2-rc.3**（`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`）。不做兼容性承诺，部署时固定精确版本和制品。
 
 ## 安装
 

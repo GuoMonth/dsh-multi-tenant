@@ -16,7 +16,11 @@ const env = { ...process.env }
 let stage = 'candidate-verification', call = 0
 const run = (command, args, options = {}) => {
   try {
-    return execFileSync(command, args, { encoding: 'utf8', timeout: 720000, maxBuffer: 16 * 1024 * 1024, env, ...options })
+    return execFileSync(command, args, {
+      encoding: 'utf8', timeout: 720000, maxBuffer: 16 * 1024 * 1024, env, ...options,
+      // execFileSync otherwise forwards a failed child's stderr before our redaction.
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
   }
   catch (error) {
     const path = resolve(privateRoot, `failure-${++call}-${basename(command)}.log`)

@@ -2,7 +2,7 @@
 
 [简体中文](../zh-CN/installation.md) · [Guides](index.md)
 
-Deploy platform 0.12.0-rc.2 with runtime 0.5.0-rc.3 and DSH 0.2.2-rc.3 (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). The CLI installs its Helm chart, upstream Agent Sandbox core v1.0.3 and runtime RBAC. This is a fresh installation. Published platform 0.12.0-rc.1 with runtime 0.5.0-rc.2 and DSH 0.2.1-rc.5 remains the historical release.
+Deploy platform 0.12.0-rc.2 with runtime 0.5.0-rc.3 and DSH 0.2.2-rc.3 (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). The CLI installs its Helm chart, upstream Agent Sandbox core v1.0.3 and runtime RBAC. This is a fresh installation.
 
 ## Prepare
 
@@ -33,4 +33,4 @@ dsh-multi-tenant install --values /private/values.json --namespace dsh-platform 
 
 Log in with two OIDC subjects. Create and open separate environments, configure a real model, read/write a disposable file and run a command. Verify an authorized CLI or MCP call. Stop/start and recreate a test Pod, checking the same PVC UID and retained files, session and credentials. Confirm cross-user access is denied and logout/member removal closes access.
 
-See [operations](operations.md) for troubleshooting and uninstall behavior. The [historical validation report](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.1/validation.md) records the published 0.12.0-rc.1 combination and its limits. This candidate does not replace that release until it is published.
+See [operations](operations.md) for troubleshooting and uninstall behavior. The [validation report](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.2/validation.md) records the exact published combination, accepted Picomatch issue and untested model/tool boundaries.
