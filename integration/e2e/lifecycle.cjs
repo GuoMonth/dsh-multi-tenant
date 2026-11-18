@@ -103,6 +103,7 @@ const waitNative = async (page) => {
     for (const r of records) {
       const context = await browser.newContext({
           ignoreHTTPSErrors: true, storageState: root + '/' + r.name + '-browser.json',
+          proxy: { server: 'http://127.0.0.1:9', bypass: 'dsh-environment.test,*.dsh-environment.test' },
         }), page = await context.newPage()
       contexts.push({
         context, page,

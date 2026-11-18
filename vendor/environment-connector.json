@@ -1,7 +1,7 @@
 {
   "repository": "GuoMonth/dsh-isolated-runtime",
-  "commit": "6de541ab51eeed8b9910c53db8ba2fbab15ea15b",
-  "artifact": "dsh-environment-connector-internal-0.0.0-rc.3-6de541a.tgz",
-  "integrity": "sha512-mbxWjlThgt6Vge1Sx8BmeTnYt2C8X/fZZXaE5EHAiM4Ywqv+lDmqQWh2P37YxexkcEMgkiXei4Kd/iR3Nu8gcw==",
-  "sha256": "858286e8f34d7bed535eb6cad8621ed750e48417d41fce39cfa26c16123107c2"
+  "commit": "28bb5cab86ba7ae877520441e12a7439f32a02e6",
+  "artifact": "dsh-environment-connector-internal-0.0.0-rc.3-28bb5ca.tgz",
+  "integrity": "sha512-Y24hgrglwV0hbfeni+r7U7Ykl1S4oVFhoSTWIC3moGt4X06iwWfcpmIQfdYfanKocXLEqgb4BB5lTCazYp9+gA==",
+  "sha256": "8b2e8c941e1b1d243ec818ac6de12b45ca93e6b96bca7a46639ef0f2a4d8619a"
 }

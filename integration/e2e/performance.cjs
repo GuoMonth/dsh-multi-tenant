@@ -9,6 +9,7 @@ const user = JSON.parse(fs.readFileSync(root + '/users.json'))[0];
   try {
     const context = await browser.newContext({
         ignoreHTTPSErrors: true,
+        proxy: { server: 'http://127.0.0.1:9', bypass: 'dsh-environment.test,*.dsh-environment.test' },
       }), page = await context.newPage()
     await page.goto(base + '/auth/login')
     if (await page.getByText('Log in with Email').count())

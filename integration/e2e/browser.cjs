@@ -51,6 +51,7 @@ async function waitNative(page) {
     for (const user of users) {
       const context = await browser.newContext({
           ignoreHTTPSErrors: true, locale: 'en-US',
+          proxy: { server: 'http://127.0.0.1:9', bypass: 'dsh-environment.test,*.dsh-environment.test' },
         }), page = await context.newPage()
       page.on('request', (r) => {
         if (r.method() === 'POST' && new URL(r.url()).host === 'dsh-environment.test')
