@@ -24,7 +24,7 @@ on:
         required: true
         type: string
       promote_latest:
-        description: Explicitly promote this verified version to npm latest after publication
+        description: Explicitly publish this verified version directly on npm latest
         type: boolean
         default: false
 permissions:
@@ -55,10 +55,5 @@ jobs:
           PACKAGE_INTEGRITY: ${{ inputs.package_integrity }}
           WORKLOAD_DIGEST: ${{ inputs.workload_digest }}
           RUNTIME_TAG: ${{ inputs.runtime_tag }}
+          PROMOTE_LATEST: ${{ inputs.promote_latest }}
         run: node scripts/publish-release.mjs
-      - name: Install npm with trusted dist-tag support
-        if: ${{ inputs.promote_latest }}
-        run: npm install --global npm@11.21.0 --ignore-scripts --no-audit --no-fund
-      - name: Promote the verified archive to npm latest
-        if: ${{ inputs.promote_latest }}
-        run: node scripts/promote-latest.mjs

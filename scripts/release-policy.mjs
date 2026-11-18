@@ -19,9 +19,10 @@ export function releaseCreateArgs(policy, notes, assets) {
     '--title', policy.tag, '--notes-file', notes, ...assets]
 }
 
-export function assertPublishedTags(tags, policy, previousLatest) {
+export function assertPublishedTags(tags, policy, previousLatest, { publishLatest = false } = {}) {
   assert.equal(tags[policy.channel], policy.version, 'Published channel must resolve to the accepted version')
-  if (policy.prerelease) assert.equal(tags.latest, previousLatest, 'Prerelease must preserve the default npm version')
+  if (publishLatest) assert.equal(tags.latest, policy.version, 'Explicit latest publication must select the accepted version')
+  else if (policy.prerelease) assert.equal(tags.latest, previousLatest, 'Prerelease must preserve the default npm version')
 }
 
 export function assertPairedRuntimeRelease(manifest, expected) {

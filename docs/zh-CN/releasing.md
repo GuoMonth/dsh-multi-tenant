@@ -11,11 +11,9 @@
 5. 在已准备的平台提交上运行 `release.yml`，提供 `platform_run`、`runtime_run`、`package_integrity`、`workload_digest`、`runtime_tag` 输入。流程发布受测归档，核对 registry 字节，创建对应标签及附带归档、清单、校验和的 Release。流程核对并自动附带 runtime 的 validation.md。
 6. 核对双方 Release、相互链接、精确版本包安装和公开镜像拉取。将源码提交、镜像 digest、包完整性记录到验收 Issue。
 
-## 显式提升 npm latest
+## 显式发布到 npm latest
 
-发行负责人授权本版本作为 npm 默认安装版本时，在 `release.yml` 设置 `promote_latest=true`。正常发布先核对 npm `next`（或该版本的常规渠道）、源码身份、registry 字节和双方 GitHub Release；独立步骤再次核对已发布包的 SHA512/SHA256 与源码，再将同一版本提升到 `latest`，保留原渠道，已完成的提升直接跳过。GitHub RC Release 仍保留预发布状态。
-
-该步骤使用 npm 11.21.0 和现有 Trusted Publisher 的 `Allow npm dist-tag` 权限；必要时为已配置的 `release.yml` publisher 启用该权限，不需要长期 npm token。提升失败不会修改已发布版本，可在相同源码和候选上恢复。
+发行负责人授权本版本作为 npm 默认安装版本时，在 `release.yml` 设置 `promote_latest=true`。发布器使用原生 `npm publish --tag latest` 发布同一受测归档，回读 registry 字节与 latest 标签，GitHub 仍保留预发布状态。只需要现有 Trusted Publisher 的发布权限，不额外授予 dist-tag 权限，也不使用长期 token。默认 RC 路径继续使用 next 并保留 latest。恢复发布时保持相同源码、归档和所选渠道。
 
 ## 验证不可变候选
 

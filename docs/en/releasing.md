@@ -11,11 +11,9 @@ Platform npm and GitHub Release share a version and lightweight `vVERSION` tag. 
 5. Run platform `release.yml` on the prepared commit with `platform_run`, `runtime_run`, `package_integrity`, `workload_digest` and `runtime_tag` inputs. It publishes the accepted archive, verifies registry bytes and creates the matching tag/Release with archive, manifest and checksums. The runtime validation.md is verified and included automatically.
 6. Verify both releases, cross-links, exact package installation and public image pulls. Record source commits, image digests and package integrity with the acceptance Issue.
 
-## Explicit npm latest promotion
+## Explicit npm latest publication
 
-When the release owner authorizes this version as the default npm installation, set `promote_latest=true` on `release.yml`. Normal publication first verifies npm `next` (or the version's normal channel), source identity, registry bytes and both GitHub releases. A separate step then checks the published SHA512/SHA256 and source again before promoting that exact version to `latest`; it preserves the original channel and skips an already completed promotion. GitHub RC releases retain their prerelease status.
-
-This uses npm 11.21.0 and the existing Trusted Publisher's `Allow npm dist-tag` permission. Enable that permission for the configured `release.yml` publisher when necessary; no long-lived npm token is needed. A failed promotion leaves the published version intact and can resume on the same source and candidates.
+When the release owner authorizes this version as the default npm installation, set `promote_latest=true` on `release.yml`. The publisher uses the native `npm publish --tag latest` operation on the same verified archive, checks registry bytes and the latest tag, and retains the GitHub prerelease status. This requires only the existing Trusted Publisher's publish permission; no separate dist-tag grant or long-lived token is needed. The default RC path still uses next and preserves latest. A resumed publication keeps the same source, archive and selected channel.
 
 ## Qualify immutable candidates
 

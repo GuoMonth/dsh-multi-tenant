@@ -19,6 +19,9 @@ const pkg = read('packages/multi-tenant/package.json')
 assertDshPin()
 const policy = releasePolicy(pkg.version)
 assert.equal(pkg.publishConfig.tag, policy.channel)
+assert.ok(['', 'false', 'true'].includes(env.PROMOTE_LATEST || ''), 'Invalid latest publication flag')
+const publishLatest = env.PROMOTE_LATEST === 'true'
+const publicationPolicy = publishLatest ? { ...policy, channel: 'latest' } : policy
 for (const key of ['PLATFORM_RUN', 'RUNTIME_RUN'])
   assert.match(env[key] ?? '', /^\d+$/)
 assert.match(env.PACKAGE_INTEGRITY ?? '', /^sha512-[A-Za-z0-9+/]+={0,2}$/)
@@ -93,7 +96,7 @@ if (existingTag)
   assert.equal(existingTag.split(/\s/)[0], env.GITHUB_SHA, 'Never move a published tag')
 const sha256 = createHash('sha256').update(bytes).digest('hex')
 const release = {
-  version: pkg.version, tag, channel: policy.channel, prerelease: policy.prerelease, platform: p, runtime: {
+  version: pkg.version, tag, channel: publicationPolicy.channel, prerelease: policy.prerelease, platform: p, runtime: {
     ...r, tag: env.RUNTIME_TAG, release: runtimeRelease.html_url,
   }, controller: read('charts/dsh-platform/files/sources.json').core.image, package: {
     name: pkg.name, version: pkg.version, integrity, sha256,
@@ -127,16 +130,16 @@ const previousLatestRelease = policy.prerelease ? json('gh', ['api', `repos/${en
 if (published)
   assert.equal(published.dist.integrity, integrity, 'Existing npm version differs; never overwrite')
 else {
-  run('npm', ['publish', '--dry-run', '--ignore-scripts', '--access', 'public', '--tag', policy.channel, artifact])
-  run('npm', ['publish', '--ignore-scripts', '--access', 'public', '--provenance', '--tag', policy.channel, artifact])
+  run('npm', ['publish', '--dry-run', '--ignore-scripts', '--access', 'public', '--tag', publicationPolicy.channel, artifact])
+  run('npm', ['publish', '--ignore-scripts', '--access', 'public', '--provenance', '--tag', publicationPolicy.channel, artifact])
 }
 for (let i = 0; i < 180; i++) {
   published = await metadata()
   if (published?.dist?.integrity === integrity) {
     const tags = await distTags()
-    if (policy.prerelease)
+    if (policy.prerelease && !publishLatest)
       assert.equal(tags.latest, previousLatest, 'Prerelease must preserve the default npm version')
-    if (tags[policy.channel] === pkg.version)
+    if (tags[publicationPolicy.channel] === pkg.version)
       break
   }
   await new Promise(resolve => setTimeout(resolve, 5000))
@@ -147,7 +150,7 @@ const response = await fetch(published.dist.tarball, {
 })
 assert.equal(response.ok, true)
 assert.equal('sha512-' + createHash('sha512').update(Buffer.from(await response.arrayBuffer())).digest('base64'), integrity)
-assertPublishedTags(await distTags(), policy, previousLatest)
+assertPublishedTags(await distTags(), publicationPolicy, previousLatest, { publishLatest })
 if (!existingTag) {
   run('git', ['tag', tag, env.GITHUB_SHA])
   run('git', ['push', 'origin', tag])
@@ -176,4 +179,4 @@ for (const path of paths) {
 }
 if (policy.prerelease)
   assert.equal(json('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/releases/latest`]).id, previousLatestRelease)
-console.log(`Verified npm ${pkg.name}@${pkg.version} on ${policy.channel}, lightweight ${tag}, and matching GitHub Release`)
+console.log(`Verified npm ${pkg.name}@${pkg.version} on ${publicationPolicy.channel}, lightweight ${tag}, and matching GitHub Release`)

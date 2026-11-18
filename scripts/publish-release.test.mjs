@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url'
 import { DSH_TARGET } from './dsh-target.mjs'
 import { DSH_SMOKE_ASSERT } from './verify-packages.mjs'
 const publisher = fileURLToPath(new URL('./publish-release.mjs', import.meta.url))
-const promoter = fileURLToPath(new URL('./promote-latest.mjs', import.meta.url))
 function fixture(wrongImage = false) {
   const root = mkdtempSync(join(tmpdir(), 'dsh-publication-test-'))
   const write = (path, data) => {
@@ -77,7 +76,7 @@ const state=JSON.parse(readFileSync('state.json'));
 const platform=JSON.parse(readFileSync('publication/platform/candidate.json'));
 const runtime=JSON.parse(readFileSync('publication/runtime/candidate.json'));
 const emit=value=>process.stdout.write(JSON.stringify(value));
-if(cmd==='npm'){if(!args.includes('--dry-run')){if(args[0]==='dist-tag')state.latest=platform.version;else state.npm=true;writeFileSync('state.json',JSON.stringify(state));}}
+if(cmd==='npm'){if(!args.includes('--dry-run')){state.npm=true;state.channel=args[args.indexOf('--tag')+1];if(state.channel==='latest')state.latest=platform.version;writeFileSync('state.json',JSON.stringify(state));}}
 else if(cmd==='git'){if(args[0]==='ls-remote'&&state.release)process.stdout.write(platform.commit+'\\trefs/tags/v0.10.0-rc.1');}
 else if(args[0]==='run'){}
 else if(args[0]==='release'){
@@ -106,16 +105,16 @@ else if(args[0]==='api'){
 globalThis.fetch=async url=>{
  const state=JSON.parse(readFileSync('state.json'));
  const pkg=JSON.parse(readFileSync('publication/platform/candidate.json'));
- if(url.includes('/dist-tags'))return Response.json({latest:state.latest||'0.10.0-alpha.1',next:state.npm?pkg.version:'0.1.0-rc.2'});
+ if(url.includes('/dist-tags'))return Response.json({latest:state.latest||'0.10.0-alpha.1',next:state.npm&&state.channel==='next'?pkg.version:'0.1.0-rc.2'});
  if(url==='https://registry.test/archive')return new Response(state.tampered?'wrong archive':readFileSync('publication/platform/'+pkg.package.filename));
  return state.npm?Response.json({dist:{integrity:pkg.package.integrity,tarball:'https://registry.test/archive'}}):new Response('',{status:404});
 };`)
   return {
     root,
-    run: (script = publisher) => execFileSync(process.execPath, ['--import', join(root, 'fetch.mjs'), script], {
+    run: (script = publisher, extraEnv = {}) => execFileSync(process.execPath, ['--import', join(root, 'fetch.mjs'), script], {
       cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
       env: {
-        ...process.env, PATH: join(root, 'bin') + ':' + process.env.PATH, GITHUB_REF: 'refs/heads/main', GITHUB_REPOSITORY: platform.repository, GITHUB_SHA: commit, PLATFORM_RUN: '1', RUNTIME_RUN: '2', PACKAGE_INTEGRITY: integrity, WORKLOAD_DIGEST: 'sha256:' + 'f'.repeat(64), RUNTIME_TAG: manifest.tag,
+        ...process.env, PATH: join(root, 'bin') + ':' + process.env.PATH, GITHUB_REF: 'refs/heads/main', GITHUB_REPOSITORY: platform.repository, GITHUB_SHA: commit, PLATFORM_RUN: '1', RUNTIME_RUN: '2', PACKAGE_INTEGRITY: integrity, WORKLOAD_DIGEST: 'sha256:' + 'f'.repeat(64), RUNTIME_TAG: manifest.tag, ...extraEnv,
       },
     }),
     calls: () => readFileSync(join(root, 'calls.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line)),
@@ -154,34 +153,29 @@ test('publisher refuses a mismatched runtime release before npm, tag or release 
     })
   }
 })
-test('explicit latest promotion checks published bytes, retains next and is idempotent', () => {
+test('explicit latest publication uses npm publish, retains GitHub RC status and resumes without another write', () => {
   const f = fixture()
   try {
-    f.run()
-    assert.match(f.run(promoter), /latest = 0.10.0-rc.1; next retained/)
-    f.run(promoter)
-    const changes = f.calls().filter(call => call.cmd === 'npm' && call.args[0] === 'dist-tag')
-    assert.deepEqual(changes.map(call => call.args), [['dist-tag', 'add', 'dsh-multi-tenant@0.10.0-rc.1', 'latest']])
+    const run = () => f.run(publisher, { PROMOTE_LATEST: 'true' })
+    assert.match(run(), /on latest/)
+    assert.match(run(), /on latest/)
+    const calls = f.calls(), publications = calls.filter(call => call.cmd === 'npm' && !call.args.includes('--dry-run'))
+    assert.equal(publications.length, 1)
+    assert.equal(publications[0].args[0], 'publish')
+    assert.equal(publications[0].args[publications[0].args.indexOf('--tag') + 1], 'latest')
+    const creation = calls.find(call => call.cmd === 'gh' && call.args[1] === 'create')
+    assert.ok(creation.args.includes('--prerelease'))
+    assert.ok(creation.args.includes('--latest=false'))
+    const release = JSON.parse(readFileSync(join(f.root, 'publication/release.json')))
+    assert.equal(release.channel, 'latest')
   }
   finally { rmSync(f.root, { recursive: true, force: true }) }
 })
-test('latest promotion refuses changed registry bytes or a different source before changing tags', () => {
-  for (const fault of ['archive', 'source']) {
-    const f = fixture()
-    try {
-      f.run()
-      if (fault === 'archive') {
-        const state = JSON.parse(readFileSync(join(f.root, 'state.json')))
-        writeFileSync(join(f.root, 'state.json'), JSON.stringify({ ...state, tampered: true }))
-      }
-      else {
-        const path = join(f.root, 'publication/release.json'), release = JSON.parse(readFileSync(path))
-        release.platform.commit = 'other'
-        writeFileSync(path, JSON.stringify(release))
-      }
-      assert.throws(() => f.run(promoter))
-      assert.ok(!f.calls().some(call => call.args[0] === 'dist-tag'))
-    }
-    finally { rmSync(f.root, { recursive: true, force: true }) }
+test('explicit latest still rejects mismatched candidate provenance before publication', () => {
+  const f = fixture(true)
+  try {
+    assert.throws(() => f.run(publisher, { PROMOTE_LATEST: 'true' }))
+    assert.ok(!f.calls().some(call => call.cmd === 'npm'))
   }
+  finally { rmSync(f.root, { recursive: true, force: true }) }
 })
