@@ -2,7 +2,7 @@
 
 [English](../en/releasing.md) · [文档目录](index.md)
 
-平台 npm 包和 GitHub Release 共用版本及轻量 `vVERSION` 标签；runtime 使用自己的版本，双方发行相互链接。获得发布授权后，发布已在本地验收的制品。RC/beta 使用 npm `next`，alpha 使用 `alpha`，正式版使用 `latest`。GitHub 预发布使用 `--prerelease --latest=false`，保留默认安装和最新发行入口。
+平台 npm 包和 GitHub Release 共用版本及轻量 `vVERSION` 标签；runtime 使用自己的版本，双方发行相互链接。获得发布授权后，发布已在本地验收的制品。默认 RC/beta 使用 npm `next`，alpha 使用 `alpha`，正式版使用 `latest`。GitHub 预发布使用 `--prerelease --latest=false`；npm latest 的显式选择见下文。
 
 1. 更新平台版本、[dsh-target.mjs](../../scripts/dsh-target.mjs) 中的 DSH 针，以及[发行说明](release-notes.md)。运行 `pnpm release:check`；配套 runtime 运行 `make verify`、`make verify-dsh`。本候选配对 runtime 0.5.0-rc.3，且必须嵌入同一个 DSH 针。
 2. 合并审核通过的源码，在两仓库 main 上运行手动 `prepare-release.yml`。流程在打包和推送精确候选前重跑完整的 `pnpm release:check`；PR CI 保持轻量，本地第 1 步仍是主要验收记录。下载精确候选：镜像 digest/源码信息及平台 npm 归档。
@@ -34,7 +34,7 @@ gh workflow run prepare-release.yml --repo GuoMonth/dsh-multi-tenant --ref main 
 
 技术验收始终报告 `releaseReady=false`，直到真实模型与明确授权的 CLI 检查也具备证据。专用测试凭据通过私有文件或已批准的 Secret 存储提供，不放进源码、命令参数，也不借用平台控制凭据。模型回合后核实原生文件、会话和凭据保留，并确认另一个用户的域保持隔离。
 
-发布前按已接受组合准备 runtime-release.json、脱敏 validation.md 和校验和。报告必须标明两个产品源码提交、平台/工作负载镜像精确摘要、包的 SHA512 integrity、Connector 来源及验收任务，并区分已通过、失败和未测要求。将同一份报告及清单附到 runtime Release，再通过 release.yml 发布已验收的平台归档。RC 发布使用 npm next，保留默认 latest 渠道。
+发布前按已接受组合准备 runtime-release.json、脱敏 validation.md 和校验和。报告必须标明两个产品源码提交、平台/工作负载镜像精确摘要、包的 SHA512 integrity、Connector 来源及验收任务，并区分已通过、失败和未测要求。将同一份报告及清单附到 runtime Release，再通过 release.yml 发布已验收的平台归档。默认 RC 发布使用 npm next 并保留 latest；本次发行已明确选择 npm latest。
 
 GitHub Actions 使用 Node 24/npm >=11.5.1、`id-token: write`、`release.yml` 和 `npm-release` 环境，与配置的 Trusted Publisher 一致。构建生成的文档链接指向源码提交。
 

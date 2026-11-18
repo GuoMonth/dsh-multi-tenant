@@ -2,7 +2,7 @@
 
 [简体中文](../zh-CN/releasing.md) · [Guides](index.md)
 
-Platform npm and GitHub Release share a version and lightweight `vVERSION` tag. Runtime has its own version and a cross-linked release. Publish the locally accepted artifacts after publication is authorized. RC/beta uses npm `next`, alpha uses `alpha`, and stable uses `latest`. GitHub prereleases use `--prerelease --latest=false`; default installation and latest-release entries are preserved.
+Platform npm and GitHub Release share a version and lightweight `vVERSION` tag. Runtime has its own version and a cross-linked release. Publish the locally accepted artifacts after publication is authorized. By default, RC/beta uses npm `next`, alpha uses `alpha`, and stable uses `latest`. GitHub prereleases use `--prerelease --latest=false`; explicit npm latest selection is described below.
 
 1. Update the platform version, the DSH pin in [dsh-target.mjs](../../scripts/dsh-target.mjs) and [release notes](release-notes.md). Run `pnpm release:check`; the paired runtime runs `make verify` and `make verify-dsh`. This candidate pairs with runtime 0.5.0-rc.3, which must embed the same DSH pin.
 2. Merge reviewed sources and run each repository's manual `prepare-release.yml` on main. The workflow re-runs the full `pnpm release:check` before packing and pushing the exact candidate; pull-request CI stays light and the local step 1 remains the primary acceptance record. Download the exact candidates: image digests/source metadata and the platform npm archive.
@@ -34,7 +34,7 @@ The `release-qualification` artifact separates harness source from product sourc
 
 Technical qualification deliberately reports `releaseReady=false` until the real model and explicitly authorized CLI checks also have evidence. Supply dedicated test credentials through private files or an approved secret store, never through source, command arguments or platform control credentials. Confirm the native file/session/credential retention after that turn and verify the second user's domain remains isolated.
 
-Before publication, assemble runtime-release.json, a redacted validation.md and checksums from the accepted combination. The report must identify both product source commits, exact platform/workload image digests, package SHA512 integrity, Connector source and qualification run, and distinguish passed, failed and untested requirements. Attach those exact reports and manifests to the runtime release, then publish the accepted platform archive through release.yml. RC publication uses npm next and preserves the default latest channel.
+Before publication, assemble runtime-release.json, a redacted validation.md and checksums from the accepted combination. The report must identify both product source commits, exact platform/workload image digests, package SHA512 integrity, Connector source and qualification run, and distinguish passed, failed and untested requirements. Attach those exact reports and manifests to the runtime release, then publish the accepted platform archive through release.yml. Default RC publication uses npm next and preserves latest; this release explicitly selected npm latest.
 
 GitHub Actions uses Node 24/npm >=11.5.1, `id-token: write`, workflow `release.yml` and environment `npm-release`, matching the configured Trusted Publisher. Build-generated documentation links point to the source commit.
 

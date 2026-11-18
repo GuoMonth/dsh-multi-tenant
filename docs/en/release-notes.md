@@ -12,7 +12,7 @@ SDK dependencies now use openid-client 6.9.0, ws 8.23.0 and Zod 4.6.7, with refr
 
 [简体中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/release-notes.md)
 
-Prepared **2026-11-17** for npm `next` and a GitHub prerelease. Paired runtime: **0.5.0-rc.3**; DSH: **0.2.2-rc.3** (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). Published platform **0.12.0-rc.1** with runtime **0.5.0-rc.2** and DSH **0.2.1-rc.5** remains the historical release.
+Published **2026-11-18** on npm `latest` as a GitHub prerelease. Paired runtime: **0.5.0-rc.3**; DSH: **0.2.2-rc.3** (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). Published platform **0.12.0-rc.1** with runtime **0.5.0-rc.2** and DSH **0.2.1-rc.5** remains the historical release.
 
 - Kubernetes environments with one persistent PVC per user, on DSH 0.2.2-rc.3.
 - Official DSH web profile owns UI, authenticated-browser settings, Session storage and plugin composition; no settings-client patch or private Node loader flag.
@@ -20,4 +20,4 @@ Prepared **2026-11-17** for npm `next` and a GitHub prerelease. Paired runtime: 
 - Fresh Linux/amd64 installations, one node/platform replica and trusted members. No in-place upgrade.
 - No compatibility guarantee: pin the exact platform, runtime, DSH and artifact identities you deploy.
 
-Start with [installation](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/installation.md). Candidate artifacts are attached at publication: [Release](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.12.0-rc.2) · [Validation](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.2/validation.md). The historical release remains [0.12.0-rc.1](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.12.0-rc.1) · [Validation](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.1/validation.md). Earlier versions remain in [Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases).
+Start with [installation](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/installation.md). The accepted artifacts and verification report are attached: [Release](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.12.0-rc.2) · [Validation](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.2/validation.md). The historical release remains [0.12.0-rc.1](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.12.0-rc.1) · [Validation](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.1/validation.md). Earlier versions remain in [Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases).

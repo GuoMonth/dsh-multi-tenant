@@ -4,7 +4,7 @@
 
 Self-hosted, multi-user [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) on Kubernetes. Members sign in with OpenID Connect (OIDC) and use the native DSH interface in their own persistent AI work environment.
 
-**Release candidate:** Linux/amd64, one node and one platform replica, for trusted organization members and fresh installations. The candidate is platform **0.12.0-rc.2**, runtime **0.5.0-rc.3**, DSH **0.2.2-rc.3** (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). Published platform **0.12.0-rc.1** remains the historical release for runtime **0.5.0-rc.2** and DSH **0.2.1-rc.5**. No compatibility guarantee; pin the exact versions and artifacts you deploy.
+**Release candidate:** Linux/amd64, one node and one platform replica, for trusted organization members and fresh installations. Published RC: platform **0.12.0-rc.2**, runtime **0.5.0-rc.3**, DSH **0.2.2-rc.3** (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). No compatibility guarantee; pin the exact versions and artifacts you deploy.
 
 ## Install
 
