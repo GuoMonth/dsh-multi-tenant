@@ -1,5 +1,7 @@
 # 0.12.0-rc.2
 
+Known security issue: picomatch 4.0.7 remains affected by GHSA-fc5q-39xc-vjpf (repeated-extglob ReDoS). The release owner accepted this issue on 2026-11-18 until 2026-12-02; it is not fixed. Raw scans and the accepted scope accompany validation.
+
 Fixed environment creation and read-only allocation recovery when the platform supplies a binding record: control metadata no longer contaminates strict resource references. Owner and resource UID checks remain enforced.
 
 SDK dependencies now use openid-client 6.9.0, ws 8.23.0 and Zod 4.6.7, with refreshed Connector provenance. The paired launcher uses Go 1.27.4, drains process output before completion and joins management/proxy cleanup. Verification includes dependency security scans and native/owner-based goroutine leak checks.

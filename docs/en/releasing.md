@@ -41,3 +41,7 @@ Before publication, assemble runtime-release.json, a redacted validation.md and 
 GitHub Actions uses Node 24/npm >=11.5.1, `id-token: write`, workflow `release.yml` and environment `npm-release`, matching the configured Trusted Publisher. Build-generated documentation links point to the source commit.
 
 On partial success, rerun the same candidate. The script checks existing npm integrity before continuing. Published versions/tags remain immutable. Metadata visibility may lag publication; the script polls for up to 15 minutes. After a timeout, check registry visibility and resume the same workflow attempt.
+
+## Accepted known security issue
+
+On 2026-11-18 the release owner authorized GHSA-fc5q-39xc-vjpf on picomatch 4.0.7 as a known issue for this release. The ReDoS risk is not fixed; acceptance expires on 2026-12-02. Set `accept_picomatch=true` on both preparation workflows. Default local audits stay strict; CI explicitly supplies this authorized exception until its enforced expiry. The accepted preparation retains raw reports and a non-clean assessment under candidate/audit, while every other advisory, version change, scan error or expired acceptance still fails. Both Releases and validation reports must disclose this issue.
