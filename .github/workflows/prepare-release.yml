@@ -3,6 +3,10 @@ run-name: ${{ inputs.qualify && 'Qualify frozen release candidates' || 'Prepare 
 on:
   workflow_dispatch:
     inputs:
+      accept_picomatch:
+        description: Accept the authorized GHSA-fc5q-39xc-vjpf known issue until 2026-12-02
+        type: boolean
+        default: false
       qualify:
         description: Run isolated AMD64 Kubernetes acceptance without rebuilding or publishing
         type: boolean
@@ -24,6 +28,9 @@ jobs:
     if: ${{ !inputs.qualify }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      ACCEPT_PICOMATCH_GHSA: ${{ inputs.accept_picomatch && 'GHSA-fc5q-39xc-vjpf' || '' }}
+      AUDIT_EVIDENCE_DIRECTORY: candidate/audit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -45,7 +52,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir candidate
+          mkdir -p candidate
           npm pack ./packages/multi-tenant --ignore-scripts --pack-destination candidate --json > candidate/pack.json
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           image="ghcr.io/guomonth/dsh-multi-tenant:source-${GITHUB_SHA}"
