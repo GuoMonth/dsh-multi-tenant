@@ -25,6 +25,10 @@ for (const namespace of namespaces) {
           securityContext: item.spec.securityContext,
           containers: item.spec.containers.map(container => ({ name: container.name, image: container.image })),
         }
+        else if (item.kind === 'EndpointSlice') {
+          projected.endpoints = item.endpoints
+          projected.ports = item.ports
+        }
         else if (item.kind !== 'Sandbox') projected.spec = item.spec
         else projected.spec = {
           operatingMode: item.spec.operatingMode, shutdownPolicy: item.spec.shutdownPolicy,

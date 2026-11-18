@@ -42,8 +42,8 @@ importers:
   packages/multi-tenant:
     devDependencies:
       '@dsh/environment-connector-internal':
-        specifier: file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.3-2d7070b.tgz
-        version: file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-2d7070b.tgz
+        specifier: file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.3-857472c.tgz
+        version: file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-857472c.tgz
       '@types/ws':
         specifier: 8.18.2
         version: 8.18.2
@@ -95,8 +95,8 @@ packages:
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
 
-  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-2d7070b.tgz':
-    resolution: {integrity: sha512-BZw4HrBq9qd4JqH50Pownnm/aUh0nfb5/Z5/EQ4m1cKSO5UvCZdmzjR/jpCclsUTyYC9cfhrHGjBHp95ZFfijQ==, tarball: file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-2d7070b.tgz}
+  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-857472c.tgz':
+    resolution: {integrity: sha512-VF/104ZWthZY+JtLKoYneZ2CI4oT2XVEpzcjCUoURJ59575TtgQP4E16aQIVrkizje1fXl12QbWZsechCIiONQ==, tarball: file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-857472c.tgz}
     version: 0.0.0-rc.3
     engines: {node: ^24.9.0 || ^26.0.0}
 
@@ -1501,7 +1501,7 @@ snapshots:
       hashery: 1.5.1
       keyv: 5.6.0
 
-  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-2d7070b.tgz':
+  '@dsh/environment-connector-internal@file:vendor/dsh-environment-connector-internal-0.0.0-rc.3-857472c.tgz':
     dependencies:
       zod: 4.6.7
 

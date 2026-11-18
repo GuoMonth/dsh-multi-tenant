@@ -1,5 +1,7 @@
 # 0.12.0-rc.2
 
+新 Service 的空 EndpointSlice 可能返回 null 端点与端口集合；控制器发布可验证目标前保持 Pending，仍拒绝外部归属、畸形字段及非空错误端口。
+
 Kubernetes 原始列表解析现在根据已验证的类型化列表头补齐 Pod/EndpointSlice 条目类型，继续保留 owner/UID 校验、未知字段和分页不完整拒绝。
 
 已知安全问题：picomatch 4.0.7 仍受 GHSA-fc5q-39xc-vjpf 影响（重复 extglob 的 ReDoS）。发行负责人于 2026-11-18 接受该问题，期限截至 2026-12-02；风险未修复。验证材料保留原始扫描和接受范围。
