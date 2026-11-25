@@ -45,7 +45,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 24
+          node-version-file: .node-version
           package-manager-cache: false
       - name: Publish the locally accepted artifacts
         env:
@@ -56,4 +56,4 @@ jobs:
           WORKLOAD_DIGEST: ${{ inputs.workload_digest }}
           RUNTIME_TAG: ${{ inputs.runtime_tag }}
           PROMOTE_LATEST: ${{ inputs.promote_latest }}
-        run: node scripts/publish-release.mjs
+        run: node scripts/publish-release.ts

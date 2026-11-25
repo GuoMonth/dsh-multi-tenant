@@ -8,7 +8,7 @@
 
 ## 安装
 
-准备已有 Kubernetes 集群、支持网络策略的 CNI、动态存储、HTTPS 入口和 OIDC 身份提供方。安装机需要 Node 24+、Helm 3 和 kubectl。
+准备已有 Kubernetes 集群、支持网络策略的 CNI、动态存储、HTTPS 入口和 OIDC 身份提供方。安装机需要 Node 24.22.3 及以上的 24.x 版本，或 26.13.1 及以上版本、Helm 3 和 kubectl。
 
 ```sh
 npm install --global dsh-multi-tenant@0.12.0-rc.2

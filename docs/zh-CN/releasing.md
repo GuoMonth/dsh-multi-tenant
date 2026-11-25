@@ -6,7 +6,7 @@
 
 平台改动可以按环境适配器契约独立评审和合并。下面的联合流程用于验收和发布参考部署。
 
-1. 更新平台版本、[dsh-target.mjs](../../scripts/dsh-target.mjs) 中的 DSH 针，以及[发行说明](release-notes.md)。运行 `pnpm release:check`。配套 runtime 必须嵌入相同的 DSH 版本和源码提交，并通过 `make verify` 和 `make verify-dsh`。
+1. 更新平台版本、[dsh-target.ts](../../scripts/dsh-target.ts) 中的 DSH 针，以及[发行说明](release-notes.md)。运行 `pnpm release:check`。配套 runtime 必须嵌入相同的 DSH 版本和源码提交，并通过 `make verify` 和 `make verify-dsh`。
 2. 合并审核通过的源码，在两仓库 main 上运行手动 `prepare-release.yml`。流程在打包和推送精确候选前重跑完整的 `pnpm release:check`；PR CI 保持轻量，本地第 1 步仍是主要验收记录。下载精确候选：镜像 digest/源码信息及平台 npm 归档。
 3. 验证包完整性和匿名镜像拉取。用该组合验证安装、双用户访问、真实模型/工具、数据保留和相关失败场景，保存脱敏报告。
 4. 在受测源码提交上发布 [runtime 版本](https://github.com/GuoMonth/dsh-isolated-runtime)，附上清单与验证报告。
@@ -38,7 +38,7 @@ gh workflow run prepare-release.yml --repo GuoMonth/dsh-multi-tenant --ref main 
 
 发布前按已接受组合准备 runtime-release.json、脱敏 validation.md 和校验和。报告必须标明两个产品源码提交、平台/工作负载镜像精确摘要、包的 SHA512 integrity、Connector 来源及验收任务，并区分已通过、失败和未测要求。将同一份报告及清单附到 runtime Release，再通过 release.yml 发布已验收的平台归档。默认 RC 发布使用 npm next 并保留 latest；本次发行已明确选择 npm latest。
 
-GitHub Actions 使用 Node 24/npm >=11.5.1、`id-token: write`、`release.yml` 和 `npm-release` 环境，与配置的 Trusted Publisher 一致。构建生成的文档链接指向源码提交。
+GitHub Actions 使用 Node 24.22.3/npm >=11.5.1、`id-token: write`、`release.yml` 和 `npm-release` 环境，与配置的 Trusted Publisher 一致。构建生成的文档链接指向源码提交。
 
 部分成功后重跑同一候选；脚本会先检查已有 npm 包完整性。已发布版本和标签保持原样。元数据可能晚于发布可见，脚本最多轮询 15 分钟；超时后核对 registry 可见性，再继续同一流程。
 

@@ -4,5 +4,5 @@
     "rootDir": ".",
     "outDir": "dist/types"
   },
-  "include": ["src", "tests", "demo"]
+  "include": ["src", "tests", "tsdown.config.ts", "vitest.config.ts"]
 }

@@ -8,7 +8,7 @@ Self-hosted, multi-user [DeepSeek Harness](https://github.com/deepseek-ai/deepse
 
 ## Install
 
-Use an existing Kubernetes cluster with network policy enforcement, dynamic storage, HTTPS ingress and an OIDC provider. The installation machine needs Node 24+, Helm 3 and kubectl.
+Use an existing Kubernetes cluster with network policy enforcement, dynamic storage, HTTPS ingress and an OIDC provider. The installation machine needs Node 24.22.3 or later in 24.x, or 26.13.1 or later, Helm 3 and kubectl.
 
 ```sh
 npm install --global dsh-multi-tenant@0.12.0-rc.2

@@ -4,5 +4,5 @@ description: Fixed single-replica platform; environments are provisioned by runt
 type: application
 # Chart revision. Not the platform npm version and not the DSH pin.
 version: 0.1.1
-# DSH pin. Must match scripts/dsh-target.mjs; verify and publish compare it.
+# DSH pin. Must match scripts/dsh-target.ts; verify and publish compare it.
 appVersion: 0.2.2-rc.5

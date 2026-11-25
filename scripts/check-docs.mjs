@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-// Keep this dependency-free checker identical in the platform and runtime repos.
+// Dependency-free checks for the platform and optional paired runtime documentation.
 const skipped = new Set(['.git', 'node_modules', 'dist', 'coverage', 'publication'])
 const repoNames = ['dsh-multi-tenant', 'dsh-isolated-runtime']
 const generatedDocs = new Set(['packages/multi-tenant/README.md', 'packages/multi-tenant/README.zh-CN.md', 'packages/multi-tenant/AI.md'])
@@ -138,7 +138,7 @@ async function online(urls) {
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-  const currentRepo = existsSync(resolve(root, 'scripts/dsh-target.mjs')) ? repoNames[0] : repoNames[1]
+  const currentRepo = existsSync(resolve(root, 'packages/multi-tenant/package.json')) ? repoNames[0] : repoNames[1]
   const paired = {
     currentRepo, [currentRepo]: root,
   }

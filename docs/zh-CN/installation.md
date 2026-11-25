@@ -7,7 +7,7 @@
 ## 准备
 
 - Linux/amd64 Kubernetes，具备生效的网络策略、动态 StorageClass 和 Ingress controller。参考验证环境为 Kubernetes 1.37、Calico 3.32.2、local-path。
-- 安装机上的 Node 24+、Helm 3、kubectl；明确的 kubeconfig/context，以及安装集群 CRD、控制器和 RBAC 的权限。
+- 安装机上的 Node 24.22.3 及以上的 24.x 版本，或 26.13.1 及以上版本、Helm 3、kubectl；明确的 kubeconfig/context，以及安装集群 CRD、控制器和 RBAC 的权限。
 - 一个已创建的平台 namespace，其中放置 TLS Secret（`tls.crt`、`tls.key`）和 OIDC client-secret Secret。values 填写 Secret 名称和 key，密钥内容放在 Secret 中。
 - 平台域名及 `*.env.<平台域名>` 指向同一 HTTPS 入口，证书覆盖两者。Ingress 保留 Host、支持 WebSocket，TLS 终止后转发到平台 8080 端口。公网明文 HTTP 关闭或重定向至 HTTPS。
 - HTTPS OIDC issuer 和 client，回调地址为 `https://<平台域名>/auth/callback`。在 `members` 中将精确 issuer/subject 映射到租户和用户 ID。

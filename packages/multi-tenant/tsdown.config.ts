@@ -1,5 +1,5 @@
 import { defineConfig } from 'tsdown'
-export default defineConfig({
+export default defineConfig([{
   entry: {
     index: 'src/index.ts',
     cli: 'src/cli/main.ts',
@@ -7,6 +7,7 @@ export default defineConfig({
     admin: 'src/platform/admin-cli.ts',
   },
   format: ['esm'],
+  target: 'node24.22.3',
   dts: true,
   sourcemap: true,
   clean: true,
@@ -16,4 +17,12 @@ export default defineConfig({
     // Validation stays internal: the installed-package type smoke rejects leaked schema dependencies.
     dts: { alwaysBundle: [/^@dsh\//, 'openid-client', 'oauth4webapi', 'jose'], neverBundle: [/^zod(?:\/|$)/] },
   },
-})
+}, {
+  entry: { install: '../../charts/install.ts' },
+  format: ['esm'],
+  target: 'node24.22.3',
+  outDir: 'charts',
+  dts: false,
+  clean: false,
+  deps: { alwaysBundle: [/^zod(?:\/|$)/] },
+}])

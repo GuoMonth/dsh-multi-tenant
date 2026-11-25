@@ -16,7 +16,7 @@ const help = `dsh-multi-tenant — OIDC + Kubernetes environment
   delete --socket /absolute/private/admin.sock --environment ID --allocation-key KEY --identity UID
   --version | --help
 
-Requires Node 24+, a configured cluster and upstream agent-sandbox core.
+Requires Node 24.22.3 or later in 24.x, or 26.13.1 or later, a configured cluster and upstream agent-sandbox core.
 Run inside the cluster (or with API and Pod-IP reachability). No cluster is created.
 SIGINT/SIGTERM stop the platform, retaining environments and data. SIGHUP reloads membership.
 Delete targets an exact allocation/UID; acceptance is not proof that its writer stopped.

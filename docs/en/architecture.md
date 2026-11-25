@@ -29,7 +29,7 @@ Normal Pod recreation changes the Pod UID and retains the Sandbox/PVC identity. 
 
 ## Sources and validation
 
-- [DSH target](../../scripts/dsh-target.mjs): the only DSH npm version and source commit.
+- [DSH target](../../scripts/dsh-target.ts): the only DSH npm version and source commit.
 - Helm chart [Chart.yaml](../../charts/dsh-platform/Chart.yaml): `version` is the chart revision. `appVersion` is that DSH pin, not the platform npm version.
 - [Connector provenance](../../vendor/environment-connector.json): source commit and tarball integrity.
 - [Installation asset sources](../../charts/dsh-platform/files/sources.json): controller, runtime RBAC and the copied DSH pin.

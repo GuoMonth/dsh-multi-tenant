@@ -48,7 +48,7 @@
     "ai-agents"
   ],
   "engines": {
-    "node": "^24.9.0 || ^26.0.0"
+    "node": "^24.22.3 || >=26.13.1"
   },
   "devDependencies": {
     "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.3-857472c.tgz",
@@ -58,7 +58,7 @@
     "zod": "4.6.7"
   },
   "scripts": {
-    "build": "tsdown && node ../../scripts/package-installation.mjs",
+    "build": "node ../../scripts/package-installation.ts && tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts"
   },
