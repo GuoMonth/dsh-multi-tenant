@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { get } from 'node:http'
-import { parseEnvironmentOwner, identities, type AgentEnvironmentRuntime, type EnvironmentConnection } from '@dsh/environment-connector-internal'
-import { parseConfiguration, parseMembership } from '../src/platform/configuration.ts'
+import { parseEnvironmentOwner, identities, type AgentEnvironmentRuntime, type EnvironmentConnection } from '../src/environment-contract.ts'
+import { parsePlatformConfiguration, parseMembership } from '../src/platform/configuration.ts'
 import { EnvironmentBindingStore } from '../src/platform/bindings.ts'
 import { createPlatformApplication } from '../src/platform/application.ts'
 import { createPlatformIngress } from '../src/platform/ingress.ts'
@@ -18,10 +18,6 @@ import { environmentId } from '../src/platform/identity.ts'
 const owner = parseEnvironmentOwner({ tenantId: ' tenant ', principalId: '汉字' })
 const member = { issuer: 'https://issuer.test', subject: 'exact subject ', owner }
 const configValue = {
-  runtime: { kubernetes: { server: 'https://cluster.test', caFile: '/ca', tokenFile: '/token' },
-    namespacePrefix: 'env', platformNamespace: 'platform', domain: 'env.example.test', image: `env@sha256:${'a'.repeat(64)}`,
-    storage: { storageClassName: 'standard', size: '1Gi' },
-    resources: { requests: { cpu: '100m', memory: '256Mi' }, limits: { cpu: '1', memory: '1Gi' } } },
   stateFile: '/private/state.sqlite', adminSocket: '/private/admin.sock',
   oidc: { issuer: member.issuer, clientId: 'client', platformOrigin: 'https://platform.example.test', siteDomain: 'example.test' },
   members: [member], host: '127.0.0.1', port: 12345,
@@ -36,15 +32,15 @@ const runtime: AgentEnvironmentRuntime = {
 }
 
 test('configuration schemas reject nested coercion, unknown fields and ambiguous membership; identity remains exact', () => {
-  expect(parseConfiguration(configValue).members[0]?.owner).toEqual(owner)
+  expect(parsePlatformConfiguration(configValue).members[0]?.owner).toEqual(owner)
   expect(parseMembership({ members: [member], other: 'requires restart' }, member.issuer)).toEqual([member])
   for (const change of [
-    { runtime: { ...configValue.runtime, resources: { requests: { cpu: 1, memory: '1Gi' } } } },
+    { runtime: { kubernetes: { server: 'https://cluster.test' } } },
     { oidc: { ...configValue.oidc, clientSecret: 'must not be inline' } },
     { members: [member, member] },
     { members: [{ ...member, issuer: 'https://other.test' }] },
     { port: '12345' },
-  ]) expect(() => parseConfiguration({ ...configValue, ...change })).toThrow()
+  ]) expect(() => parsePlatformConfiguration({ ...configValue, ...change })).toThrow()
 })
 
 test.each(['json', 'owner', 'phase', 'ref', 'pending', 'coercion', 'id'])(
@@ -117,11 +113,11 @@ test.each(['authentication', 'connect'] as const)('ingress close waits for actua
 
 test('startup cancellation waits for late authentication acquisition and releases the SQLite lock exactly once', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'dsh-app-'))
-  const config = parseConfiguration({ ...configValue, stateFile: join(directory, 'state.sqlite'), adminSocket: join(directory, 'admin.sock') })
+  const config = parsePlatformConfiguration({ ...configValue, stateFile: join(directory, 'state.sqlite'), adminSocket: join(directory, 'admin.sock') })
   const auth = { authenticator: { authenticate: vi.fn() }, updateMembers: vi.fn(), close: vi.fn() }
   const waiting = deferred<typeof auth>()
-  const app = createPlatformApplication(config, undefined, {
-    createAgentEnvironmentRuntime: () => runtime, openStore: path => new EnvironmentBindingStore(path), createEnvironmentControl,
+  const app = createPlatformApplication(config, undefined, () => runtime, {
+    openStore: path => new EnvironmentBindingStore(path), createEnvironmentControl,
     createOIDCAuthentication: () => waiting.promise, createPlatformIngress, listenAdmin, listenServer,
   })
   const started = app.start().catch((cause: unknown) => cause)
@@ -139,11 +135,11 @@ test('startup cancellation waits for late authentication acquisition and release
 
 test('shutdown awaits membership reload and never installs late membership after cancellation', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'dsh-reload-'))
-  const config = parseConfiguration({ ...configValue, stateFile: join(directory, 'state.sqlite'), adminSocket: join(directory, 'admin.sock') })
+  const config = parsePlatformConfiguration({ ...configValue, stateFile: join(directory, 'state.sqlite'), adminSocket: join(directory, 'admin.sock') })
   const auth = { authenticator: { authenticate: vi.fn() }, updateMembers: vi.fn(), close: vi.fn() }
   const input = deferred<unknown>()
-  const app = createPlatformApplication(config, undefined, {
-    createAgentEnvironmentRuntime: () => runtime, openStore: path => new EnvironmentBindingStore(path), createEnvironmentControl,
+  const app = createPlatformApplication(config, undefined, () => runtime, {
+    openStore: path => new EnvironmentBindingStore(path), createEnvironmentControl,
     createOIDCAuthentication: async () => auth, createPlatformIngress, listenAdmin, listenServer: async () => {},
   })
   try {
@@ -164,14 +160,15 @@ test('shutdown awaits membership reload and never installs late membership after
 
 test('admin shutdown drains a late runtime read before releasing private storage', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'dsh-admin-'))
-  const config = parseConfiguration({ ...configValue, stateFile: join(directory, 'state.sqlite'), adminSocket: join(directory, 'admin.sock') })
+  const config = parsePlatformConfiguration({ ...configValue, stateFile: join(directory, 'state.sqlite'), adminSocket: join(directory, 'admin.sock') })
   const store = new EnvironmentBindingStore(config.stateFile)
   const record = store.reserve(owner)
   store.save({ ...record, phase: 'submitted' }, 'pending')
   const released = vi.spyOn(store, 'close')
   const admitted = deferred<void>(), finished = deferred<null>()
-  const app = createPlatformApplication(config, undefined, {
-    createAgentEnvironmentRuntime: () => ({ ...runtime, async inspectAllocation() { admitted.resolve(); return finished.promise } }),
+  const app = createPlatformApplication(config, undefined, () => ({
+    ...runtime, async inspectAllocation() { admitted.resolve(); return finished.promise },
+  }), {
     openStore: () => store, createEnvironmentControl,
     createOIDCAuthentication: async () => ({ authenticator: { authenticate: vi.fn() }, updateMembers: vi.fn(), close: vi.fn() }),
     createPlatformIngress, listenAdmin, listenServer: async () => {},
@@ -193,11 +190,11 @@ test('admin shutdown drains a late runtime read before releasing private storage
 
 test('partial startup and authentication cleanup failures still close ingress and release storage', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'dsh-failure-'))
-  const config = parseConfiguration({ ...configValue, stateFile: join(directory, 'state.sqlite'), adminSocket: join(directory, 'admin.sock') })
+  const config = parsePlatformConfiguration({ ...configValue, stateFile: join(directory, 'state.sqlite'), adminSocket: join(directory, 'admin.sock') })
   const startupCause = new Error('admin binding failed')
   const cleanupCause = new Error('authentication disposal failed')
-  const app = createPlatformApplication(config, undefined, {
-    createAgentEnvironmentRuntime: () => runtime, openStore: path => new EnvironmentBindingStore(path), createEnvironmentControl,
+  const app = createPlatformApplication(config, undefined, () => runtime, {
+    openStore: path => new EnvironmentBindingStore(path), createEnvironmentControl,
     createOIDCAuthentication: async () => ({
       authenticator: { authenticate: vi.fn() }, updateMembers: vi.fn(), close() { throw cleanupCause },
     }),

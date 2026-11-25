@@ -1,5 +1,11 @@
-// Compiles from the installed exact tarball. No fake production constructor.
-import type { AgentEnvironmentRuntime, EnvironmentRef, EnvironmentRuntimeOptions } from '../../packages/multi-tenant/src/environment-contract.ts'
+// Compile the standalone platform API from source. The tarball smoke exercises the installed API.
+import {
+  createPlatformApplication, parsePlatformConfiguration,
+  type AgentEnvironmentRuntime, type EnvironmentRef, type EnvironmentRuntimeOptions,
+} from '../../packages/multi-tenant/src/index.ts'
+export function platform(value: unknown, runtime: AgentEnvironmentRuntime) {
+  return createPlatformApplication(parsePlatformConfiguration(value), undefined, () => runtime)
+}
 export const options: EnvironmentRuntimeOptions = {
   kubernetes: { server:'https://kubernetes.default.svc',caFile:'/platform/ca.crt',tokenFile:'/platform/token' },
   namespacePrefix:'dsh-user',platformNamespace:'dsh-platform',domain:'workspaces.example.test',

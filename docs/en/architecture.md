@@ -11,7 +11,13 @@
 | Agent Sandbox core | The sole Pod/Service controller |
 | DeepSeek Harness | Native UI, conversations, models, tools and application protocols |
 
-The platform calls the bundled Connector after authorization. Runtime verifies exact resources and forwards native traffic. DSH runs in each user's Pod. Kubernetes reconciles the Sandbox; runtime has no separate service or background controller.
+The platform calls an environment adapter after authorization. The CLI wires in the bundled Kubernetes Connector as the reference adapter. It verifies exact resources and forwards native traffic. DSH runs in each user's Pod, and Kubernetes reconciles the Sandbox.
+
+## Environment adapter contract
+
+The public TypeScript API exports `AgentEnvironmentRuntime` and `ENVIRONMENT_CONTRACT_VERSION`. Use `parsePlatformConfiguration` and pass an adapter factory to `createPlatformApplication(config, secret, createRuntime)` to compose the platform independently. The CLI also validates its Kubernetes-specific `runtime` configuration. The DSH pin identifies the reference deployment for combined qualification.
+
+Contract version 1 covers allocation, inspection, start, stop, deletion and connection handling. An allocation is tied to its exact owner, backing resource identities and revision. A missing known resource is stale. An unknown write requires observing the original allocation before any retry. Stop requires proof that the exact writer terminated, and deletion retains the original data volume. The connection signal covers the lifetime of HTTP streams and WebSockets, so revocation closes established traffic. The `namespace`, `sandbox` and `data` fields preserve the existing binding format.
 
 ## Identity and storage
 

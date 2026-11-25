@@ -1,15 +1,14 @@
-import { createAgentEnvironmentRuntime } from '@dsh/environment-connector-internal'
+import type { AgentEnvironmentRuntime } from '../environment-contract.ts'
 import { EnvironmentBindingStore } from './bindings.ts'
 import { createEnvironmentControl } from './control.ts'
 import { createOIDCAuthentication } from './oidc.ts'
 import { createPlatformIngress } from './ingress.ts'
 import { listenAdmin } from './admin.ts'
 import { listenServer, settleCleanup } from './work.ts'
-import { parseMembership, type Configuration } from './configuration.ts'
+import { parseMembership, type PlatformConfiguration } from './configuration.ts'
 import type { StartupStage } from './startup.ts'
 
 const defaults = {
-  createAgentEnvironmentRuntime,
   openStore: (path: string) => new EnvironmentBindingStore(path),
   createEnvironmentControl,
   createOIDCAuthentication,
@@ -19,7 +18,12 @@ const defaults = {
 }
 
 /** The process owns startup, reload and reverse-order resource disposal. */
-export function createPlatformApplication(config: Configuration, secret: string | undefined, dependencies = defaults) {
+export function createPlatformApplication(
+  config: PlatformConfiguration,
+  secret: string | undefined,
+  createRuntime: () => AgentEnvironmentRuntime,
+  dependencies = defaults,
+) {
   const lifecycle = new AbortController()
   let stage: StartupStage = 'runtime'
   let store: EnvironmentBindingStore | undefined
@@ -31,9 +35,7 @@ export function createPlatformApplication(config: Configuration, secret: string 
   let closing: Promise<void> | undefined
   async function acquire() {
     lifecycle.signal.throwIfAborted()
-    if (config.runtime.domain !== config.oidc.siteDomain && !config.runtime.domain.endsWith('.' + config.oidc.siteDomain))
-      throw new Error('Environment domain must use the configured OIDC site')
-    const runtime = dependencies.createAgentEnvironmentRuntime(config.runtime)
+    const runtime = createRuntime()
     stage = 'state'
     store = dependencies.openStore(config.stateFile)
     const control = dependencies.createEnvironmentControl(runtime, store)

@@ -1,14 +1,14 @@
 import { z } from 'zod'
-import { refSchema } from '@dsh/environment-connector-internal'
 import { environmentId, type EnvironmentId } from './identity.ts'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type {
-  AgentEnvironmentRuntime,
-  EnvironmentContext,
-  EnvironmentView,
-  AllocationKey,
-  SandboxUID,
-} from '@dsh/environment-connector-internal'
+import {
+  refSchema,
+  type AgentEnvironmentRuntime,
+  type EnvironmentContext,
+  type EnvironmentView,
+  type AllocationKey,
+  type SandboxUID,
+} from '../environment-contract.ts'
 import {
   EnvironmentBindingStore,
   sameRef,
@@ -91,6 +91,7 @@ export function createEnvironmentControl(
     active.add(id)
     try {
       ctx.signal.throwIfAborted()
+      const intent = { allocationKey: record.allocationKey, owner: record.owner }
       let view: EnvironmentView | null
       if (record.phase === 'reserved') {
         if (operation !== 'enter')
@@ -101,8 +102,8 @@ export function createEnvironmentControl(
           }
         record = { ...record, phase: 'submitted' }
         store.save(record, ctx.correlationId) // durable before any runtime write
-        view = await runtime.create(record, ctx)
-      } else view = await runtime.inspectAllocation(record, record.ref, ctx)
+        view = await runtime.create(intent, ctx)
+      } else view = await runtime.inspectAllocation(intent, record.ref, ctx)
       if (!view) {
         withdraw(id)
         // A missing unknown create is not authority to replay or replace its allocation.

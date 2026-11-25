@@ -2,7 +2,7 @@ import {
   EnvironmentError,
   type EnvironmentFailure,
   type AllocationKey,
-} from '@dsh/environment-connector-internal'
+} from '../environment-contract.ts'
 /** Platform state errors are separate from the runtime's fixed error vocabulary. */
 export type PlatformErrorCode =
   | 'StateUnavailable' | 'Forbidden' | 'AccessRejected' | 'StaleInstance'
