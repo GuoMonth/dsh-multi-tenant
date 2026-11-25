@@ -1,0 +1,195 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { resolve } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { z } from 'zod'
+import { readJson } from '../../scripts/json.ts'
+import { chart, sources, verifyAssets, documents, render, inspect, rejectFixture, deploymentSchema } from '../../charts/install.ts'
+const fixture = new URL('./fixture.values.json', import.meta.url)
+const fixturePath = fileURLToPath(fixture)
+const values = z.looseObject({
+  members: z.array(z.looseObject({})), oidc: z.looseObject({}),
+}).parse(readJson(fixture))
+const namespace = 'dsh-install-fixture'
+const output = render(fixturePath, namespace)
+const objects = documents(output)
+void test('Helm lint passes for explicitly nondeployable fixture', () => {
+  const result = spawnSync('helm', ['lint', chart, '--values', fixturePath, '--strict'], {
+    encoding: 'utf8',
+  })
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.doesNotMatch(result.stderr, /Fail:/)
+})
+void test('fixed core and runtime assets retain exact approved bytes', () => {
+  verifyAssets()
+  const role = readFileSync(resolve(chart, 'files', sources.runtimeRole.file), 'utf8')
+  assert.doesNotMatch(role, /secrets|pods\/exec|\*|persistentvolumeclaims.*delete|namespaces.*delete/)
+  assert.match(role, /resources: \[pods\]\s+verbs: \[get, list, watch\]/)
+  assert.match(role, /resources: \[persistentvolumeclaims, serviceaccounts\]\s+verbs: \[get, create\]/)
+  assert.match(role, /resources: \[namespaces\]\s+verbs: \[get, create, patch\]/)
+  assert.match(role, /resources: \[nodes\]\s+verbs: \[get\]/)
+  assert.match(role, /resources: \[leases\]\s+verbs: \[get\]/)
+})
+void test('chart creates only platform resources, with no per-user control path', () => {
+  assert.deepEqual(objects.map(x => x.kind).sort(), ['ClusterRoleBinding', 'ConfigMap', 'Deployment', 'Ingress', 'PersistentVolumeClaim', 'Service', 'ServiceAccount'].sort())
+  assert.equal(objects.filter(x => x.kind === 'PersistentVolumeClaim').length, 1)
+  const claim = objects.find(x => x.kind === 'PersistentVolumeClaim')
+  assert.ok(claim)
+  assert.equal(claim.metadata.name, 'dsh-platform-state')
+  assert.equal(claim.metadata.annotations?.['helm.sh/resource-policy'], 'keep')
+  const binding = z.looseObject({ subjects: z.array(z.looseObject({ namespace: z.string() })) })
+    .parse(objects.find(resource => resource.kind === 'ClusterRoleBinding'))
+  assert.equal(binding.subjects[0]?.namespace, namespace)
+  const deployment = deploymentSchema.parse(objects.find(resource => resource.kind === 'Deployment'))
+  assert.equal(deployment.spec.replicas, 1)
+  assert.equal(deployment.spec.strategy.type, 'Recreate')
+  assert.equal(deployment.spec.template.metadata.labels['app.kubernetes.io/name'], 'dsh-platform')
+})
+void test('config matches C and runtime options, private identity stays in platform', () => {
+  const { config, pod, ingress, secret } = inspect(output)
+  assert.deepEqual(Object.keys(config).sort(), ['runtime', 'stateFile', 'adminSocket', 'oidc', 'members', 'host', 'port'].sort())
+  assert.equal(config.runtime.platformNamespace, namespace)
+  assert.equal(config.runtime.storage.size, '10Gi')
+  assert.equal(config.runtime.domain, 'env.dsh.example.invalid')
+  assert.deepEqual(config.runtime.resources, {
+    requests: {
+      cpu: '250m', memory: '512Mi',
+    }, limits: {
+      cpu: '2', memory: '2Gi',
+    },
+  })
+  assert.equal(config.oidc.clientSecretFile, '/private/platform/oidc-client-secret')
+  assert.equal(config.adminSocket, '/tmp/platform/admin.sock')
+  assert.equal(config.stateFile, '/state/platform/state.sqlite')
+  assert.equal(config.members.length, 2)
+  assert.equal(secret.secretName, 'dsh-oidc')
+  assert.equal(pod.automountServiceAccountToken, false)
+  assert.equal(pod.securityContext.runAsUser, 1000)
+  assert.equal(pod.containers[0]?.readinessProbe?.httpGet.path, '/healthz')
+  const command = pod.initContainers[0]?.command[2]
+  assert.ok(command)
+  assert.match(command, /0o600/)
+  assert.match(command, /0o700/)
+  assert.deepEqual(ingress.spec.rules.map(x => x.host), ['dsh.example.invalid', '*.env.dsh.example.invalid'])
+  assert.throws(() => { rejectFixture(inspect(output)) }, /Fixture/)
+})
+void test('fail early for missing prerequisites, floating digests and accidental legacy fields', () => {
+  const directory = mkdtempSync(resolve(tmpdir(), 'dsh-install-test-'))
+  try {
+    for (const changes of [
+      {
+        platformImage: 'example.invalid/platform:latest',
+      },
+      {
+        workloadImage: '',
+      }, {
+        domain: 'https://wrong.example',
+      }, {
+        tlsSecretName: '',
+      },
+      {
+        storageClassName: '',
+      }, {
+        storageSize: '0Gi',
+      }, {
+        members: [],
+      },
+      {
+        resources: {
+          requests: {
+            cpu: '250m', memory: null,
+          }, limits: {
+            cpu: '2', memory: '2Gi',
+          },
+        },
+      },
+      {
+        resources: {
+          requests: {
+            cpu: '1Gi', memory: '512Mi',
+          }, limits: {
+            cpu: '2', memory: '2Gi',
+          },
+        },
+      },
+      {
+        namespacePrefix: 'a'.repeat(25),
+      },
+      {
+        environments: [],
+      }, {
+        modelSecret: 'must-not-exist',
+      },
+      {
+        members: [{
+          ...values.members[0], issuer: 'https://wrong.example',
+        }],
+      },
+    ]) {
+      const file = resolve(directory, 'values.json')
+      writeFileSync(file, JSON.stringify({
+        ...values, ...changes,
+      }))
+      assert.throws(() => render(file, namespace), /helm template failed/, JSON.stringify(changes))
+    }
+    const missing = spawnSync('helm', ['template', 'dsh-platform', chart], {
+      encoding: 'utf8',
+    })
+    assert.notEqual(missing.status, 0)
+    assert.match(missing.stderr, /platformImage|workloadImage/)
+    const valid = resolve(directory, 'valid.json')
+    writeFileSync(valid, JSON.stringify({
+      ...values, namespacePrefix: 'a'.repeat(24), resources: {
+        requests: {
+          cpu: '0.5', memory: '512Mi',
+        }, limits: {
+          cpu: '2', memory: '2Gi',
+        },
+      },
+    }))
+    assert.equal(inspect(render(valid, namespace)).config.runtime.resources.requests.cpu, '0.5')
+  }
+  finally {
+    rmSync(directory, {
+      recursive: true, force: true,
+    })
+  }
+})
+void test('live installer refuses fixtures before reaching Kubernetes', () => {
+  const result = spawnSync(process.execPath, [resolve(chart, '..', 'install.ts'), 'install', '--values', fixturePath, '--namespace', namespace], {
+    encoding: 'utf8',
+  })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /Fixture domain\/image/)
+})
+void test('optional private issuer CA uses native Node trust and a read-only Secret', () => {
+  const directory = mkdtempSync(resolve(tmpdir(), 'dsh-install-ca-'))
+  try {
+    const file = resolve(directory, 'values.json')
+    writeFileSync(file, JSON.stringify({
+      ...values, oidc: {
+        ...values.oidc, caSecretName: 'issuer-ca', caSecretKey: 'issuer.pem',
+      },
+    }))
+    const { pod, config } = inspect(render(file, namespace))
+    assert.deepEqual(pod.containers[0]?.env, [{
+      name: 'NODE_EXTRA_CA_CERTS', value: '/oidc-ca/ca.crt',
+    }])
+    assert.deepEqual(pod.volumes.find(v => v.name === 'oidc-ca')?.secret, {
+      secretName: 'issuer-ca', defaultMode: 288, items: [{
+        key: 'issuer.pem', path: 'ca.crt',
+      }],
+    })
+    assert.equal(pod.containers[0]?.volumeMounts?.find(v => v.name === 'oidc-ca')?.readOnly, true)
+    assert.equal(config.oidc.caSecretName, undefined)
+    assert.equal(inspect(output).pod.volumes.some(v => v.name === 'oidc-ca'), false)
+  }
+  finally {
+    rmSync(directory, {
+      recursive: true, force: true,
+    })
+  }
+})

@@ -6,7 +6,7 @@ Platform npm and GitHub Release share a version and lightweight `vVERSION` tag. 
 
 Platform changes can be reviewed and merged against the environment adapter contract. The combined steps below apply to qualifying and publishing the reference deployment.
 
-1. Update the platform version, the DSH pin in [dsh-target.mjs](../../scripts/dsh-target.mjs) and [release notes](release-notes.md). Run `pnpm release:check`. The paired runtime must embed the same DSH version and source commit and pass `make verify` and `make verify-dsh`.
+1. Update the platform version, the DSH pin in [dsh-target.ts](../../scripts/dsh-target.ts) and [release notes](release-notes.md). Run `pnpm release:check`. The paired runtime must embed the same DSH version and source commit and pass `make verify` and `make verify-dsh`.
 2. Merge reviewed sources and run each repository's manual `prepare-release.yml` on main. The workflow re-runs the full `pnpm release:check` before packing and pushing the exact candidate; pull-request CI stays light and the local step 1 remains the primary acceptance record. Download the exact candidates: image digests/source metadata and the platform npm archive.
 3. Verify archive integrity and anonymous image pulls. Test installation, two-user access, real model/tool use, data retention and relevant failures on that exact combination. Save a redacted report.
 4. Publish the [runtime release](https://github.com/GuoMonth/dsh-isolated-runtime) at its accepted source commit and attach its manifest and validation report.
@@ -38,7 +38,7 @@ Technical qualification deliberately reports `releaseReady=false` until the real
 
 Before publication, assemble runtime-release.json, a redacted validation.md and checksums from the accepted combination. The report must identify both product source commits, exact platform/workload image digests, package SHA512 integrity, Connector source and qualification run, and distinguish passed, failed and untested requirements. Attach those exact reports and manifests to the runtime release, then publish the accepted platform archive through release.yml. Default RC publication uses npm next and preserves latest; this release explicitly selected npm latest.
 
-GitHub Actions uses Node 24/npm >=11.5.1, `id-token: write`, workflow `release.yml` and environment `npm-release`, matching the configured Trusted Publisher. Build-generated documentation links point to the source commit.
+GitHub Actions uses Node 24.22.3/npm >=11.5.1, `id-token: write`, workflow `release.yml` and environment `npm-release`, matching the configured Trusted Publisher. Build-generated documentation links point to the source commit.
 
 On partial success, rerun the same candidate. The script checks existing npm integrity before continuing. Published versions/tags remain immutable. Metadata visibility may lag publication; the script polls for up to 15 minutes. After a timeout, check registry visibility and resume the same workflow attempt.
 

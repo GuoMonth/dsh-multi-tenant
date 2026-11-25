@@ -7,7 +7,7 @@ Deploy platform 0.12.0-rc.2 with runtime 0.5.0-rc.3 and DSH 0.2.2-rc.3 (`38a6a5c
 ## Prepare
 
 - Linux/amd64 Kubernetes with an enforcing NetworkPolicy CNI, dynamic StorageClass and an Ingress controller. The tested reference used Kubernetes 1.37, Calico 3.32.2 and local-path.
-- Node 24+, Helm 3 and kubectl on the installation machine; explicit kubeconfig/context and permission to install cluster CRDs, controller and RBAC.
+- Node 24.22.3 or later in 24.x, or 26.13.1 or later, Helm 3 and kubectl on the installation machine; explicit kubeconfig/context and permission to install cluster CRDs, controller and RBAC.
 - One platform namespace, already created. Supply its TLS Secret (`tls.crt`, `tls.key`) and OIDC client-secret Secret. Put Secret names and keys in values, not secret contents.
 - Platform DNS and wildcard `*.env.<platform-domain>` DNS pointing to the same HTTPS ingress. Its certificate covers both. Ingress preserves Host, supports WebSocket and forwards to platform port 8080 after TLS termination. Disable or redirect public plaintext HTTP.
 - An HTTPS OIDC issuer and client with callback `https://<platform-domain>/auth/callback`. Map exact issuer/subject pairs to tenant/principal IDs in `members`.

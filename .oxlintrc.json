@@ -12,7 +12,10 @@
       "files": [
         "packages/*/src/**/*.ts",
         "packages/*/tests/**/*.ts",
-        "integration/**/*.ts"
+        "packages/*/*.ts",
+        "integration/**/*.ts",
+        "scripts/**/*.ts",
+        "charts/**/*.ts"
       ],
       "plugins": [
         "typescript"

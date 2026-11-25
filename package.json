@@ -4,31 +4,33 @@
   "type": "module",
   "packageManager": "pnpm@11.28.5",
   "engines": {
-    "node": "^24.11.0 || ^26.0.0"
+    "node": "^24.22.3 || >=26.13.1"
   },
   "scripts": {
-    "docs:check": "node scripts/check-docs.mjs && node --test scripts/check-docs.test.mjs scripts/package-docs.test.mjs",
+    "docs:check": "node scripts/check-docs.mjs && node --test scripts/check-docs.test.mjs scripts/package-docs.test.ts",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "test": "pnpm -r test",
-    "verify": "node scripts/check-standards.mjs && pnpm fmt:check && pnpm lint && pnpm test:tooling && pnpm docs:check && node --test scripts/release-policy.test.mjs scripts/publish-release.test.mjs scripts/verify-packages.test.mjs && node scripts/verify-packages.mjs && node integration/environment-contract/verify.mjs && pnpm security",
-    "security": "node --test scripts/audit-node.test.mjs && node scripts/audit-node.mjs",
-    "smoke": "node scripts/artifact-consumer-smoke.mjs",
-    "release:check": "pnpm verify && pnpm typecheck && pnpm test && pnpm build && pnpm smoke && node --test integration/installation/verify.test.mjs",
-    "fmt": "node scripts/format.mjs",
+    "verify": "node scripts/check-standards.ts && pnpm fmt:check && pnpm lint && pnpm test:tooling && pnpm docs:check && node --test scripts/release-policy.test.ts scripts/publish-release.test.ts scripts/verify-packages.test.ts && node scripts/verify-packages.ts && node integration/environment-contract/verify.ts && pnpm security",
+    "security": "node --test scripts/audit-node.test.ts && node scripts/audit-node.ts",
+    "smoke": "node scripts/artifact-consumer-smoke.ts",
+    "release:check": "pnpm verify && pnpm typecheck && pnpm test && pnpm build && pnpm smoke && node --test integration/installation/verify.test.ts",
+    "fmt": "node scripts/format.ts",
     "fmt:check": "oxlint --config .oxlintrc.format.json --deny-warnings",
-    "lint": "node scripts/lint.mjs",
+    "lint": "node scripts/lint.ts",
     "lint:raw": "oxlint --format json",
-    "test:tooling": "node --test scripts/lint.test.mjs"
+    "test:tooling": "node --test scripts/lint.test.ts integration/e2e/qualification.test.ts"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "22.20.1",
     "oxlint": "1.81.0",
     "oxlint-tsgolint": "7.0.2001",
+    "playwright": "1.58.2",
+    "tsdown": "0.22.2",
     "tsx": "4.23.13",
     "typescript": "6.0.3",
-    "tsdown": "0.22.2",
-    "vitest": "4.1.12"
+    "vitest": "4.1.12",
+    "zod": "4.6.7"
   }
 }

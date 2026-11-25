@@ -1,6 +1,6 @@
 # Local joint acceptance (English)
 
-These are explicit, destructive test-environment operations, not a second installer or product service. Run only as the dedicated cluster owner. They use actual Dex, Traefik, the installed platform and native DSH. The fixture IdP does not prove enterprise SSO compatibility. The model/tool probe uses explicit private credentials after authorization.
+These operations can destroy test resources. Run them only as the dedicated cluster owner after `pnpm install --frozen-lockfile`. The harness uses actual Dex, Traefik, the installed platform and native DSH. The fixture IdP provides test OIDC. The model/tool probe uses explicit private credentials after authorization.
 
 Start with [installation](../../docs/en/installation.md) ([简体中文](../../docs/zh-CN/installation.md)). The fixture helpers supply DNS/TLS/IdP/Ingress prerequisites for the dedicated test cluster. Release validation and product image identities are in [validation.md](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.11.0-rc.1/validation.md).
 
@@ -18,19 +18,19 @@ For a read-only local identity check of already downloaded candidates:
 QUALIFICATION_ROOT=/private/new-verification \
 CANDIDATE_ROOT=/private/downloaded-candidates \
 PLATFORM_RUN=123 RUNTIME_RUN=456 \
-node integration/e2e/qualify-release.mjs --verify-only
+node integration/e2e/qualify-release.ts --verify-only
 ```
 
-Prerequisites are the dedicated `kind-dsh-environment` cluster/container, an imported pinned platform/workload image and the pinned Dex/Traefik images below. Node 24, Helm, kubectl, Docker and Playwright 1.58.2 are required. If installing its browser, use `PLAYWRIGHT_SKIP_BROWSER_GC=1`. Record the exact product image digests for this test. Fixture images are Traefik 3.7.13 (`sha256:3429c14149401de2ac82fc72ddc6a92642332b90deb3012301ff211b9d2d0f18`) and Dex 2.45.1 (`sha256:f5f9fb373188b0f701b80edd68b3f4745ced69306c9d382999f11b7774335a98`).
+Prerequisites are the dedicated `kind-dsh-environment` cluster/container, an imported pinned platform/workload image and the pinned Dex/Traefik images below. Node 24.22.3 or later in 24.x, or 26.13.1 or later, Helm, kubectl, Docker and Playwright 1.58.2 are required. If installing its browser, use `PLAYWRIGHT_SKIP_BROWSER_GC=1`. Record the exact product image digests for this test. Fixture images are Traefik 3.7.13 (`sha256:3429c14149401de2ac82fc72ddc6a92642332b90deb3012301ff211b9d2d0f18`) and Dex 2.45.1 (`sha256:f5f9fb373188b0f701b80edd68b3f4745ced69306c9d382999f11b7774335a98`).
 
 Set private directories outside the repository (mode 0700): `E_PRIVATE`, `E_EVIDENCE`, and explicit `KUBECONFIG`. Private input consists of `ca.crt`, `tls.crt`, `tls.key`, `client-secret` and `users.json`; the latter holds two generated local identities `{name,email,password,hash,userID}`, with names alice/bob, IDs e-alice/e-bob and bcrypt password hashes. The local certificate covers `dsh-environment.test`, `*.env.dsh-environment.test` and `idp.dsh-environment.test`. Keep every credential file mode 0600. `E_EVIDENCE/images.json` contains the `platform`, `dex`, `traefik` sha256 manifest digests selected for this test. Do not rerun credential generation over an existing installation.
 
 `install-reference.sh` requires `E_LINUX_TOOLS`, a directory of verified executable Linux/amd64 `kubectl` and Helm 3 binaries. Host macOS binaries cannot be mounted into the Linux installer. Browser contexts explicitly bypass host proxies only for fixture domains, without changing host DNS, proxy or trust settings. ARM-hosted Docker can exercise the workload image, but a cross-architecture kind runtime that cannot enforce `RuntimeDefault` seccomp is unsuitable for full Kubernetes qualification.
 
 ```sh
-node integration/e2e/reference-infra.mjs
+node integration/e2e/reference-infra.ts
 # Wait for actual dex/traefik rollouts in dsh-mvp-e-system.
-E_NAMESPACE=dsh-mvp-e-platform-final node integration/e2e/prepare-install.mjs
+E_NAMESPACE=dsh-mvp-e-platform-final node integration/e2e/prepare-install.ts
 # prepare-install writes only private values/kubeconfig, test Secrets, and the
 # one local issuer DNS entry in this dedicated cluster. It saves original DNS once.
 export E_NAMESPACE=dsh-mvp-e-platform-final E_NODE_ADDRESS=192.168.64.2
@@ -38,10 +38,10 @@ export E_PLATFORM_IMAGE=ghcr.io/guomonth/dsh-multi-tenant@sha256:REPLACE_WITH_VE
 bash integration/e2e/install-reference.sh preflight
 bash integration/e2e/install-reference.sh install
 # PLAYWRIGHT_MODULE may point to an isolated installed playwright module.
-node integration/e2e/browser.cjs
-node integration/e2e/lifecycle.cjs
-node integration/e2e/revocation.cjs
-node integration/e2e/performance.cjs
+node integration/e2e/browser.ts
+node integration/e2e/lifecycle.ts
+node integration/e2e/revocation.ts
+node integration/e2e/performance.ts
 ```
 
 The wrapper uses the invoking UID to read private host files and per-container DNS, without changing host DNS/trust. The product remains UID1000. Set the actual kind node address when it differs. The host must access that bridge address. Browser contexts accept the local test certificate; installer and platform OIDC use strict Node TLS with the provided CA. This is not browser/public-PKI validation.
@@ -52,7 +52,7 @@ Scripts retain user volumes and do not tear down the cluster. Missing/replaced P
 
 ## Real model and authorized CLI
 
-`model-tool.cjs` uses Alice's `E_PRIVATE/release-alice-browser.json` after an actual OIDC login, the native model credential store and a GitHub CLI installed in her persistent HOME. Set the model key through the native `credentials/set` API from a private local file; never place it in source, command arguments or evidence. Import an explicitly authorized GitHub credential through `gh auth login --with-token` stdin; use only the two read-only user/repository API calls in the prompt. Do not copy platform or Kubernetes credentials.
+`model-tool.ts` uses Alice's `E_PRIVATE/release-alice-browser.json` after an actual OIDC login, the native model credential store and a GitHub CLI installed in her persistent HOME. Set the model key through the native `credentials/set` API from a private local file; never place it in source, command arguments or evidence. Import an explicitly authorized GitHub credential through `gh auth login --with-token` stdin; use only the two read-only user/repository API calls in the prompt. Do not copy platform or Kubernetes credentials.
 
 The probe asks actual DeepSeek to write/read `release-model-proof.txt`, calculate its hash, and invoke the authenticated CLI. It waits for a completed native session turn and saves a redacted summary under `E_EVIDENCE`; raw native frames stay in `E_PRIVATE`. Then stop/start and recreate the exact fixture Pod to verify that file, native session, model credential and CLI authorization remain usable. Check the other user's HOME lacks that CLI credential. Remove temporary test authorization after acceptance, without removing other user data.
 
