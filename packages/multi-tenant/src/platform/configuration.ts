@@ -1,5 +1,7 @@
 import { z } from 'zod'
-import { ownerSchema, runtimeOptionsSchema } from '@dsh/environment-connector-internal'
+import { ownerSchema } from '../environment-contract.ts'
+import type { OIDCOptions } from './oidc.ts'
+import type { Member } from './sessions.ts'
 
 const text = z.string().min(1)
 const member = z.strictObject({ issuer: text, subject: text, owner: ownerSchema })
@@ -11,8 +13,7 @@ const members = z.array(member).superRefine((values, ctx) => {
     keys.add(key)
   }
 })
-const configuration = z.strictObject({
-  runtime: runtimeOptionsSchema,
+export const platformConfiguration = z.strictObject({
   stateFile: text,
   adminSocket: text,
   oidc: z.strictObject({
@@ -27,9 +28,16 @@ const configuration = z.strictObject({
     if (entry.issuer !== value.oidc.issuer)
       ctx.addIssue({ code: 'custom', path: ['members', index, 'issuer'], message: 'Issuer must match configured issuer' })
 })
-export type Configuration = z.infer<typeof configuration>
-export function parseConfiguration(value: unknown): Configuration {
-  return configuration.parse(value)
+export interface PlatformConfiguration {
+  readonly stateFile: string
+  readonly adminSocket: string
+  readonly oidc: OIDCOptions & { readonly clientSecretFile?: string | undefined }
+  readonly members: readonly Member[]
+  readonly host: string
+  readonly port: number
+}
+export function parsePlatformConfiguration(value: unknown): PlatformConfiguration {
+  return platformConfiguration.parse(value)
 }
 /** Reload intentionally admits only membership; all other changes still require restart. */
 export function parseMembership(value: unknown, issuer: string) {

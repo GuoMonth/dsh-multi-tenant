@@ -1,5 +1,5 @@
 {
-  "dsh": {"version": "0.2.2-rc.3", "commit": "38a6a5c965aa99ab525161efb7cc5cf1fe62fced"},
+  "dsh": {"version": "0.2.2-rc.5", "commit": "9c2670d3bce5275e0d1610272958121af87787bb"},
   "core": {
     "url": "https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.3/core.yaml",
     "original": "agent-sandbox-v1.0.3.yaml",

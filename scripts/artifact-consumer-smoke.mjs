@@ -47,11 +47,12 @@ try {
     'typescript@6.0.3',
     '@types/node@22.20.1',
   ])
-  writeFileSync(join(dir, 'consumer.mts'), `import { type AgentEnvironmentRuntime, type EnvironmentRuntimeOptions, EnvironmentBindingStore, createEnvironmentControl } from 'dsh-multi-tenant';
+  writeFileSync(join(dir, 'consumer.mts'), `import { type AgentEnvironmentRuntime, type EnvironmentRuntimeOptions, EnvironmentBindingStore, createEnvironmentControl, createPlatformApplication, parsePlatformConfiguration } from 'dsh-multi-tenant';
 declare const runtime: AgentEnvironmentRuntime;
 declare const options: EnvironmentRuntimeOptions;
 const store = new EnvironmentBindingStore('/private/state.sqlite');
 createEnvironmentControl(runtime, store);
+createPlatformApplication(parsePlatformConfiguration({}), undefined, () => runtime);
 options.storage.size satisfies string;
 `)
   run(process.execPath, [
@@ -72,6 +73,8 @@ options.storage.size satisfies string;
     '-e',
     `import * as sdk from 'dsh-multi-tenant'; import assert from 'node:assert/strict'; assert.equal(sdk.DSH_RUNTIME_VERSION,${JSON.stringify(DSH_TARGET.version)}); assert.equal(typeof sdk.EnvironmentBindingStore,'function'); assert.ok(!('DockerRuntimeProvider' in sdk)); assert.ok(!('DomainRuntimeCoordinator' in sdk)); console.log(Object.keys(sdk).join(','));`,
   ])
+  assert.match(exports, /\bENVIRONMENT_CONTRACT_VERSION\b/)
+  assert.match(exports, /\bcreatePlatformApplication\b/)
   const cli = join(dir, 'node_modules/dsh-multi-tenant/dist/cli.mjs')
   assert.match(run(process.execPath, [cli, '--help']), /resume/)
   assert.match(run(process.execPath, [cli, '--version']), /^0\./)

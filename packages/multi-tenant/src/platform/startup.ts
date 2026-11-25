@@ -1,4 +1,3 @@
-import { parseEnvironmentRuntimeOptions } from '@dsh/environment-connector-internal'
 /** Fixed diagnostics only: dependency errors can contain URLs, tokens or file contents. */
 const actions = {
   configuration:
@@ -15,10 +14,6 @@ const actions = {
   listen: 'Check configured listen address and port availability',
 } as const
 export type StartupStage = keyof typeof actions
-
-export function validateEnvironmentConfiguration(runtime: unknown): void {
-  parseEnvironmentRuntimeOptions(runtime)
-}
 
 export function startupDiagnostic(stage: StartupStage, correlationId: string) {
   return {

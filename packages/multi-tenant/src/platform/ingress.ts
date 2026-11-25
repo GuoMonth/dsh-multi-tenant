@@ -11,7 +11,7 @@ import {
   type AgentEnvironmentRuntime,
   type EnvironmentRef,
   type EnvironmentOwner,
-} from '@dsh/environment-connector-internal'
+} from '../environment-contract.ts'
 
 export interface Environment {
   readonly id: EnvironmentId

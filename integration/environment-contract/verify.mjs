@@ -11,13 +11,44 @@ const archive = readFileSync(new URL('vendor/' + pin.artifact, root))
 assert.equal('sha512-' + createHash('sha512').update(archive).digest('base64'), pin.integrity)
 assert.equal(createHash('sha256').update(archive).digest('hex'), pin.sha256)
 const require = createRequire(new URL('packages/multi-tenant/package.json', root))
-execFileSync(process.execPath, ['--input-type=module', '-e', "import {environmentTemplate,EnvironmentError,createAgentEnvironmentRuntime} from '@dsh/environment-connector-internal';\nimport assert from 'node:assert/strict';\nconst template=environmentTemplate({image:`local/dsh@sha256:${'a'.repeat(64)}`,authority:'alice.example.test',dataClaim:'data',serviceAccount:'workload',resources:{requests:{cpu:'100m',memory:'256Mi'},limits:{cpu:'1',memory:'1Gi'}}});\nassert.equal(template.spec.volumes.filter(v=>v.persistentVolumeClaim).length,1);\nassert.equal(template.spec.automountServiceAccountToken,false);\nassert.equal(typeof EnvironmentError,'function');\nassert.equal(typeof createAgentEnvironmentRuntime,'function');\n"], {
+execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', `
+  import assert from 'node:assert/strict'
+  import { environmentTemplate } from '@dsh/environment-connector-internal'
+  import { EnvironmentError, identities } from './src/environment-contract.ts'
+  import { createKubernetesRuntime } from './src/platform/kubernetes.ts'
+  import { options } from '../../integration/environment-contract/consumer.ts'
+
+  const template = environmentTemplate({
+    image: options.image, authority: options.domain, dataClaim: 'data', serviceAccount: 'workload', resources: options.resources,
+  })
+  assert.equal(template.spec.volumes.filter(volume => volume.persistentVolumeClaim).length, 1)
+  assert.equal(template.spec.automountServiceAccountToken, false)
+
+  const runtime = createKubernetesRuntime(options, 'example.test')
+  const intent = { allocationKey: identities.allocationKey(''), owner: {
+    tenantId: identities.tenantId('tenant'), principalId: identities.principalId('member'),
+  } }
+  await assert.rejects(runtime.inspectAllocation(intent, undefined, {
+    correlationId: 'contract-check', signal: new AbortController().signal,
+  }), error => {
+    assert.ok(error instanceof EnvironmentError)
+    assert.equal(error.failure.code, 'InvalidConfiguration')
+    assert.equal(error.failure.effect, 'not-submitted')
+    return true
+  })
+`], {
   cwd: new URL('packages/multi-tenant/', root), stdio: 'inherit',
 })
-execFileSync(process.execPath, [require.resolve('typescript/bin/tsc'), '--noEmit', '--strict', '--skipLibCheck', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2024', fileURLToPath(new URL('consumer.ts', import.meta.url))], {
+execFileSync(process.execPath, [
+  require.resolve('typescript/bin/tsc'), '--noEmit', '--strict', '--skipLibCheck', '--allowImportingTsExtensions',
+  '--types', 'node', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2024',
+  fileURLToPath(new URL('consumer.ts', import.meta.url)),
+], {
   stdio: 'inherit',
 })
 const removed = /ENVIRONMENT_TEMPLATE|dsh-rc2-single-pvc-v1/
+const packagePath = fileURLToPath(new URL('packages/multi-tenant/', root))
+const adapterPath = join(packagePath, 'src/platform/kubernetes.ts')
 const walk = (directory) => {
   for (const entry of readdirSync(directory, {
     withFileTypes: true,
@@ -27,10 +58,14 @@ const walk = (directory) => {
     const path = join(directory, entry.name)
     if (entry.isDirectory())
       walk(path)
-    else if (/\.(?:mjs|cjs|ts|js)$/.test(entry.name) && removed.test(readFileSync(path, 'utf8')))
-      throw new Error('Import environmentTemplate only: ' + path)
+    else if (/\.(?:mjs|cjs|ts|js)$/.test(entry.name)) {
+      const source = readFileSync(path, 'utf8')
+      assert.ok(!removed.test(source), 'Import environmentTemplate only: ' + path)
+      if (path.startsWith(packagePath) && path !== adapterPath)
+        assert.ok(!source.includes('@dsh/environment-connector-internal'), 'Connector import outside the reference adapter: ' + path)
+    }
   }
 }
-for (const dir of ['packages/multi-tenant/src', 'integration'])
+for (const dir of ['packages/multi-tenant/src', 'packages/multi-tenant/tests', 'integration'])
   walk(fileURLToPath(new URL(dir, root)))
-console.log('Exact connector tarball integrity, environmentTemplate import, single-PVC template and consumer typecheck passed')
+console.log('Standalone platform contract, exact Connector integrity and reference workload template verified')

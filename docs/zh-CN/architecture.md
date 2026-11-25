@@ -11,7 +11,13 @@
 | Agent Sandbox core | 唯一的 Pod/Service 控制器 |
 | DeepSeek Harness | 原生界面、对话、模型、工具和应用协议 |
 
-平台完成授权后调用已打包的 Connector。runtime 核对精确资源并转发原生流量，DSH 在各用户 Pod 中运行。Kubernetes 调谐 Sandbox；runtime 通过同进程调用工作，不另外部署服务或后台控制器。
+平台完成授权后调用环境适配器。CLI 启动入口装配随包交付的 Kubernetes Connector 作为参考实现。它核对精确资源并转发原生流量。DSH 在各用户 Pod 中运行，Kubernetes 调谐 Sandbox。
+
+## 环境适配器契约
+
+公开 TypeScript API 导出 `AgentEnvironmentRuntime` 和 `ENVIRONMENT_CONTRACT_VERSION`。独立装配平台时，使用 `parsePlatformConfiguration` 解析配置，再调用 `createPlatformApplication(config, secret, createRuntime)` 注入适配器工厂。CLI 额外校验 Kubernetes 专用的 `runtime` 配置。DSH 版本针标识联合验收使用的参考部署。
+
+第 1 版契约覆盖分配、查询、启动、停止、删除和连接处理。分配与精确 owner、底层资源身份和修订绑定。已知资源缺失时视为绑定失效。写入结果未知时，重试前必须观测原分配。停止要求证明原写入进程已终止，删除保留原数据卷。连接信号覆盖 HTTP 流和 WebSocket 的完整生命周期，撤权会关闭已建立的连接。`namespace`、`sandbox` 和 `data` 字段保留既有绑定格式。
 
 ## 身份与存储
 

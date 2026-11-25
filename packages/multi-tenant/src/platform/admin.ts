@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { PendingWork, closeServer, settleCleanup, listenServer } from './work.ts'
 import { environmentId } from './identity.ts'
-import { identities } from '@dsh/environment-connector-internal'
+import { identities } from '../environment-contract.ts'
 import { diagnostic } from './errors.ts'
 import { createServer, type ServerResponse } from 'node:http'
 import { chmod, lstat } from 'node:fs/promises'

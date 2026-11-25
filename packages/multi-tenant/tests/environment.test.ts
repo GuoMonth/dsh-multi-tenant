@@ -1,4 +1,3 @@
-import { identities, parseEnvironmentOwner } from '@dsh/environment-connector-internal'
 import { environmentId } from '../src/platform/identity.ts'
 import { test, expect, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -7,6 +6,8 @@ import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   EnvironmentError,
+  identities,
+  parseEnvironmentOwner,
   type AgentEnvironmentRuntime,
   type EnvironmentView,
   type EnvironmentIntent,
@@ -136,14 +137,20 @@ async function api(
   return { status, body }
 }
 test('one stable reservation per owner, persistence and exact binding across restart', async () => {
-  const f = fixture()
+  const create = vi.fn(async (intent: EnvironmentIntent) => view(intent))
+  const inspectAllocation = vi.fn(async (intent: EnvironmentIntent) => view(intent))
+  const f = fixture({ create, inspectAllocation })
   expect(f.store.reserve(owner)).toEqual(f.record)
   expect(f.store.reserve({ ...owner, principalId: identities.principalId('bob') }).id).not.toBe(
     f.record.id,
   )
   await api(f)
   const bound = f.store.get(f.record.id)!
+  const intent = { allocationKey: f.record.allocationKey, owner }
+  expect(create).toHaveBeenCalledWith(intent, expect.anything())
   expect(bound.ref?.data.uid).toBe('pvc-uid')
+  await api(f, 'GET')
+  expect(inspectAllocation).toHaveBeenCalledWith(intent, bound.ref, expect.anything())
   expect(f.reopen().get(f.record.id)).toEqual(bound)
 })
 test('concurrent first entry submits create once', async () => {

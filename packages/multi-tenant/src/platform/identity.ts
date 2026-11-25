@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
-import type { EnvironmentOwner, Identity } from '@dsh/environment-connector-internal'
+import type { EnvironmentOwner, Identity } from '../environment-contract.ts'
 
 export type EnvironmentId = Identity<'EnvironmentId'>
 export const environmentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/u)

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { startupDiagnostic, type StartupStage } from './startup.ts'
-import { parseConfiguration } from './configuration.ts'
+import { createKubernetesRuntime, parseKubernetesConfiguration } from './kubernetes.ts'
 import { createPlatformApplication } from './application.ts'
 
 let startupStage: StartupStage = 'configuration'
@@ -9,7 +9,7 @@ async function main() {
   const filename = process.argv[2]
   if (!filename) throw new Error('Configuration required')
   const parsed: unknown = JSON.parse(await readFile(filename, 'utf8'))
-  const config = parseConfiguration(parsed)
+  const { runtime, ...config } = parseKubernetesConfiguration(parsed)
   startupStage = 'secret'
   let secret: string | undefined
   if (config.oidc.clientSecretFile) {
@@ -18,7 +18,7 @@ async function main() {
     secret = (await readFile(config.oidc.clientSecretFile, 'utf8')).trim()
     if (!secret) throw new Error('Empty client secret')
   }
-  const app = createPlatformApplication(config, secret)
+  const app = createPlatformApplication(config, secret, () => createKubernetesRuntime(runtime, config.oidc.siteDomain))
   const status = { stopping: false }
   const detach = () => {
     process.off('SIGTERM', stop)

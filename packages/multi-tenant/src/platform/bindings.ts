@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { identities, intentSchema, refSchema, type AllocationKey,
   type EnvironmentOwner,
   type EnvironmentRef,
-} from '@dsh/environment-connector-internal'
+} from '../environment-contract.ts'
 import { PlatformError } from './errors.ts'
 import { z } from 'zod'
 import { environmentIdSchema, ownerEnvironmentId, type EnvironmentId } from './identity.ts'

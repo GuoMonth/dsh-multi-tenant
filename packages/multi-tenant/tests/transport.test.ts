@@ -1,13 +1,14 @@
-import { identities, parseEnvironmentOwner } from '@dsh/environment-connector-internal'
 import { environmentId } from '../src/platform/identity.ts'
 import { test, expect } from 'vitest'
 import { get, type IncomingMessage } from 'node:http'
 import { once } from 'node:events'
 import { WebSocket, WebSocketServer } from 'ws'
 import type { AddressInfo } from 'node:net'
-import type {
-  AgentEnvironmentRuntime,
-  EnvironmentRef,
+import {
+  identities,
+  parseEnvironmentOwner,
+  type AgentEnvironmentRuntime,
+  type EnvironmentRef,
 } from '../src/environment-contract.ts'
 import { createPlatformIngress } from '../src/platform/ingress.ts'
 import { Sessions } from '../src/platform/sessions.ts'
