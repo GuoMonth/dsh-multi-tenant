@@ -35,9 +35,9 @@ function view(
     ref: {
       allocationKey: intent.allocationKey,
       owner: intent.owner,
-      namespace: identities.namespace('ns'),
-      sandbox: { name: 'env', uid: identities.sandboxUID('sandbox-uid') },
-      data: { name: 'data', uid: identities.pvcUID('pvc-uid') },
+      instanceId: identities.instanceId('worker-a'),
+      storageId: identities.storageId('disk-a'),
+      locator: 'worker-path-a',
     },
     revision: identities.revision('r1'),
     state,
@@ -148,7 +148,7 @@ test('one stable reservation per owner, persistence and exact binding across res
   const bound = f.store.get(f.record.id)!
   const intent = { allocationKey: f.record.allocationKey, owner }
   expect(create).toHaveBeenCalledWith(intent, expect.anything())
-  expect(bound.ref?.data.uid).toBe('pvc-uid')
+  expect(bound.ref?.storageId).toBe('disk-a')
   await api(f, 'GET')
   expect(inspectAllocation).toHaveBeenCalledWith(intent, bound.ref, expect.anything())
   expect(f.reopen().get(f.record.id)).toEqual(bound)
@@ -207,7 +207,7 @@ test('cross-owner API rejects before runtime, including mutations', async () => 
   expect(f.runtime.create).not.toHaveBeenCalled()
   expect(f.runtime.start).not.toHaveBeenCalled()
 })
-test.each(['owner', 'sandbox', 'data'] as const)(
+test.each(['owner', 'instanceId', 'storageId', 'locator'] as const)(
   'mismatched %s identity withdraws routing',
   async (field) => {
     const f = fixture()
@@ -215,11 +215,11 @@ test.each(['owner', 'sandbox', 'data'] as const)(
     const wrong = structuredClone(view(f.record))
     if (field === 'owner')
       (wrong.ref.owner as { principalId: string }).principalId = 'mallory'
-    else (wrong.ref[field] as { uid: string }).uid = 'replaced'
+    else Object.assign(wrong.ref, { [field]: 'replaced' })
     f.runtime.inspectAllocation = vi.fn(async () => wrong)
     expect((await api(f, 'GET')).status).toBe(409)
     expect(f.control.environments.size).toBe(0)
-    expect(f.store.get(f.record.id)?.ref?.data.uid).toBe('pvc-uid')
+    expect(f.store.get(f.record.id)?.ref?.storageId).toBe('disk-a')
   },
 )
 test('stop revokes before runtime mutation, persists unknown barrier and requires positive stopped proof', async () => {
@@ -241,7 +241,7 @@ test('stop revokes before runtime mutation, persists unknown barrier and require
   const start = vi.spyOn(f.runtime, 'start')
   expect((await api(f, 'POST', '/start')).status).toBe(200)
   expect(start).toHaveBeenCalledWith(
-    expect.objectContaining({ data: { name: 'data', uid: identities.pvcUID('pvc-uid') } }),
+    expect.objectContaining({ storageId: identities.storageId('disk-a') }),
     'r1',
     expect.anything(),
   )
@@ -266,13 +266,13 @@ test('delete checks local identity, requires Stopped and never automatically rec
   await api(f)
   const expected = {
     allocationKey: f.record.allocationKey,
-    identity: identities.sandboxUID('sandbox-uid'),
+    identity: identities.instanceId('worker-a'),
   }
   await expect(
     f.control.administer(
       f.record.id,
       'delete',
-      { ...expected, identity: identities.sandboxUID('wrong') },
+      { ...expected, identity: identities.instanceId('wrong') },
       ctx(),
     ),
   ).rejects.toThrow('StaleInstance')
@@ -335,7 +335,7 @@ test('deleted-resource inspect preserves StaleInstance and durable deletion barr
   await f.control.administer(
     f.record.id,
     'delete',
-    { allocationKey: f.record.allocationKey, identity: identities.sandboxUID('sandbox-uid') },
+    { allocationKey: f.record.allocationKey, identity: identities.instanceId('worker-a') },
     ctx(),
   )
   f.runtime.inspectAllocation = vi.fn(async () => {
@@ -381,7 +381,7 @@ test('invalid deletion retention proof preserves the durable deletion barrier', 
     return result
   })
   await expect(f.control.administer(f.record.id, 'delete', {
-    allocationKey: f.record.allocationKey, identity: identities.sandboxUID('sandbox-uid'),
+    allocationKey: f.record.allocationKey, identity: identities.instanceId('worker-a'),
   }, ctx())).rejects.toThrow()
   expect(f.store.get(f.record.id)?.phase).toBe('delete-requested')
   expect(f.control.environments.size).toBe(0)

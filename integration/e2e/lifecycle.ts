@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import type { BrowserContext, Page } from 'playwright'
 import { z } from 'zod'
+import { toConnector } from '../../charts/kubernetes-reference.ts'
 import { parseJson, requiredEnv } from '../../scripts/json.ts'
 import { launchBrowser, platformResult, readBrowserRecords, rpc, submitPlatformForm, waitNative } from './browser-support.ts'
 
@@ -83,6 +84,7 @@ const follow = (page: Page, sessionId: string) => page.evaluate(sessionId => new
 async function main(): Promise<void> {
   const [aliceRecord, bobRecord] = records
   assert.ok(aliceRecord && bobRecord, 'Two browser fixture users are required')
+  const aliceLocation = toConnector(aliceRecord.instance.ref)
   const browser = await launchBrowser()
   const negative: Partial<Record<IsolationCheck, boolean>> = {}
   const result = {
@@ -92,6 +94,7 @@ async function main(): Promise<void> {
   try {
     const contexts: { context: BrowserContext; page: Page }[] = []
     for (const r of records) {
+      const location = toConnector(r.instance.ref)
       const context = await browser.newContext({
           ignoreHTTPSErrors: true, storageState: root + '/' + r.name + '-browser.json',
           proxy: { server: 'http://127.0.0.1:9', bypass: 'dsh-environment.test,*.dsh-environment.test' },
@@ -111,14 +114,14 @@ async function main(): Promise<void> {
       })
       const { sessionId } = session.parse(await rpc(page, 'session/create', { request: {} }))
       await follow(page, sessionId)
-      const podList = pods.parse(parseJson(k(['get', 'pods', '-n', r.instance.ref.namespace, '-o', 'json']))).items
-      const claimList = claims.parse(parseJson(k(['get', 'pvc', '-n', r.instance.ref.namespace, '-o', 'json']))).items
+      const podList = pods.parse(parseJson(k(['get', 'pods', '-n', location.namespace, '-o', 'json']))).items
+      const claimList = claims.parse(parseJson(k(['get', 'pvc', '-n', location.namespace, '-o', 'json']))).items
       const [pod] = podList
       const [dataClaim] = claimList
       assert.ok(podList.length === 1 && pod && claimList.length === 1 && dataClaim)
-      assert.equal(dataClaim.metadata.uid, r.instance.ref.data.uid)
+      assert.equal(dataClaim.metadata.uid, r.instance.ref.storageId)
       const path = '/var/lib/dsh/data/workspace/e-' + r.name + '.txt', marker = 'persistent-' + r.name
-      k(['exec', '-n', r.instance.ref.namespace, pod.metadata.name, '--', 'node', '-e', `require('node:fs').writeFileSync(${JSON.stringify(path)},${JSON.stringify(marker)})`])
+      k(['exec', '-n', location.namespace, pod.metadata.name, '--', 'node', '-e', `require('node:fs').writeFileSync(${JSON.stringify(path)},${JSON.stringify(marker)})`])
       const record = {
         name: r.name, sessionId, pvcUid: dataClaim.metadata.uid, oldPodUid: pod.metadata.uid, nativeHttp: true, nativeWebsocketSnapshot: true, modelSettings: true, fileSeed: 'administrator exec (not model/tool evidence)', resources: pod.spec.containers[0]?.resources,
       }
@@ -172,7 +175,7 @@ async function main(): Promise<void> {
       const description = settings.parse(await rpc(page, 'settings/describe', {}))
       const provider = description.namespaces.find(entry => entry.ns === 'llm-deepseek')
       assert.equal(z.object({ baseURL: text }).parse(provider?.user).baseURL, 'https://api.deepseek.com/anthropic')
-      const namespace = aliceRecord.instance.ref.namespace
+      const namespace = aliceLocation.namespace
       const [pod] = pods.parse(parseJson(k(['get', 'pods', '-n', namespace, '-o', 'json']))).items
       assert.ok(pod)
       assert.equal(k(['exec', '-n', namespace, pod.metadata.name, '--', 'cat', '/var/lib/dsh/data/workspace/e-alice.txt']), 'persistent-alice')
@@ -182,11 +185,11 @@ async function main(): Promise<void> {
     const before = await retained(portal)
     aliceEvidence.stopStartRetained = true
     save()
-    k(['delete', 'pod', before.metadata.name, '-n', aliceRecord.instance.ref.namespace, '--wait=false'])
+    k(['delete', 'pod', before.metadata.name, '-n', aliceLocation.namespace, '--wait=false'])
     let replacement
     for (let i = 0; i < 90; i++) {
       await portal.waitForTimeout(1000)
-      replacement = pods.parse(parseJson(k(['get', 'pods', '-n', aliceRecord.instance.ref.namespace, '-o', 'json']))).items.find(p => p.metadata.uid !== before.metadata.uid && p.status.conditions?.some(c => c.type === 'Ready' && c.status === 'True'))
+      replacement = pods.parse(parseJson(k(['get', 'pods', '-n', aliceLocation.namespace, '-o', 'json']))).items.find(p => p.metadata.uid !== before.metadata.uid && p.status.conditions?.some(c => c.type === 'Ready' && c.status === 'True'))
       if (replacement)
         break
     }

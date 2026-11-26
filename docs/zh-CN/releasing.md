@@ -19,7 +19,7 @@
 
 ## 验证不可变候选
 
-runtime 的 Go 二进制或原生 SDK 闭包变化时，需要新的 GHCR 工作负载镜像；平台捆绑的 SDK/Connector 变化时，需要新的 npm 包。已退役的 runtime npm 安装器不在本次发布路径内。
+runtime 的 Go 二进制或原生 SDK 闭包变化时，需要新的 GHCR 工作负载镜像；准备流程在 Kubernetes 参考镜像中单独安装精确 Connector。平台 npm 归档提供适配器 API 和入口。已退役的 runtime npm 安装器不在本次发布路径内。
 
 先合并发布准备改动，再冻结最终产品源码。记录两个成功的 main 准备任务 ID、源码提交、镜像摘要、npm integrity 和 Connector 来源。发布器要求平台准备源码与发布工作流源码完全一致；验收后 main 前进，就需要重新准备平台候选并联合验收。未变化的 runtime 候选可以保留，但必须使用其独立且已核验的来源身份。
 

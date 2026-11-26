@@ -9,7 +9,7 @@ import { parseMembership, type PlatformConfiguration } from './configuration.ts'
 import type { StartupStage } from './startup.ts'
 
 const defaults = {
-  openStore: (path: string) => new EnvironmentBindingStore(path),
+  openStore: (path: string, migrate?: AgentEnvironmentRuntime['migrateLegacyReference']) => new EnvironmentBindingStore(path, migrate),
   createEnvironmentControl,
   createOIDCAuthentication,
   createPlatformIngress,
@@ -37,7 +37,7 @@ export function createPlatformApplication(
     lifecycle.signal.throwIfAborted()
     const runtime = createRuntime()
     stage = 'state'
-    store = dependencies.openStore(config.stateFile)
+    store = dependencies.openStore(config.stateFile, runtime.migrateLegacyReference?.bind(runtime))
     const control = dependencies.createEnvironmentControl(runtime, store)
     stage = 'oidc'
     authentication = await dependencies.createOIDCAuthentication(

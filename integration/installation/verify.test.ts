@@ -51,10 +51,10 @@ void test('chart creates only platform resources, with no per-user control path'
 void test('config matches C and runtime options, private identity stays in platform', () => {
   const { config, pod, ingress, secret } = inspect(output)
   assert.deepEqual(Object.keys(config).sort(), ['runtime', 'stateFile', 'adminSocket', 'oidc', 'members', 'host', 'port'].sort())
-  assert.equal(config.runtime.platformNamespace, namespace)
-  assert.equal(config.runtime.storage.size, '10Gi')
-  assert.equal(config.runtime.domain, 'env.dsh.example.invalid')
-  assert.deepEqual(config.runtime.resources, {
+  assert.equal(config.runtime.options.platformNamespace, namespace)
+  assert.equal(config.runtime.options.storage.size, '10Gi')
+  assert.equal(config.runtime.options.domain, 'env.dsh.example.invalid')
+  assert.deepEqual(config.runtime.options.resources, {
     requests: {
       cpu: '250m', memory: '512Mi',
     }, limits: {
@@ -150,7 +150,7 @@ void test('fail early for missing prerequisites, floating digests and accidental
         },
       },
     }))
-    assert.equal(inspect(render(valid, namespace)).config.runtime.resources.requests.cpu, '0.5')
+    assert.equal(inspect(render(valid, namespace)).config.runtime.options.resources.requests.cpu, '0.5')
   }
   finally {
     rmSync(directory, {

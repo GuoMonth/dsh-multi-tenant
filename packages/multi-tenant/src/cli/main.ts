@@ -7,17 +7,17 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 
-const help = `dsh-multi-tenant — OIDC + Kubernetes environment
+const help = `dsh-multi-tenant — OIDC and environment access
   render --values FILE --namespace NAME
   preflight | install --values FILE --namespace NAME --kubeconfig FILE --context NAME
   start --config /absolute/private/config.json
   inspect --socket /absolute/private/admin.sock --environment ID
-  stop | resume --socket /absolute/private/admin.sock --environment ID --allocation-key KEY --identity UID
-  delete --socket /absolute/private/admin.sock --environment ID --allocation-key KEY --identity UID
+  stop | resume --socket /absolute/private/admin.sock --environment ID --allocation-key KEY --identity INSTANCE_ID
+  delete --socket /absolute/private/admin.sock --environment ID --allocation-key KEY --identity INSTANCE_ID
   --version | --help
 
-Requires Node 24.22.3 or later in 24.x, or 26.13.1 or later, a configured cluster and upstream agent-sandbox core.
-Run inside the cluster (or with API and Pod-IP reachability). No cluster is created.
+Requires Node 24.22.3 or later in 24.x, or 26.13.1 or later. Start loads the adapter selected in the configuration.
+Render, preflight and install use the recommended Kubernetes deployment with upstream Agent Sandbox core.
 SIGINT/SIGTERM stop the platform, retaining environments and data. SIGHUP reloads membership.
 Delete targets an exact allocation/UID; acceptance is not proof that its writer stopped.
 `

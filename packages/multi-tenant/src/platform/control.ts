@@ -7,7 +7,7 @@ import {
   type EnvironmentContext,
   type EnvironmentView,
   type AllocationKey,
-  type SandboxUID,
+  type EnvironmentInstanceId,
 } from '../environment-contract.ts'
 import {
   EnvironmentBindingStore,
@@ -38,16 +38,12 @@ export function createEnvironmentControl(
     view: EnvironmentView,
     ctx: EnvironmentContext,
   ) {
-    const ref = view.ref
+    const { success, data: ref } = refSchema.safeParse(view.ref)
     if (
+      !success ||
       ref.allocationKey !== record.allocationKey ||
       ref.owner.tenantId !== record.owner.tenantId ||
       ref.owner.principalId !== record.owner.principalId ||
-      !ref.namespace ||
-      !ref.sandbox.name ||
-      !ref.sandbox.uid ||
-      !ref.data.name ||
-      !ref.data.uid ||
       !view.revision ||
       (record.ref && !sameRef(record.ref, ref))
     ) {
@@ -55,10 +51,10 @@ export function createEnvironmentControl(
       throw new PlatformError(
         'StaleInstance',
         ctx.correlationId,
-        'Inspect the original owner, Sandbox and PVC identity',
+        'Inspect the original owner, instance and storage identity',
       )
     }
-    return view
+    return { ...view, ref }
   }
   function publish(record: EnvironmentBinding, view: EnvironmentView) {
     if (view.state === 'Ready' && record.phase === 'bound' && !record.pending) {
@@ -146,7 +142,7 @@ export function createEnvironmentControl(
           throw new PlatformError(
             'StartRejected',
             ctx.correlationId,
-            'Start requires positively Stopped with the original PVC',
+            'Start requires positively Stopped with the original storage',
           )
         if (operation === 'delete' && view.state !== 'Stopped')
           throw new PlatformError(
@@ -223,7 +219,7 @@ export function createEnvironmentControl(
     async administer(
       id: EnvironmentId,
       operation: Operation,
-      expected: { allocationKey: AllocationKey; identity: SandboxUID } | undefined,
+      expected: { allocationKey: AllocationKey; identity: EnvironmentInstanceId } | undefined,
       ctx: EnvironmentContext,
     ) {
       const r = store.get(id)
@@ -233,12 +229,12 @@ export function createEnvironmentControl(
         (!r?.ref ||
           !expected ||
           expected.allocationKey !== r.allocationKey ||
-          expected.identity !== r.ref.sandbox.uid)
+          expected.identity !== r.ref.instanceId)
       )
         throw new PlatformError(
           'StaleInstance',
           ctx.correlationId,
-          'Supply the persisted allocation key and Sandbox UID',
+          'Supply the persisted allocation key and instance identity',
         )
       return operate(id, operation, ctx)
     },

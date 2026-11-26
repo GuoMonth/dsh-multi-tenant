@@ -16,9 +16,8 @@ const owner = parseEnvironmentOwner({ tenantId: 't', principalId: identities.pri
 const ref: EnvironmentRef = {
   owner,
   allocationKey: identities.allocationKey('k'),
-  namespace: identities.namespace('ns'),
-  sandbox: { name: 'env', uid: identities.sandboxUID('s') },
-  data: { name: 'data', uid: identities.pvcUID('d') },
+  instanceId: identities.instanceId('instance'),
+  storageId: identities.storageId('storage'),
 }
 test('real HTTP stream and WebSocket close when membership revokes authority', async () => {
   const member = { issuer: 'https://issuer.example', subject: 'alice', owner }

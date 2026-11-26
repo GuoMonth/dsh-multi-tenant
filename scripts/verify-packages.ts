@@ -45,35 +45,27 @@ export function assertDshPin(root = process.cwd()): PlatformPin {
   return { ...pkg, version, dshRuntime: pin }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const pkg = assertDshPin()
+function verifyReferenceConnector() {
   const pin = record(readJson('vendor/environment-connector.json'), 'Connector provenance')
   const artifact = string(pin.artifact, 'Connector archive')
+  const archive = readFileSync('vendor/' + artifact)
+  assert.equal(createHash('sha256').update(archive).digest('hex'), pin.sha256)
+  assert.equal('sha512-' + createHash('sha512').update(archive).digest('base64'), pin.integrity)
+  const source = record(parseJson(execFileSync('tar', ['-xOf', 'vendor/' + artifact, 'package/source.json'], { encoding: 'utf8' })), 'Connector source')
+  assert.equal(source.repository, pin.repository)
+  assert.equal(source.commit, pin.commit)
+  assert.ok(!readdirSync('vendor').some(name => name.includes('cell')))
+  console.log('Kubernetes reference Connector archive and source verified')
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  assert.ok(process.argv.length === 2 || (process.argv.length === 3 && process.argv[2] === '--reference'))
+  if (process.argv[2] === '--reference') verifyReferenceConnector()
+  const pkg = assertDshPin()
   assert.equal(record(pkg['publishConfig'], 'npm publish config').tag, releasePolicy(pkg.version).channel)
   assert.deepEqual(Object.keys(record(pkg['exports'], 'package exports')), ['.'])
   assert.deepEqual(pkg['bin'], { 'dsh-multi-tenant': 'dist/cli.mjs' })
-  const archive = readFileSync('vendor/' + artifact)
-  assert.equal(createHash('sha256').update(archive).digest('hex'), pin.sha256)
-  assert.equal(
-    'sha512-' + createHash('sha512').update(archive).digest('base64'),
-    pin.integrity,
-  )
-  const source = record(parseJson(
-    execFileSync(
-      'tar',
-      ['-xOf', 'vendor/' + artifact, 'package/source.json'],
-      { encoding: 'utf8' },
-    ),
-  ), 'Connector source')
-  assert.equal(source.repository, pin.repository)
-  assert.equal(source.commit, pin.commit)
-  assert.equal(
-    record(pkg['devDependencies'], 'package development dependencies')['@dsh/environment-connector-internal'],
-    'file:../../vendor/' + artifact,
-  )
+  assert.doesNotMatch(JSON.stringify(pkg), /@dsh\/environment-connector-internal|vendor\//)
   assert.ok(readFileSync('docs/en/release-notes.md', 'utf8').startsWith(`# ${pkg.version}\n`))
-  assert.ok(!readdirSync('vendor').some(n => n.includes('cell')))
-  console.log(
-    'Exact DSH/connector pin, public exports and release-note version verified',
-  )
+  console.log('DSH reference pin, standalone package and public exports verified')
 }

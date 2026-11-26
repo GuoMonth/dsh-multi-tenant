@@ -18,13 +18,13 @@ OIDC 登录后使用 Enter/create、Inspect、Open、Stop 和 Start。平台重�
 
 ## 管理员命令
 
-先查询，再使用返回的环境 ID、分配键（allocation key）和 Sandbox UID 修改环境。Helm 部署中，在平台 Pod 内执行命令，私有 socket 路径为 `/tmp/platform/admin.sock`。
+先查询，再使用返回的环境 ID、分配键（allocation key）和 `instanceId` 修改环境。Helm 部署中，在平台 Pod 内执行命令，私有 socket 路径为 `/tmp/platform/admin.sock`。
 
 ```sh
 dsh-multi-tenant inspect --socket /tmp/platform/admin.sock --environment env-ID
-dsh-multi-tenant stop --socket /tmp/platform/admin.sock --environment env-ID --allocation-key KEY --identity SANDBOX_UID
-dsh-multi-tenant resume --socket /tmp/platform/admin.sock --environment env-ID --allocation-key KEY --identity SANDBOX_UID
-dsh-multi-tenant delete --socket /tmp/platform/admin.sock --environment env-ID --allocation-key KEY --identity SANDBOX_UID
+dsh-multi-tenant stop --socket /tmp/platform/admin.sock --environment env-ID --allocation-key KEY --identity INSTANCE_ID
+dsh-multi-tenant resume --socket /tmp/platform/admin.sock --environment env-ID --allocation-key KEY --identity INSTANCE_ID
+dsh-multi-tenant delete --socket /tmp/platform/admin.sock --environment env-ID --allocation-key KEY --identity INSTANCE_ID
 ```
 
 `resume` 启动已停止的用户环境。删除后原分配仍被阻止重建，供管理员检查；删除操作不会创建替代环境。结果未知时检查原分配。卷缺失或替换、资源 UID 变化、停止未经确认，都需要排查后再写入。
@@ -33,13 +33,13 @@ dsh-multi-tenant delete --socket /tmp/platform/admin.sock --environment env-ID -
 
 修改平台 ConfigMap 中的 `members`，等待内容投射到 Pod，再向平台进程发送 SIGHUP。成员被移除或重新映射时，已有 HTTP/WebSocket 连接关闭；重载内容无效时撤销所有会话。其他配置变化需要重启。OIDC Secret 轮换后重启平台 Pod，刷新私有副本。`/healthz` 仅检查平台本地就绪状态。
 
-需要直接集成且能访问 Kubernetes API 与 Pod IP 时，可启动平台进程：
+使用部署选定的固定适配器启动平台进程。
 
 ```sh
 dsh-multi-tenant start --config /private/config.json
 ```
 
-使用[配置示例](../../integration/distribution/config.example.json)。顶层字段为 `runtime`、`stateFile`、`adminSocket`、`oidc`、`members`、`host`、`port`。Secret/token/CA 通过文件引用；状态和 socket 目录权限为 0700，文件为 0600。每个绑定存储只运行一个平台进程。
+用 `runtime.modulePath` 指定受信任的 ES 模块，用 `runtime.options` 向工厂传入配置。[Kubernetes 参考配置](../../integration/distribution/config.example.json)适用于参考镜像。已发布的 0.12.0-rc.2 使用原格式。继续使用其参考部署的绑定库时，将原 Kubernetes 配置放入 `runtime.options`，并为同一后端选用参考模块。SQLite 转换会保留原绑定和待确认操作。顶层字段为 `runtime`、`stateFile`、`adminSocket`、`oidc`、`members`、`host`、`port`。Secret/token/CA 通过文件引用；状态和 socket 目录权限为 0700，文件为 0600。每个绑定存储只运行一个平台进程。
 
 ## 排障
 

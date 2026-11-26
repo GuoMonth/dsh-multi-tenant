@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { chromium, type Browser, type Page, type Response } from 'playwright'
 import { z } from 'zod'
+import { refSchema } from '../../packages/multi-tenant/src/environment-contract.ts'
 import { isRecord, parseJson, readJson, requiredEnv } from '../../scripts/json.ts'
 
 declare global {
@@ -37,7 +38,7 @@ export async function launchBrowser(): Promise<Browser> {
 
 const text = z.string()
 const instance = z.looseObject({
-  state: text, ref: z.looseObject({ namespace: text, data: z.looseObject({ uid: text }) }),
+  state: text, ref: refSchema,
 })
 export const platformResult = z.looseObject({ id: text.optional(), instance: instance.optional() })
 const browserRecord = z.looseObject({ name: text, origin: text, id: text, instance, coldReadyMs: z.number(), nativeHttp: z.boolean() })

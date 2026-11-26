@@ -11,21 +11,19 @@
 | Agent Sandbox core | The sole Pod/Service controller |
 | DeepSeek Harness | Native UI, conversations, models, tools and application protocols |
 
-The platform calls an environment adapter after authorization. The CLI wires in the bundled Kubernetes Connector as the reference adapter. It verifies exact resources and forwards native traffic. DSH runs in each user's Pod, and Kubernetes reconciles the Sandbox.
+After authorization, the platform calls the single environment adapter selected at startup. The npm package accepts an administrator-provided module. The recommended Kubernetes reference image separately installs the Connector from [dsh-isolated-runtime](https://github.com/GuoMonth/dsh-isolated-runtime). Agent Sandbox reconciles Pods and Services.
 
 ## Environment adapter contract
 
-The public TypeScript API exports `AgentEnvironmentRuntime` and `ENVIRONMENT_CONTRACT_VERSION`. Use `parsePlatformConfiguration` and pass an adapter factory to `createPlatformApplication(config, secret, createRuntime)` to compose the platform independently. The CLI also validates its Kubernetes-specific `runtime` configuration. The DSH pin identifies the reference deployment for combined qualification.
+The TypeScript API exports `AgentEnvironmentRuntime`, `EnvironmentAdapterFactory` and `ENVIRONMENT_CONTRACT_VERSION`. Embedded deployments inject a factory into `createPlatformApplication(config, secret, createRuntime)`. The CLI accepts the absolute path `runtime.modulePath` to one trusted ES module. The module exports `contractVersion` and `createRuntime(options, { siteDomain })` and receives `runtime.options`. It runs with platform process privileges. See [direct startup](operations.md#membership-and-platform-restart).
 
-Contract version 1 covers allocation, inspection, start, stop, deletion and connection handling. An allocation is tied to its exact owner, backing resource identities and revision. A missing known resource is stale. An unknown write requires observing the original allocation before any retry. Stop requires proof that the exact writer terminated, and deletion retains the original data volume. The connection signal covers the lifetime of HTTP streams and WebSockets, so revocation closes established traffic. The `namespace`, `sandbox` and `data` fields preserve the existing binding format.
+Contract v2 covers allocation, inspection, access, start, stop and deletion. A binding stores the exact owner, allocation key, `instanceId`, `storageId` and optional adapter-owned `locator`. A revision guards updates. An unknown write requires inspection of the original allocation. Restart requires positive proof that the old writer stopped and uses the same storage identity. Deletion retains data. Revocation closes active HTTP streams and WebSockets.
 
 ## Identity and storage
 
-An OIDC `(issuer, subject)` maps to `(tenantId, principalId)`. The platform keeps one environment binding per owner, including its allocation key and Sandbox/PVC UIDs. Namespace names and labels do not grant user access.
+OIDC `(issuer, subject)` maps to `(tenantId, principalId)`. The platform stores one binding per owner. The adapter verifies the exact resource identities before access or mutation. The Kubernetes reference adapter represents Sandbox and PVC UIDs as instance and storage identities and checks the current Pod and endpoint for each connection. It can convert legacy v1 bindings in a SQLite transaction, preserving their exact resources and pending operations.
 
-One user PVC stores workspace, HOME and DSH_HOME. Platform state, OIDC secrets and Kubernetes credentials stay in the platform namespace. Workload service accounts have no cluster token. The fixed network policy admits platform traffic and excludes cluster/private/metadata destinations from public egress.
-
-Normal Pod recreation changes the Pod UID and retains the Sandbox/PVC identity. Runtime checks the current Pod and endpoints at connection time. Authorization revocation cancels existing HTTP/WebSocket connections. The [runtime repository](https://github.com/GuoMonth/dsh-isolated-runtime) links its contract for states, mutations and error handling.
+The Kubernetes reference uses one PVC per owner for workspace, HOME and DSH_HOME. Platform state, OIDC secrets and infrastructure credentials remain outside user environments. See the [runtime documentation](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/README.md).
 
 ## Sources and validation
 

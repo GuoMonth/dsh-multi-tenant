@@ -17,11 +17,17 @@ export async function verifyPlatformShutdown(cli: string, directory: string): Pr
   await once(server, 'listening')
   const address = server.address()
   assert.ok(address && typeof address !== 'string')
+  const adapter = join(directory, 'test-adapter.mjs')
+  writeFileSync(adapter, `import { ENVIRONMENT_CONTRACT_VERSION } from 'dsh-multi-tenant'
+export const contractVersion = ENVIRONMENT_CONTRACT_VERSION
+export function createRuntime(options, { siteDomain }) {
+  if (options.marker !== 'fixture' || siteDomain !== 'example.test') throw new Error('invalid fixture options')
+  const unavailable = () => { throw new Error('fixture runtime was called before OIDC startup') }
+  return { create: unavailable, inspectAllocation: unavailable, inspect: unavailable, connect: unavailable,
+    stop: unavailable, start: unavailable, delete: unavailable }
+}`)
   const config = {
-    runtime: { kubernetes: { server: 'https://cluster.test', caFile: '/unused/ca', tokenFile: '/unused/token' },
-      namespacePrefix: 'env', platformNamespace: 'platform', domain: 'env.example.test', image: `env@sha256:${'a'.repeat(64)}`,
-      storage: { storageClassName: 'standard', size: '1Gi' },
-      resources: { requests: { cpu: '100m', memory: '256Mi' }, limits: { cpu: '1', memory: '1Gi' } } },
+    runtime: { modulePath: adapter, options: { marker: 'fixture' } },
     oidc: { issuer: `https://localhost:${address.port}`, clientId: 'private-fixture-marker',
       platformOrigin: 'https://platform.example.test', siteDomain: 'example.test' },
     stateFile: join(directory, 'state.sqlite'), adminSocket: join(directory, 'admin.sock'),

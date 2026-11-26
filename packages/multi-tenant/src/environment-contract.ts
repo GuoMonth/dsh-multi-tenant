@@ -3,7 +3,7 @@ import type { Duplex } from 'node:stream'
 import { z } from 'zod'
 
 /** Version of the environment adapter contract, independent of the reference DSH pin. */
-export const ENVIRONMENT_CONTRACT_VERSION = 1
+export const ENVIRONMENT_CONTRACT_VERSION = 2
 
 /** Domain identities retain their exact wire strings and cannot be interchanged. */
 export type Identity<Tag extends string> = string & {
@@ -12,10 +12,8 @@ export type Identity<Tag extends string> = string & {
 export type TenantId = Identity<'TenantId'>
 export type PrincipalId = Identity<'PrincipalId'>
 export type AllocationKey = Identity<'AllocationKey'>
-export type EnvironmentNamespace = Identity<'EnvironmentNamespace'>
-export type SandboxUID = Identity<'SandboxUID'>
-export type PVCUID = Identity<'PVCUID'>
-export type PodUID = Identity<'PodUID'>
+export type EnvironmentInstanceId = Identity<'EnvironmentInstanceId'>
+export type EnvironmentStorageId = Identity<'EnvironmentStorageId'>
 export type ResourceVersion = Identity<'ResourceVersion'>
 
 /** Apply a role to an identity produced by a trusted generator or admitted by a parser. */
@@ -26,10 +24,8 @@ export const identities = {
   tenantId: (value: string) => identity('TenantId', value),
   principalId: (value: string) => identity('PrincipalId', value),
   allocationKey: (value: string) => identity('AllocationKey', value),
-  namespace: (value: string) => identity('EnvironmentNamespace', value),
-  sandboxUID: (value: string) => identity('SandboxUID', value),
-  pvcUID: (value: string) => identity('PVCUID', value),
-  podUID: (value: string) => identity('PodUID', value),
+  instanceId: (value: string) => identity('EnvironmentInstanceId', value),
+  storageId: (value: string) => identity('EnvironmentStorageId', value),
   revision: (value: string) => identity('ResourceVersion', value),
 }
 
@@ -42,17 +38,12 @@ export interface EnvironmentIntent {
   readonly allocationKey: AllocationKey
   readonly owner: EnvironmentOwner
 }
-/** Exact backing resource identities. Field names preserve the existing binding format. */
+/** Exact identities issued by the fixed deployment adapter. */
 export interface EnvironmentRef extends EnvironmentIntent {
-  readonly namespace: EnvironmentNamespace
-  readonly sandbox: {
-    readonly name: string
-    readonly uid: SandboxUID
-  }
-  readonly data: {
-    readonly name: string
-    readonly uid: PVCUID
-  }
+  readonly instanceId: EnvironmentInstanceId
+  readonly storageId: EnvironmentStorageId
+  /** Optional adapter-owned lookup data. Its exact value is part of the binding. */
+  readonly locator?: string | undefined
 }
 export interface EnvironmentContext {
   readonly signal: AbortSignal
@@ -84,6 +75,8 @@ export interface EnvironmentDeletion {
 }
 /** In-process contract for an authorized environment adapter. */
 export interface AgentEnvironmentRuntime {
+  /** Decode an existing v1 reference for this same deployment, without external writes. */
+  readonly migrateLegacyReference?: (value: unknown) => EnvironmentRef
   create(intent: EnvironmentIntent, context: EnvironmentContext): Promise<EnvironmentView>
   /** Return null for an unbound allocation with no observed instance. A missing known UID is StaleInstance. */
   inspectAllocation(
@@ -95,11 +88,14 @@ export interface AgentEnvironmentRuntime {
   connect(ref: EnvironmentRef, context: EnvironmentContext): Promise<EnvironmentConnection>
   /** Stop access first. Stopped requires positive termination proof for the exact writer. */
   stop(ref: EnvironmentRef, revision: ResourceVersion, context: EnvironmentContext): Promise<EnvironmentMutation>
-  /** Only a positively Stopped environment with the same PVC UID may start. */
+  /** Only a positively Stopped environment with the same storage identity may start. */
   start(ref: EnvironmentRef, revision: ResourceVersion, context: EnvironmentContext): Promise<EnvironmentMutation>
-  /** Delete runtime resources after verified stop and retain the original data volume. */
+  /** Delete runtime resources after verified stop and retain the original data. */
   delete(ref: EnvironmentRef, revision: ResourceVersion, context: EnvironmentContext): Promise<EnvironmentDeletion>
 }
+export type EnvironmentAdapterFactory = (
+  options: unknown, context: { readonly siteDomain: string },
+) => AgentEnvironmentRuntime | Promise<AgentEnvironmentRuntime>
 export type EnvironmentErrorCode =
   | 'InvalidConfiguration' | 'Forbidden' | 'OwnerMismatch' | 'IntentConflict' | 'StaleInstance'
   | 'StorageMismatch' | 'TemplateMismatch' | 'NotReady' | 'ReadUnavailable' | 'AllocationUnresolved'
@@ -118,8 +114,10 @@ export interface EnvironmentFailure {
 
 /** Supply a redacted diagnostic. The cause stays private. */
 export class EnvironmentError extends Error {
-  constructor(readonly failure: EnvironmentFailure, options?: ErrorOptions) {
+  readonly failure: EnvironmentFailure
+  constructor(failure: EnvironmentFailure, options?: ErrorOptions) {
     super(failure.code, options)
+    this.failure = failure
     this.name = 'EnvironmentError'
   }
   toJSON(): EnvironmentFailure {
@@ -140,9 +138,9 @@ export const intentSchema = z.strictObject({
 })
 export const refSchema = z.strictObject({
   ...intentSchema.shape,
-  namespace: opaque.transform(identities.namespace),
-  sandbox: z.strictObject({ name: opaque, uid: opaque.transform(identities.sandboxUID) }),
-  data: z.strictObject({ name: opaque, uid: opaque.transform(identities.pvcUID) }),
+  instanceId: opaque.transform(identities.instanceId),
+  storageId: opaque.transform(identities.storageId),
+  locator: z.string().min(1).max(8192).optional(),
 })
 export const parseEnvironmentOwner = (value: unknown): EnvironmentOwner => ownerSchema.parse(value)
 export const parseEnvironmentIntent = (value: unknown): EnvironmentIntent => intentSchema.parse(value)
