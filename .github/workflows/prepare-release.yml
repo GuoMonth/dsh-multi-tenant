@@ -54,9 +54,13 @@ jobs:
           set -euo pipefail
           mkdir -p candidate
           npm pack ./packages/multi-tenant --ignore-scripts --pack-destination candidate --json > candidate/pack.json
+          node scripts/verify-packages.ts --reference
+          connector="$(node -p 'require("./vendor/environment-connector.json").artifact')"
+          cp "vendor/$connector" candidate/
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           image="ghcr.io/guomonth/dsh-multi-tenant:source-${GITHUB_SHA}"
           docker buildx build --platform linux/amd64 --provenance=false --push --metadata-file candidate/image.json -f integration/distribution/Dockerfile -t "$image" candidate
+          unlink "candidate/$connector"
           node scripts/candidate-manifest.ts
           cd candidate
           sha256sum *.tgz candidate.json > SHA256SUMS

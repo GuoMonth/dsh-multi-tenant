@@ -3,14 +3,13 @@ export {
   ENVIRONMENT_CONTRACT_VERSION, EnvironmentError, identities, parseEnvironmentOwner, parseEnvironmentIntent, parseEnvironmentRef,
 } from './environment-contract.ts'
 export type {
-  TenantId, PrincipalId, AllocationKey, EnvironmentNamespace, SandboxUID, PVCUID, PodUID, ResourceVersion,
-  AgentEnvironmentRuntime, EnvironmentOwner, EnvironmentIntent, EnvironmentRef, EnvironmentContext,
+  TenantId, PrincipalId, AllocationKey, EnvironmentInstanceId, EnvironmentStorageId, ResourceVersion,
+  AgentEnvironmentRuntime, EnvironmentAdapterFactory, EnvironmentOwner, EnvironmentIntent, EnvironmentRef, EnvironmentContext,
   EnvironmentView, EnvironmentState, EnvironmentConnection, EnvironmentMutation, EnvironmentDeletion,
   EnvironmentErrorCode, EnvironmentFailure,
 } from './environment-contract.ts'
 export { createPlatformApplication } from './platform/application.ts'
 export { parsePlatformConfiguration, type PlatformConfiguration } from './platform/configuration.ts'
-export { parseEnvironmentRuntimeOptions, type EnvironmentRuntimeOptions } from './platform/kubernetes-options.ts'
 export { EnvironmentBindingStore } from './platform/bindings.ts'
 export type {
   EnvironmentBinding,

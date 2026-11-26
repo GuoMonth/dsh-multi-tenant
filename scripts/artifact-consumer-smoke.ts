@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync, readdirSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import assert from 'node:assert/strict'
@@ -53,13 +53,13 @@ try {
     'typescript@6.0.3',
     '@types/node@22.20.1',
   ])
-  writeFileSync(join(dir, 'consumer.mts'), `import { type AgentEnvironmentRuntime, type EnvironmentRuntimeOptions, EnvironmentBindingStore, createEnvironmentControl, createPlatformApplication, parsePlatformConfiguration } from 'dsh-multi-tenant';
+  writeFileSync(join(dir, 'consumer.mts'), `import { type AgentEnvironmentRuntime, type EnvironmentAdapterFactory, EnvironmentBindingStore, createEnvironmentControl, createPlatformApplication, parsePlatformConfiguration } from 'dsh-multi-tenant';
 declare const runtime: AgentEnvironmentRuntime;
-declare const options: EnvironmentRuntimeOptions;
+const createRuntime: EnvironmentAdapterFactory = () => runtime;
 const store = new EnvironmentBindingStore('/private/state.sqlite');
 createEnvironmentControl(runtime, store);
 createPlatformApplication(parsePlatformConfiguration({}), undefined, () => runtime);
-options.storage.size satisfies string;
+void createRuntime;
 `)
   run(process.execPath, [
     join(dir, 'node_modules/typescript/bin/tsc'),
@@ -74,6 +74,7 @@ options.storage.size satisfies string;
     'NodeNext',
     'consumer.mts',
   ])
+  assert.equal(existsSync(join(dir, 'node_modules/@dsh/environment-connector-internal')), false)
   const exports = run(process.execPath, [
     '--input-type=module',
     '-e',
@@ -94,7 +95,7 @@ options.storage.size satisfies string;
     return true
   })
   await verifyPlatformShutdown(cli, dir)
-  console.log('Clean installed tarball import, bundled dependencies, CLI and deleted-backend rejection passed: ' +
+  console.log('Installed tarball, standalone adapter loading and optional Kubernetes rendering passed: ' +
         exports.trim())
 }
 finally {

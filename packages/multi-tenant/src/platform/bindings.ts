@@ -24,11 +24,9 @@ export function sameRef(a: EnvironmentRef, b: EnvironmentRef) {
     a.allocationKey === b.allocationKey &&
     a.owner.tenantId === b.owner.tenantId &&
     a.owner.principalId === b.owner.principalId &&
-    a.namespace === b.namespace &&
-    a.sandbox.name === b.sandbox.name &&
-    a.sandbox.uid === b.sandbox.uid &&
-    a.data.name === b.data.name &&
-    a.data.uid === b.data.uid
+    a.instanceId === b.instanceId &&
+    a.storageId === b.storageId &&
+    a.locator === b.locator
   )
 }
 
@@ -39,6 +37,9 @@ const bindingSchema = z.strictObject({
   ref: refSchema.optional(),
   pending: z.enum(['stop', 'start']).optional(),
 })
+const legacyBindingSchema = bindingSchema.extend({ ref: z.unknown().optional() })
+type ReferenceMigration = (value: unknown) => EnvironmentRef
+
 function parseBinding(value: unknown, id: EnvironmentId): EnvironmentBinding {
   const record = bindingSchema.parse(value)
   if (record.id !== id || record.id !== ownerEnvironmentId(record.owner) ||
@@ -56,7 +57,7 @@ export class EnvironmentBindingStore {
   private readonly db: DatabaseSync
   private failure: PlatformError | undefined
   private closed = false
-  constructor(filename: string) {
+  constructor(filename: string, migrateLegacyReference?: ReferenceMigration) {
     try {
       const ownerUID = process.getuid?.()
       const parent = lstatSync(dirname(filename))
@@ -95,10 +96,13 @@ export class EnvironmentBindingStore {
           )
             throw new Error('Unsupported state')
           this.db.exec(
-            'CREATE TABLE bindings (id TEXT PRIMARY KEY, record TEXT NOT NULL); PRAGMA user_version=20;',
+            'CREATE TABLE bindings (id TEXT PRIMARY KEY, record TEXT NOT NULL); PRAGMA user_version=21;',
           )
-        } else if (version !== 20)
-          throw new Error('Unsupported state format; no legacy migration')
+        } else if (version === 20 && migrateLegacyReference) {
+          this.migrateBindings(migrateLegacyReference)
+          this.db.exec('PRAGMA user_version=21;')
+        } else if (version !== 21)
+          throw new Error('State requires its original adapter and a supported migration')
         this.db.exec('COMMIT')
       } catch (error) {
         this.db.close()
@@ -108,6 +112,18 @@ export class EnvironmentBindingStore {
       throw new PlatformError('StateUnavailable', randomUUID(),
         'Check private state permissions, exclusive ownership and current schema; do not erase existing allocations',
         {}, { stage: 'state', effect: 'not-submitted' }, { cause })
+    }
+  }
+
+  private migrateBindings(migrateReference: ReferenceMigration): void {
+    const update = this.db.prepare('UPDATE bindings SET record=? WHERE id=?')
+    for (const { id, record } of this.db.prepare('SELECT id, record FROM bindings').all()) {
+      if (typeof id !== 'string' || typeof record !== 'string') throw new Error('Invalid legacy binding row')
+      const value: unknown = JSON.parse(record)
+      const { ref, ...legacy } = legacyBindingSchema.parse(value)
+      const binding = ref === undefined ? legacy : { ...legacy, ref: migrateReference(ref) }
+      const migrated = parseBinding(binding, environmentIdSchema.parse(id))
+      update.run(JSON.stringify(migrated), id)
     }
   }
 

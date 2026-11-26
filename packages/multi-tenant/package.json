@@ -1,7 +1,7 @@
 {
   "name": "dsh-multi-tenant",
   "version": "0.12.0-rc.2",
-  "description": "Self-hosted multi-user DeepSeek Harness on Kubernetes with OIDC and persistent AI work environments",
+  "description": "Self-hosted multi-tenant DeepSeek Harness access with OIDC and a pluggable environment contract",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",
   "repository": {
@@ -51,7 +51,6 @@
     "node": "^24.22.3 || >=26.13.1"
   },
   "devDependencies": {
-    "@dsh/environment-connector-internal": "file:../../vendor/dsh-environment-connector-internal-0.0.0-rc.3-857472c.tgz",
     "@types/ws": "8.18.2",
     "openid-client": "6.9.0",
     "ws": "8.23.0",

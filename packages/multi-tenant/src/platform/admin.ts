@@ -70,7 +70,7 @@ export async function listenAdmin(
       identity = request.headers['x-instance-identity']
     const expected =
       typeof allocationKey === 'string' && typeof identity === 'string'
-        ? { allocationKey: identities.allocationKey(allocationKey), identity: identities.sandboxUID(identity) }
+        ? { allocationKey: identities.allocationKey(allocationKey), identity: identities.instanceId(identity) }
         : undefined
     void work.track(control
       .administer(

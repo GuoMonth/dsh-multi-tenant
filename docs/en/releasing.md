@@ -19,7 +19,7 @@ When the release owner authorizes this version as the default npm installation, 
 
 ## Qualify immutable candidates
 
-Runtime needs a new GHCR workload image when its Go binary or native SDK closure changes. The platform needs a new npm archive when its bundled SDK/Connector changes. The retired runtime npm installer is not part of this release path.
+Runtime needs a new GHCR workload image when its Go binary or native SDK closure changes. Preparation installs the exact Connector separately in the Kubernetes reference image. The platform npm archive carries the adapter API and entry point. The retired runtime npm installer is not part of this release path.
 
 Merge release preparation changes before freezing the final product sources. Record the two successful main preparation run IDs, source commits, image digests, npm integrity and Connector provenance. The publisher requires the platform preparation source to equal the publication workflow source; advancing main after acceptance requires a new platform candidate and joint acceptance. An unchanged runtime candidate may be retained with its own verified source identity.
 

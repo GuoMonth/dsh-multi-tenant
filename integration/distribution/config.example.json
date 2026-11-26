@@ -1,5 +1,7 @@
 {
   "runtime": {
+    "modulePath": "/app/node_modules/dsh-multi-tenant/dist/kubernetes-reference.mjs",
+    "options": {
     "kubernetes": {"server":"https://kubernetes.default.svc","caFile":"/var/run/secrets/kubernetes.io/serviceaccount/ca.crt","tokenFile":"/var/run/secrets/kubernetes.io/serviceaccount/token"},
     "namespacePrefix":"dsh-user",
     "domain":"environments.example.test",
@@ -7,6 +9,7 @@
     "storage":{"size":"10Gi","storageClassName":"local-path"},
     "resources":{"requests":{"cpu":"100m","memory":"512Mi"},"limits":{"cpu":"2","memory":"2Gi"}},
     "platformNamespace":"dsh-platform"
+    }
   },
   "stateFile":"/private/state.sqlite",
   "adminSocket":"/private/admin.sock",

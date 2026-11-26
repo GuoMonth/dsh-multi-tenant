@@ -1,10 +1,11 @@
 import { test, expect, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { get } from 'node:http'
-import { parseEnvironmentOwner, identities, type AgentEnvironmentRuntime, type EnvironmentConnection } from '../src/environment-contract.ts'
+import { parseEnvironmentRef, parseEnvironmentOwner, type AgentEnvironmentRuntime, type EnvironmentConnection } from '../src/environment-contract.ts'
+import { loadRuntime, startupConfiguration } from '../src/platform/runtime-adapter.ts'
 import { parsePlatformConfiguration, parseMembership } from '../src/platform/configuration.ts'
 import { EnvironmentBindingStore } from '../src/platform/bindings.ts'
 import { createPlatformApplication } from '../src/platform/application.ts'
@@ -58,8 +59,7 @@ test.each(['json', 'owner', 'phase', 'ref', 'pending', 'coercion', 'id'])(
       ...(kind === 'coercion' ? { allocationKey: 42 } : {}),
       ...(kind === 'id' ? { id: 'env-other' } : {}),
       ...(kind === 'ref' ? { phase: 'bound', ref: {
-        allocationKey: record.allocationKey, owner: { ...owner, tenantId: 'other' }, namespace: 'ns',
-        sandbox: { name: 'environment', uid: 'sb' }, data: { name: 'data', uid: 'pvc' },
+        allocationKey: record.allocationKey, owner: { ...owner, tenantId: 'other' }, instanceId: 'instance', storageId: 'storage',
       } } : {}),
     })
     db.prepare('UPDATE bindings SET record=? WHERE id=?').run(encoded, record.id)
@@ -80,8 +80,7 @@ test.each(['authentication', 'connect'] as const)('ingress close waits for actua
   const admitted = deferred<void>()
   const finished = deferred<void>()
   const session = { environmentId: environmentId('env'), owner, signal: new AbortController().signal }
-  const ref = { allocationKey: identities.allocationKey('key'), owner, namespace: identities.namespace('ns'),
-    sandbox: { name: 'environment', uid: identities.sandboxUID('sb') }, data: { name: 'data', uid: identities.pvcUID('pvc') } }
+  const ref = parseEnvironmentRef({ allocationKey: 'key', owner, instanceId: 'instance', storageId: 'storage' })
   const forward = vi.fn()
   const connection: EnvironmentConnection = { origin: 'https://env.test', forward, upgrade: vi.fn() }
   const app = createPlatformIngress({ ...runtime, async connect() {
@@ -205,5 +204,51 @@ test('partial startup and authentication cleanup failures still close ingress an
     await expect(app.close()).rejects.toMatchObject({ errors: [cleanupCause] })
     const reopened = new EnvironmentBindingStore(config.stateFile)
     reopened.close()
+  } finally { rmSync(directory, { recursive: true }) }
+})
+
+test('legacy references require the original adapter and preserve pending writes across migration', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'dsh-binding-migration-'))
+  const filename = join(directory, 'state.sqlite')
+  try {
+    const fresh = new EnvironmentBindingStore(filename)
+    const record = fresh.reserve(owner)
+    fresh.close()
+    const legacyRef = { allocationKey: record.allocationKey, owner, resource: 'old-exact-fixture' }
+    const old = { ...record, phase: 'bound', pending: 'stop', ref: legacyRef }
+    const db = new DatabaseSync(filename)
+    db.prepare('UPDATE bindings SET record=? WHERE id=?').run(JSON.stringify(old), record.id)
+    db.exec('PRAGMA user_version=20;')
+    db.close()
+
+    expect(() => new EnvironmentBindingStore(filename)).toThrow('StateUnavailable')
+    expect(() => new EnvironmentBindingStore(filename, () => { throw new Error('invalid legacy ref') })).toThrow('StateUnavailable')
+    const afterFailure = new DatabaseSync(filename)
+    try {
+      expect(afterFailure.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 })
+      expect(afterFailure.prepare('SELECT record FROM bindings').get()?.record).toBe(JSON.stringify(old))
+    } finally { afterFailure.close() }
+
+    const ref = parseEnvironmentRef({ allocationKey: record.allocationKey, owner, instanceId: 'worker', storageId: 'disk', locator: 'original' })
+    const migrated = new EnvironmentBindingStore(filename, (value) => {
+      expect(value).toEqual(legacyRef)
+      return ref
+    })
+    try { expect(migrated.get(record.id)).toEqual({ ...old, ref }) } finally { migrated.close() }
+    const reopened = new EnvironmentBindingStore(filename)
+    try { expect(reopened.get(record.id)).toEqual({ ...old, ref }) } finally { reopened.close() }
+  } finally { rmSync(directory, { recursive: true }) }
+})
+
+test('startup requires a fixed absolute module path and rejects incompatible adapter exports', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'dsh-module-'))
+  try {
+    expect(() => startupConfiguration.parse({ ...configValue, runtime: { modulePath: './adapter.mjs' } })).toThrow()
+    const wrongVersion = join(directory, 'wrong-version.mjs')
+    writeFileSync(wrongVersion, 'export const contractVersion = 1; export const createRuntime = () => { throw Error("called fixture") }')
+    await expect(loadRuntime({ modulePath: wrongVersion, options: undefined }, 'example.test')).rejects.toMatchObject({ name: 'ZodError' })
+    const missingMethods = join(directory, 'missing-methods.mjs')
+    writeFileSync(missingMethods, 'export const contractVersion = 2; export const createRuntime = () => ({})')
+    await expect(loadRuntime({ modulePath: missingMethods, options: undefined }, 'example.test')).rejects.toMatchObject({ name: 'ZodError' })
   } finally { rmSync(directory, { recursive: true }) }
 })

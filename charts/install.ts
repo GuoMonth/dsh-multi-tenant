@@ -9,7 +9,7 @@ import { lookup } from 'node:dns/promises'
 import assert from 'node:assert/strict'
 import { z } from 'zod'
 import { list, parseJson, readJson, record, string } from '../scripts/json.ts'
-import { runtimeOptionsSchema } from '../packages/multi-tenant/src/platform/kubernetes-options.ts'
+import { runtimeOptionsSchema } from './kubernetes-options.ts'
 
 const text = z.string()
 const strings = z.record(text, text)
@@ -34,7 +34,9 @@ const ingressSchema = z.looseObject({ spec: z.looseObject({
   ingressClassName: text, tls: z.array(z.looseObject({ secretName: text })), rules: z.array(z.looseObject({ host: text })),
 }) })
 const configuration = z.looseObject({
-  runtime: runtimeOptionsSchema, oidc: z.looseObject({ issuer: text, platformOrigin: text, siteDomain: text }),
+  runtime: z.strictObject({
+    modulePath: z.literal('/app/node_modules/dsh-multi-tenant/dist/kubernetes-reference.mjs'), options: runtimeOptionsSchema,
+  }), oidc: z.looseObject({ issuer: text, platformOrigin: text, siteDomain: text }),
   members: z.array(z.looseObject({ issuer: text, subject: text })),
 })
 
@@ -104,7 +106,7 @@ export function inspect(rendered: string) {
 export function rejectFixture({ config, pod }: ReturnType<typeof inspect>): void {
   const container = pod.containers[0]
   assert.ok(container, 'Platform container is required')
-  for (const value of [config.oidc.issuer, config.oidc.platformOrigin, config.runtime.image, container.image]) {
+  for (const value of [config.oidc.issuer, config.oidc.platformOrigin, config.runtime.options.image, container.image]) {
     if (value.includes('.invalid') || /@sha256:([a-f0-9])\1{63}$/.test(value))
       throw new Error('Fixture domain/image cannot be installed; supply real candidate values')
   }
@@ -149,7 +151,7 @@ export async function main(args: string[]): Promise<void> {
   const { config, pod, ingress, secret } = target
   // All checks precede any write. Only fixed, redacted diagnostics leave this process.
   get('namespace', namespace)
-  get('storageclass', config.runtime.storage.storageClassName)
+  get('storageclass', config.runtime.options.storage.storageClassName)
   get('ingressclass', ingress.spec.ingressClassName)
   const nodes = list(get('nodes').items, 'cluster nodes').map(node => z.looseObject({
     metadata: z.looseObject({ labels: strings }),

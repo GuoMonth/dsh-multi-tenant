@@ -37,4 +37,3 @@ export const runtimeOptionsSchema = z.strictObject({
   resources: z.strictObject({ requests: quantities, limits: quantities }),
   platformNamespace: text,
 })
-export const parseEnvironmentRuntimeOptions = (value: unknown): EnvironmentRuntimeOptions => runtimeOptionsSchema.parse(value)

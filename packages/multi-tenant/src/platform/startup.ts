@@ -1,11 +1,11 @@
 /** Fixed diagnostics only: dependency errors can contain URLs, tokens or file contents. */
 const actions = {
   configuration:
-    'Check the current configuration schema and environment template bindings',
+    'Check the platform configuration schema and the fixed adapter module path',
   secret:
     'Check OIDC client secret exists, is nonempty, readable and mode 0600',
   runtime:
-    'Check the fixed environment image, storage, resources, namespace prefix and domain against the runtime contract',
+    'Check the trusted adapter module, environment contract version and adapter options',
   state:
     'Check private SQLite permissions, exclusive ownership and current schema; check owner bindings; do not erase existing allocations',
   oidc: 'Check HTTPS issuer discovery, CA trust, client registration and membership mapping',

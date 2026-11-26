@@ -21,7 +21,7 @@ TypeScript 和 JavaScript 使用两空格、单引号、无语句末尾分号，
 
 `pnpm lint` 执行官方严格 TypeScript 规则，存量诊断的精确例外记录在 [lint-baseline.json](../../scripts/lint-baseline.json)。每条例外绑定文件、规则、所属语句和声明，以及出现次数；新增或迁移诊断都会失败。修复债务后运行 `pnpm lint --prune` 删除已解决的例外，该命令不能新增例外。PR CI 对照受信任的基线提交，拒绝扩大例外。本地 lint 前先获取 `origin/main`；`LINT_BASE_REF` 可以指定受信任的基线 SHA。`pnpm lint:raw` 展示包含存量债务的全部诊断。`pnpm test:tooling` 验证新增债务、变更归属、扩大例外和隐藏风格错误都会被拒绝。
 
-`pnpm verify` 检查源码规范、格式、lint、工具测试、文档、DSH/Connector 身份和环境契约。`scripts/dsh-target.ts` 是唯一 DSH 版本针；包的 `dshRuntime`、公开版本常量、Chart `appVersion`、来源清单和消费 smoke 断言必须一致。`pnpm release:check` 进一步执行类型检查、行为测试、构建、干净安装消费和安装检查。编辑时选择受影响的检查；包或发布变更在本地运行完整命令。
+`pnpm verify` 检查源码规范、格式、lint、工具测试、文档、参考 DSH 版本针和环境契约。`scripts/dsh-target.ts` 是唯一 DSH 版本针；包的 `dshRuntime`、公开版本常量、Chart `appVersion`、来源清单和消费 smoke 断言必须一致。`pnpm release:check` 进一步执行类型检查、行为测试、构建、干净安装消费和安装检查。编辑时选择受影响的检查；包或发布变更在本地运行完整命令。
 
 GitHub PR CI 在 Node 24.22.3 和 26.13.1 上执行验证、类型检查、测试及全新安装检查，并开启严格引擎校验。手动 `prepare-release.yml` 在构建候选前重跑 `pnpm release:check`。
 
@@ -29,7 +29,7 @@ GitHub PR CI 在 Node 24.22.3 和 26.13.1 上执行验证、类型检查、测�
 
 下一候选版的参考部署目标是官方 [DSH 0.2.2-rc.5](https://github.com/deepseek-ai/deepseek-harness/tree/9c2670d3bce5275e0d1610272958121af87787bb)。平台可独立评审和测试。参考部署验收使用同一 DSH 版本针构建的工作负载镜像。[安装指南](installation.md)说明已发布的组合。
 
-DSH 的 web profile 负责 UI、Session/设置存储、插件组合、worktree 和 Agent 能力。平台保留组织身份、访问撤权和 Kubernetes 环境绑定。优先使用受支持的 profile 与 patch，不另建平行应用。runtime 的[兼容取舍](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/compat/dsh/README.zh-CN.md)说明了已删除的私有 Node 参数和仍保留的 OIDC cookie、部署适配。全新安装和相同版本重启检查不等于旧数据迁移验收。
+DSH 的 web profile 负责 UI、Session/设置存储、插件组合、worktree 和 Agent 能力。平台保留组织身份、访问撤权和 环境绑定。优先使用受支持的 profile 与 patch，不另建平行应用。runtime 的[兼容取舍](https://github.com/GuoMonth/dsh-isolated-runtime/blob/main/compat/dsh/README.zh-CN.md)说明了已删除的私有 Node 参数和仍保留的 OIDC cookie、部署适配。全新安装和相同版本重启检查不等于旧数据迁移验收。
 
 owner、allocation、environment、资源 UID 和修订号使用不同类型。SDK 提供外部值的身份解析器，保留精确字符串及 owner 到 environment 的哈希。配置与持久化绑定经 schema 校验，涵盖 owner/ref 一致性和变更屏障。损坏绑定会阻断后续写入，直到检查私有状态；不会授权创建替代 allocation。Connector 的 Kubernetes 解析保留未知字段供模板拒绝。
 

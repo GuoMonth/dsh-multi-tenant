@@ -1,6 +1,6 @@
 # AI assistant guide
 
-This guide is in English; answer in the user's language. Install DSH multi-tenant through the platform package. Runtime is bundled and needs no separate service.
+This guide is in English; answer in the user's language. Use the platform package for OIDC and environment access. The Kubernetes reference image includes its recommended Connector. For direct startup from current source, configure the deployment’s trusted adapter module.
 
 1. Read the installation guide: [English](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/installation.md) or [简体中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/installation.md).
 2. Identify the package version, its release manifest, exact images, Kubernetes context and namespace. Ask for missing configuration. Follow existing user authorization.

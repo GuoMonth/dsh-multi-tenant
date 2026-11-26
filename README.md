@@ -2,7 +2,7 @@
 
 [简体中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/README.zh-CN.md)
 
-Self-hosted, multi-user [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) on Kubernetes. Members sign in with OpenID Connect (OIDC) and use the native DSH interface in their own persistent AI work environment.
+Self-hosted, multi-user [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Members sign in with OpenID Connect (OIDC) and use the native DSH interface in their own persistent AI work environment.
 
 **Release candidate:** Linux/amd64, one node and one platform replica, for trusted organization members and fresh installations. Published RC: platform **0.12.0-rc.2**, runtime **0.5.0-rc.3**, DSH **0.2.2-rc.3** (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). No compatibility guarantee; pin the exact versions and artifacts you deploy.
 
@@ -26,7 +26,7 @@ Each user has one persistent volume for files, conversations, configuration and 
 
 - [English guides](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/index.md) · [中文指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/index.md)
 - [Architecture](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/architecture.md) · [Contributing](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/CONTRIBUTING.md)
-- [Runtime repository](https://github.com/GuoMonth/dsh-isolated-runtime): workload image, resource identity and lifecycle. Its Connector is bundled into this platform; deployment starts here.
+- [Runtime repository](https://github.com/GuoMonth/dsh-isolated-runtime): workload image, resource identity and lifecycle. Recommended for the Kubernetes reference deployment. The current platform source accepts an administrator-selected adapter.
 - [Releases and validation](https://github.com/GuoMonth/dsh-multi-tenant/releases)
 
 MIT licensed.

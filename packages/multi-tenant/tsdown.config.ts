@@ -5,6 +5,7 @@ export default defineConfig([{
     cli: 'src/cli/main.ts',
     platform: 'src/platform/main.ts',
     admin: 'src/platform/admin-cli.ts',
+    'kubernetes-reference': '../../charts/kubernetes-reference.ts',
   },
   format: ['esm'],
   target: 'node24.22.3',
@@ -13,9 +14,9 @@ export default defineConfig([{
   clean: true,
   outDir: 'dist',
   deps: {
-    alwaysBundle: [/^@dsh\//, 'openid-client', 'oauth4webapi', 'jose', /^zod(?:\/|$)/],
+    alwaysBundle: ['openid-client', 'oauth4webapi', 'jose', /^zod(?:\/|$)/],
     // Validation stays internal: the installed-package type smoke rejects leaked schema dependencies.
-    dts: { alwaysBundle: [/^@dsh\//, 'openid-client', 'oauth4webapi', 'jose'], neverBundle: [/^zod(?:\/|$)/] },
+    dts: { alwaysBundle: ['openid-client', 'oauth4webapi', 'jose'], neverBundle: [/^zod(?:\/|$)/] },
   },
 }, {
   entry: { install: '../../charts/install.ts' },
