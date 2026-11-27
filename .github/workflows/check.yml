@@ -14,8 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Release-owner acceptance; audit-node enforces the 2026-12-02 expiry and exact advisory/version.
-      ACCEPT_PICOMATCH_GHSA: GHSA-fc5q-39xc-vjpf
       LINT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
     strategy:
       fail-fast: false

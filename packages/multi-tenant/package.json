@@ -1,6 +1,6 @@
 {
   "name": "dsh-multi-tenant",
-  "version": "0.12.0-rc.2",
+  "version": "0.12.0-rc.3",
   "description": "Self-hosted multi-tenant DeepSeek Harness access with OIDC and a pluggable environment contract",
   "author": "DeepSeek Harness community contributors",
   "license": "MIT",

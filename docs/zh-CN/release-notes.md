@@ -1,23 +1,13 @@
-# 0.12.0-rc.2
-
-新 Service 的空 EndpointSlice 可能返回 null 端点与端口集合；控制器发布可验证目标前保持 Pending，仍拒绝外部归属、畸形字段及非空错误端口。
-
-Kubernetes 原始列表解析现在根据已验证的类型化列表头补齐 Pod/EndpointSlice 条目类型，继续保留 owner/UID 校验、未知字段和分页不完整拒绝。
-
-已知安全问题：picomatch 4.0.7 仍受 GHSA-fc5q-39xc-vjpf 影响（重复 extglob 的 ReDoS）。发行负责人于 2026-11-18 接受该问题，期限截至 2026-12-02；风险未修复。验证材料保留原始扫描和接受范围。
-
-修复平台传入绑定记录时的环境创建与只读分配恢复：控制元数据不再混入严格资源引用，owner 与资源 UID 校验继续生效。
-
-SDK 依赖升级至 openid-client 6.9.0、ws 8.23.0、Zod 4.6.7，并更新 Connector 来源身份。配套 launcher 使用 Go 1.27.4，在公布进程结束前读完输出，并等待管理服务和代理清理完成。验证增加依赖安全扫描、原生 goroutine 泄漏检测和 goroutine 归属检查。
+# 0.12.0-rc.3
 
 [English](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/release-notes.md)
 
-**2026-11-18 发布**，npm `latest` 直接指向本版，GitHub 保持预发布。配套 runtime：**0.5.0-rc.3**；DSH：**0.2.2-rc.3**（`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`）。已发布的平台 **0.12.0-rc.1**、runtime **0.5.0-rc.2**、DSH **0.2.1-rc.5** 仍是历史版本。
+参考部署使用平台 **0.12.0-rc.3**、`dsh-isolated-runtime` **0.5.0-rc.4** 和 DSH **0.2.2-rc.5**。平台和 runtime 固定到同一个上游 DSH 提交。[DSH 源码](https://github.com/deepseek-ai/deepseek-harness/tree/9c2670d3bce5275e0d1610272958121af87787bb)
 
-- Kubernetes 用户环境，每用户一个持久 PVC，使用 DSH 0.2.2-rc.3。
-- 官方 DSH web profile 负责 UI、认证浏览器设置、Session 存储和插件组合；不再使用 settings client 补丁或私有 Node loader 参数。
-- OIDC 成员管理、原生 HTTP/WebSocket 访问、显式启停与撤权。
-- 支持 Linux/amd64、单节点、平台单副本、可信成员和全新安装，不提供原地升级。
-- 不做兼容性承诺：部署时固定 platform、runtime、DSH 和制品身份。
+- 平台负责 OIDC、授权和环境绑定。平台启动时通过 `runtime.modulePath` 加载一个受信任的 runtime 适配器，集成方也可通过嵌入 API 提供适配器工厂。
+- 环境契约 v2 使用适配器签发的精确实例和存储身份。绑定迁移保留所有者、分配键、原资源身份和待处理操作。
+- Kubernetes 参考镜像单独安装固定版本的 Connector，并推荐使用 `dsh-isolated-runtime`。源码部署迁移配置时，把 runtime 专属设置放到 `runtime.options`，通过 `runtime.modulePath` 选择适配器。
 
-使用从[安装](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/installation.md)开始。已附受测制品和验证报告：[发行版本](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.12.0-rc.2)、[验证报告](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.2/validation.md)。历史版本仍是 [0.12.0-rc.1](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.12.0-rc.1) 和[验证报告](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.1/validation.md)。更早版本保留在 [Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases)。
+参考验收范围为全新安装的 Linux/amd64 单节点和单平台副本。验收覆盖双用户 OIDC 和撤权、原生 HTTP 和 WebSocket、真实模型和授权工具，以及启停和 Pod 重建后的同卷数据保留。[发布流程](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/releasing.md)
+
+发布后用 `npm install --global dsh-multi-tenant@0.12.0-rc.3` 安装精确版本，并使用对应 GitHub Release 中的镜像摘要。[安装指南](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/installation.md)

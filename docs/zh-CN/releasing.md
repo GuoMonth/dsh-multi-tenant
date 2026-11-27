@@ -6,8 +6,8 @@
 
 平台改动可以按环境适配器契约独立评审和合并。下面的联合流程用于验收和发布参考部署。
 
-1. 更新平台版本、[dsh-target.ts](../../scripts/dsh-target.ts) 中的 DSH 针，以及[发行说明](release-notes.md)。运行 `pnpm release:check`。配套 runtime 必须嵌入相同的 DSH 版本和源码提交，并通过 `make verify` 和 `make verify-dsh`。
-2. 合并审核通过的源码，在两仓库 main 上运行手动 `prepare-release.yml`。流程在打包和推送精确候选前重跑完整的 `pnpm release:check`；PR CI 保持轻量，本地第 1 步仍是主要验收记录。下载精确候选：镜像 digest/源码信息及平台 npm 归档。
+1. 在包清单设置尚未发布的平台版本并更新发行说明。核对上游 DSH 的精确版本和源码提交，运行 `pnpm release:check`。配套 runtime 必须嵌入同一 DSH 版本和提交，并通过 `make verify` 和 `make verify-dsh`。[DSH 版本配置](../../scripts/dsh-target.ts) · [发行说明](release-notes.md)
+2. 合并审核通过的源码，在需要准备新候选的仓库 main 上运行手动 `prepare-release.yml`。平台工作流在打包 npm 归档和推送 GHCR 镜像前重跑 `pnpm release:check`。下载候选清单、镜像摘要和 npm 归档。沿用未变化的 runtime 候选时，使用已验证的源码提交和镜像摘要。
 3. 验证包完整性和匿名镜像拉取。用该组合验证安装、双用户访问、真实模型/工具、数据保留和相关失败场景，保存脱敏报告。
 4. 在受测源码提交上发布 [runtime 版本](https://github.com/GuoMonth/dsh-isolated-runtime)，附上清单与验证报告。
 5. 在已准备的平台提交上运行 `release.yml`，提供 `platform_run`、`runtime_run`、`package_integrity`、`workload_digest`、`runtime_tag` 输入。流程发布受测归档，核对 registry 字节，创建对应标签及附带归档、清单、校验和的 Release。流程核对并自动附带 runtime 的 validation.md。
@@ -36,12 +36,12 @@ gh workflow run prepare-release.yml --repo GuoMonth/dsh-multi-tenant --ref main 
 
 技术验收始终报告 `releaseReady=false`，直到真实模型与明确授权的 CLI 检查也具备证据。专用测试凭据通过私有文件或已批准的 Secret 存储提供，不放进源码、命令参数，也不借用平台控制凭据。模型回合后核实原生文件、会话和凭据保留，并确认另一个用户的域保持隔离。
 
-发布前按已接受组合准备 runtime-release.json、脱敏 validation.md 和校验和。报告必须标明两个产品源码提交、平台/工作负载镜像精确摘要、包的 SHA512 integrity、Connector 来源及验收任务，并区分已通过、失败和未测要求。将同一份报告及清单附到 runtime Release，再通过 release.yml 发布已验收的平台归档。默认 RC 发布使用 npm next 并保留 latest；本次发行已明确选择 npm latest。
+发布前按已接受组合准备 runtime-release.json、脱敏 validation.md 和校验和。报告必须标明两个产品源码提交、平台/工作负载镜像精确摘要、包的 SHA512 integrity、Connector 来源及验收任务，并区分已通过、失败和未测要求。将同一份报告及清单附到 runtime Release，再通过 release.yml 发布已验收的平台归档。
 
 GitHub Actions 使用 Node 24.22.3/npm >=11.5.1、`id-token: write`、`release.yml` 和 `npm-release` 环境，与配置的 Trusted Publisher 一致。构建生成的文档链接指向源码提交。
 
 部分成功后重跑同一候选；脚本会先检查已有 npm 包完整性。已发布版本和标签保持原样。元数据可能晚于发布可见，脚本最多轮询 15 分钟；超时后核对 registry 可见性，再继续同一流程。
 
-## 已接受的已知安全问题
+## 安全报告
 
-2026-11-18，发行负责人授权将 picomatch 4.0.7 的 GHSA-fc5q-39xc-vjpf 作为本次发行的已知问题；ReDoS 风险没有修复，接受期限截至 2026-12-02。两个准备工作流均设置 `accept_picomatch=true`。默认本地审计保持严格，CI 显式携带该项授权并强制检查期限；接受后的准备任务在 candidate/audit 中保留原始报告和非零风险评估，其他公告、版本变化、扫描错误和例外过期仍阻断。双方 Release 及验证报告必须披露该问题。
+使用严格的 Node 审计，将原始报告和评估随两边的候选制品保留。GitHub 已于 2026-11-18 撤回 Picomatch 公告。已发布的 0.12.0-rc.2 验证报告记录了该次发行获得授权的例外。[GitHub 公告](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) · [已发布版本的验证报告](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.2/validation.md)

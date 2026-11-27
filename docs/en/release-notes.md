@@ -1,23 +1,13 @@
-# 0.12.0-rc.2
-
-Kubernetes wire parsing now derives missing Pod/EndpointSlice item type metadata from a validated typed-list envelope, while retaining owner/UID checks, unknown fields and pagination rejection.
-
-New Services may expose empty EndpointSlices with null endpoint/port collections. They remain Pending until the controller publishes a verified target; foreign ownership and malformed or populated wrong ports remain rejected.
-
-Known security issue: picomatch 4.0.7 remains affected by GHSA-fc5q-39xc-vjpf (repeated-extglob ReDoS). The release owner accepted this issue on 2026-11-18 until 2026-12-02; it is not fixed. Raw scans and the accepted scope accompany validation.
-
-Fixed environment creation and read-only allocation recovery when the platform supplies a binding record: control metadata no longer contaminates strict resource references. Owner and resource UID checks remain enforced.
-
-SDK dependencies now use openid-client 6.9.0, ws 8.23.0 and Zod 4.6.7, with refreshed Connector provenance. The paired launcher uses Go 1.27.4, drains process output before completion and joins management/proxy cleanup. Verification includes dependency security scans and native/owner-based goroutine leak checks.
+# 0.12.0-rc.3
 
 [简体中文](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/release-notes.md)
 
-Published **2026-11-18** on npm `latest` as a GitHub prerelease. Paired runtime: **0.5.0-rc.3**; DSH: **0.2.2-rc.3** (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). Published platform **0.12.0-rc.1** with runtime **0.5.0-rc.2** and DSH **0.2.1-rc.5** remains the historical release.
+The reference deployment pairs platform **0.12.0-rc.3** with `dsh-isolated-runtime` **0.5.0-rc.4** and DSH **0.2.2-rc.5**. The platform and runtime use the same upstream DSH commit. [DSH source](https://github.com/deepseek-ai/deepseek-harness/tree/9c2670d3bce5275e0d1610272958121af87787bb)
 
-- Kubernetes environments with one persistent PVC per user, on DSH 0.2.2-rc.3.
-- Official DSH web profile owns UI, authenticated-browser settings, Session storage and plugin composition; no settings-client patch or private Node loader flag.
-- OIDC membership, native HTTP/WebSocket access, explicit stop/start and revocation.
-- Fresh Linux/amd64 installations, one node/platform replica and trusted members. No in-place upgrade.
-- No compatibility guarantee: pin the exact platform, runtime, DSH and artifact identities you deploy.
+- The platform owns OIDC, authorization and environment bindings. It loads one trusted runtime adapter at startup through `runtime.modulePath`, or accepts an adapter factory through its embedding API.
+- Environment contract v2 uses exact instance and storage identities issued by the adapter. The binding migration retains the owner, allocation key, original resource identities and pending operations.
+- The Kubernetes reference image installs the pinned Connector separately. It uses `dsh-isolated-runtime` as the recommended runtime. Source deployments migrating their configuration put runtime-specific settings under `runtime.options` and select the adapter through `runtime.modulePath`.
 
-Start with [installation](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/installation.md). The accepted artifacts and verification report are attached: [Release](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.12.0-rc.2) · [Validation](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.2/validation.md). The historical release remains [0.12.0-rc.1](https://github.com/GuoMonth/dsh-multi-tenant/releases/tag/v0.12.0-rc.1) · [Validation](https://github.com/GuoMonth/dsh-multi-tenant/releases/download/v0.12.0-rc.1/validation.md). Earlier versions remain in [Releases](https://github.com/GuoMonth/dsh-multi-tenant/releases).
+Reference acceptance covers fresh Linux/amd64 installations on a single node with one platform replica. It checks two-user OIDC and revocation, native HTTP and WebSocket access, real model and authorized tool use, and data retention on the same volume through stop/start and Pod recreation. [Release procedure](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/releasing.md)
+
+Once published, install the exact version with `npm install --global dsh-multi-tenant@0.12.0-rc.3` and use the image digests in its GitHub Release. [Installation guide](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/installation.md)
