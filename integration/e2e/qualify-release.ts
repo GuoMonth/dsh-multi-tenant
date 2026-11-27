@@ -89,9 +89,10 @@ assert.equal(process.platform, 'linux', 'Kubernetes qualification requires a nat
 assert.equal(process.arch, 'x64', 'Do not relax product seccomp or node architecture for emulation')
 const draft = resolve(privateRoot, 'evidence-draft')
 const kubeconfig = resolve(privateRoot, 'kubeconfig')
+const namespace = 'dsh-mvp-e-platform-final'
 mkdirSync(draft, { mode: 0o700 })
 Object.assign(env, {
-  E_PRIVATE: privateRoot, E_EVIDENCE: draft, E_CLUSTER: 'dsh-environment', E_NAMESPACE: 'dsh-mvp-e-platform-final',
+  E_PRIVATE: privateRoot, E_EVIDENCE: draft, E_CLUSTER: 'dsh-environment', E_NAMESPACE: namespace,
   KUBECONFIG: kubeconfig, E_PLATFORM_IMAGE: p.platformImage,
 })
 const checks: { name: string; status: 'passed' | 'failed' }[] = []
@@ -109,6 +110,26 @@ const execute = (name: string, command: string, args: readonly string[], options
   checks.push({ name, status: 'passed' })
   return output
 }
+const observeColdStart = (moment: 'before' | 'after') => {
+  stage = `platform-cold-start-${moment}-login`
+  const pods = z.object({ items: z.array(z.object({
+    metadata: z.object({ uid: z.string() }),
+    status: z.object({ containerStatuses: z.array(z.object({
+      name: z.string(), ready: z.boolean(), restartCount: z.number().int().nonnegative(),
+    })).optional() }).optional(),
+  })) }).parse(parseJson(run('kubectl', [
+    'get', 'pods', '-n', namespace, '-l', 'app.kubernetes.io/name=dsh-platform', '-o', 'json',
+  ])))
+  const observation = pods.items.map(pod => ({
+    uid: pod.metadata.uid, platform: pod.status?.containerStatuses?.find(container => container.name === 'platform'),
+  }))
+  write(`cold-start-${moment}-login.json`, observation)
+  const [pod] = observation
+  assert.ok(observation.length === 1 && pod?.platform?.ready, 'Expected one Ready platform container')
+  assert.equal(pod.platform.restartCount, 0, 'Platform restarted during the first-login qualification')
+  return pod.uid
+}
+
 try {
   const tools = z.record(z.string(), z.object({
     version: z.string(), url: z.string(), sha256: z.string(), archivePath: z.string().optional(),
@@ -188,7 +209,12 @@ try {
   // Node trust is scoped to the installer container; host DNS/trust stay untouched.
   execute('installed-cli-preflight', 'bash', ['integration/e2e/install-reference.sh', 'preflight'])
   execute('installed-cli-install', 'bash', ['integration/e2e/install-reference.sh', 'install'])
-  for (const name of ['browser', 'lifecycle', 'revocation', 'performance'])
+  const coldPod = observeColdStart('before')
+  checks.push({ name: stage, status: 'passed' })
+  execute('platform-browser', 'node', ['integration/e2e/browser.ts'])
+  assert.equal(observeColdStart('after'), coldPod, 'The platform Pod changed during first login')
+  checks.push({ name: stage, status: 'passed' })
+  for (const name of ['lifecycle', 'revocation', 'performance'])
     execute(`platform-${name}`, 'node', [`integration/e2e/${name}.ts`])
   execute('runtime-contracts', 'node', ['integration/e2e/runtime-probe.ts'])
   write('model-tool.json', { status: 'blocked', reason: 'Dedicated provider credential and external CLI authorization have not been supplied', paidCalls: 0 })

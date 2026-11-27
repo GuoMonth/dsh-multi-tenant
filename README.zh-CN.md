@@ -6,7 +6,7 @@
 
 **候选版（RC）：** Linux/amd64、单节点、平台单副本，面向可信组织成员，仅支持全新安装。已发布 RC 组合为平台 **0.12.0-rc.2**、runtime **0.5.0-rc.3**、DSH **0.2.2-rc.3**（`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`）。不做兼容性承诺，部署时固定精确版本和制品。
 
-当前源码准备平台 **0.12.0-rc.3**，推荐搭配 runtime **0.5.0-rc.4** 和 DSH **0.2.2-rc.5**。[候选版发行说明](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/release-notes.md)
+当前源码准备平台 **0.12.0**，推荐搭配 runtime **0.5.0** 和 DSH **0.2.2-rc.5**。[候选版发行说明](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/zh-CN/release-notes.md)
 
 ## 安装
 

@@ -76,7 +76,10 @@ const corefile = string(dnsData.Corefile, 'CoreDNS configuration')
 if (!corefile.includes('idp.dsh-environment.test')) {
   dnsData.Corefile = corefile.replace('    kubernetes ', `    hosts {\n        ${ip} idp.dsh-environment.test\n        fallthrough\n    }\n    kubernetes `)
   k(['replace', '-f', '-'], JSON.stringify(coredns))
+  // Start both DNS replicas with the fixture record before the platform's first issuer lookup.
+  k(['rollout', 'restart', 'deployment/coredns', '-n', 'kube-system'])
 }
+k(['rollout', 'status', 'deployment/coredns', '-n', 'kube-system', '--timeout=180s'])
 const node = dockerNodeAddress(execFileSync('docker', ['inspect', `${cluster}-control-plane`], {
   encoding: 'utf8',
 }))

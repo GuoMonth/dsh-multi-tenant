@@ -6,7 +6,7 @@ Self-hosted, multi-user [DeepSeek Harness](https://github.com/deepseek-ai/deepse
 
 **Release candidate:** Linux/amd64, one node and one platform replica, for trusted organization members and fresh installations. Published RC: platform **0.12.0-rc.2**, runtime **0.5.0-rc.3**, DSH **0.2.2-rc.3** (`38a6a5c965aa99ab525161efb7cc5cf1fe62fced`). No compatibility guarantee; pin the exact versions and artifacts you deploy.
 
-This source prepares platform **0.12.0-rc.3** with the recommended runtime **0.5.0-rc.4** and DSH **0.2.2-rc.5**. [Candidate release notes](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/release-notes.md)
+This source prepares platform **0.12.0** with the recommended runtime **0.5.0** and DSH **0.2.2-rc.5**. [Candidate release notes](https://github.com/GuoMonth/dsh-multi-tenant/blob/main/docs/en/release-notes.md)
 
 ## Install
 
