@@ -8,6 +8,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { DSH_TARGET } from '../../scripts/dsh-target.ts'
 import { readJson, record } from '../../scripts/json.ts'
+import { releasePolicy } from '../../scripts/release-policy.ts'
 import { projectResource } from './cluster-state.ts'
 
 void test('failure projection applies the Pod allowlist when the item omits TypeMeta', () => {
@@ -43,6 +44,8 @@ process.stdout.write(JSON.stringify({
 `, { mode: 0o755 })
     const version = record(readJson('packages/multi-tenant/package.json'), 'platform package').version
     assert.ok(typeof version === 'string')
+    const { stage } = releasePolicy(version)
+    const runtimeVersion = stage === 'stable' ? '0.5.0' : `0.5.0-${stage}.1`
     const filename = `dsh-multi-tenant-${version}.tgz`
     const bytes = Buffer.from('accepted archive')
     const digest = 'sha256:' + 'c'.repeat(64)
@@ -56,7 +59,7 @@ process.stdout.write(JSON.stringify({
       package: { name: 'dsh-multi-tenant', filename, integrity: 'sha512-' + createHash('sha512').update(bytes).digest('base64') },
     }))
     writeFileSync(join(candidates, 'runtime', 'candidate.json'), JSON.stringify({
-      repository: 'GuoMonth/dsh-isolated-runtime', version: '0.5.0-rc.4', runId: '2', commit: 'b'.repeat(40), dsh,
+      repository: 'GuoMonth/dsh-isolated-runtime', version: runtimeVersion, runId: '2', commit: 'b'.repeat(40), dsh,
       workloadImage: 'ghcr.io/guomonth/dsh-isolated-runtime@' + digest,
     }))
     const run = (attempt: string, fail = false) => spawnSync(process.execPath,
